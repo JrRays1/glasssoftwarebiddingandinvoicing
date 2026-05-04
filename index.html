@@ -1185,8 +1185,7 @@ function saveBidPDF() {
     if(edgedPieces.length>0){
       sectionLabel('Glass Edging');
       edgedPieces.forEach(p=>{
-        const perim=getPiecePerimFt(p),cpf=parseFloat(p.edgeCpf)||0;
-        row((p.edgeName||'Edging')+' – '+getPieceDisplay(p)+' ('+perim.toFixed(2)+' in x '+fmt(cpf)+'/in)',fmt(getPieceEdgeTotal(p)));
+        row((p.edgeName||'Edging')+' – '+getPieceDisplay(p),fmt(getPieceEdgeTotal(p)));
       });y+=6;
     }
     sectionLabel('Hardware');
@@ -1519,11 +1518,7 @@ function saveInvoicePDF() {
           doc.text(nl,cx,rowY+11);
         }
       });
-      // Divider between rows
-      if(rowIdx===0){
-        doc.setDrawColor(220,220,220);doc.setLineWidth(0.4);
-        doc.line(M,gridStartY+row0H-2,R,gridStartY+row0H-2);
-      }
+      // No divider between rows
     });
 
     y=pmBoxY+pmBoxH;
