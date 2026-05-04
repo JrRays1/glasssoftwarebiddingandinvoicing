@@ -643,6 +643,7 @@ function syncJobInfo() {
   if (!document.getElementById('invCustomer').value)    document.getElementById('invCustomer').value    = name;
   if (!document.getElementById('invJobDesc').value)     document.getElementById('invJobDesc').value     = desc;
   if (!document.getElementById('invJobAddress').value)  document.getElementById('invJobAddress').value  = loc;
+  if (!document.getElementById('invAddress').value)     document.getElementById('invAddress').value     = loc;
 }
 
 // ─────────────────────────────────────────────────
@@ -987,7 +988,7 @@ function importFromBid() {
     const dim=(qty>1?qty+'× ':'')+parseFloat(p.w)+'x'+parseFloat(p.h)+'"';
     const gparts=[p.thickness?p.thickness+'"':'',p.glassType].filter(Boolean).join(' · ');
     const desc='Glass — '+dim+(gparts?' · '+gparts:'');
-    invItems.push({ id: uid(), desc, qty: parseFloat(sqftP.toFixed(3)), price: parseFloat(p.rate)||0 });
+    invItems.push({ id: uid(), desc, qty, price: parseFloat(getPieceGlassTotal(p).toFixed(2))/qty });
   });
   pieces.filter(p=>getPieceEdgeTotal(p)>0).forEach(p => {
     invItems.push({ id: uid(), desc: (p.edgeName||'Edging')+' – '+getPieceDisplay(p), qty: 1, price: getPieceEdgeTotal(p) });
@@ -1007,8 +1008,11 @@ function importFromBid() {
   // Sync customer/job info
   const cname = document.getElementById('customerName').value;
   const jdesc = document.getElementById('jobDesc').value;
-  if (cname) document.getElementById('invCustomer').value = cname;
-  if (jdesc) document.getElementById('invJobDesc').value  = jdesc;
+  const jloc  = document.getElementById('jobLocation').value;
+  if (cname) document.getElementById('invCustomer').value   = cname;
+  if (jdesc) document.getElementById('invJobDesc').value    = jdesc;
+  if (jloc)  document.getElementById('invJobAddress').value = jloc;
+  if (jloc)  document.getElementById('invAddress').value    = jloc;
   // Sync tax exempt
   invTaxExemptActive = window.taxExemptActive || false;
   const btn = document.getElementById('invTaxExemptBtn');
@@ -1169,7 +1173,7 @@ function saveBidPDF() {
       const rate=parseFloat(p.rate)||0;
       const dim=(qty>1?qty+'x ':'')+parseFloat(p.w)+'x'+parseFloat(p.h)+'"';
       const gparts=[p.thickness?p.thickness+'"':'',p.glassType].filter(Boolean).join(' · ');
-      const desc=dim+(gparts?' · '+gparts:'')+' — '+sqftP.toFixed(3)+' ft²'+(rate?' @ '+fmt(rate)+'/ft²':'');
+      const desc=dim+(gparts?' · '+gparts:'');
       row(desc, rate?fmt(getPieceGlassTotal(p)):'(no rate)');
     });
     if(pieces.filter(p=>parseFloat(p.w)&&parseFloat(p.h)).length===0) row('No dimensions',fmt(0));
@@ -1371,8 +1375,7 @@ function saveInvoicePDF() {
     doc.rect(M-8,y-10,R-M+16,20,'F');
     doc.setFontSize(8);doc.setFont('helvetica','bold');doc.setTextColor(40,20,5);
     doc.text('DESCRIPTION',M,y+4);
-    doc.text('QTY',M+280,y+4,{align:'right'});
-    doc.text('UNIT PRICE',M+370,y+4,{align:'right'});
+    doc.text('QTY',M+310,y+4,{align:'right'});
     doc.text('TOTAL',R,y+4,{align:'right'});
     y+=22;
 
@@ -1384,8 +1387,7 @@ function saveInvoicePDF() {
       const descLines=doc.splitTextToSize(item.desc||'—', 250);
       doc.text(descLines[0]||'—',M,y+2);
       const qty=parseFloat(item.qty)||0, price=parseFloat(item.price)||0;
-      doc.text(qty%1===0?String(qty):qty.toFixed(2),M+280,y+2,{align:'right'});
-      doc.text(fmt(price),M+370,y+2,{align:'right'});
+      if(qty!==1) doc.text(qty%1===0?String(qty):qty.toFixed(2),M+310,y+2,{align:'right'});
       doc.text(fmt(qty*price),R,y+2,{align:'right'});
       y+=18;
     });
@@ -1469,58 +1471,62 @@ function saveInvoicePDF() {
       y+=12;
     }
 
-    // Payment Methods block
+    // Payment Methods block — 2×2 grid layout
     y+=18;
-    const pmBoxY=y-10;
-    // Draw box after we know height — skip fill for now, draw after
-    const pmStartY=y;
-
-    y+=16;
+    const pmBoxY=y;
+    const colW=(R-M)/2-6;
+    const col1X=M+4, col2X=M+colW+14;
 
     const payMethods=[
-      {icon:'💵', label:'Cash'},
-      {icon:'✉', label:'Check'},
-      {icon:'💳', label:'Credit Card', note:'3% processing fee applies — a separate payment link will be sent to your email'},
-      {icon:'⚡', label:'Zelle', note:'Zelle Tag: 1americanlegacy'},
+      {label:'Cash'},
+      {label:'Check'},
+      {label:'Credit Card', note:'3% processing fee — payment link sent to email'},
+      {label:'Zelle', note:'Zelle Tag: 1americanlegacy'},
     ];
-    payMethods.forEach((m)=>{
-      doc.setFontSize(9);doc.setFont('helvetica','bold');gray(30);
-      doc.text(m.label,M+4,y);
-      y+=12;
-      if(m.note){
-        doc.setFontSize(7.5);doc.setFont('helvetica','normal');gray(110);
-        const noteLines=doc.splitTextToSize(m.note, R-M-8);
-        doc.text(noteLines,M+4,y);
-        y+=noteLines.length*10;
-      }
-      y+=4;
-    });
 
-    // Draw payment methods box now that we know the height
-    const pmBoxH=y-pmBoxY+10;
+    // Calculate row heights for each column pair
+    doc.setFontSize(7.5);doc.setFont('helvetica','normal');
+    function pmRowH(m){ return 13+(m.note?doc.splitTextToSize(m.note,colW).length*9+2:0)+6; }
+    const row0H=Math.max(pmRowH(payMethods[0]),pmRowH(payMethods[1]));
+    const row1H=Math.max(pmRowH(payMethods[2]),pmRowH(payMethods[3]));
+    const pmContentH=row0H+row1H;
+    const pmBoxH=pmContentH+38; // 24pt header + 14pt bottom pad
+
+    // Draw box
     doc.setFillColor(245,245,245);
     doc.roundedRect(M-8,pmBoxY,R-M+16,pmBoxH,4,4,'F');
     doc.setDrawColor(210,210,210);doc.setLineWidth(0.5);
     doc.roundedRect(M-8,pmBoxY,R-M+16,pmBoxH,4,4,'S');
-    // Redraw header text on top of box
+
+    // Header
     doc.setFontSize(7.5);doc.setFont('helvetica','bold');doc.setTextColor(100,80,30);
     doc.text('PAYMENT METHODS ACCEPTED',M,pmBoxY+12);
     doc.setDrawColor(232,194,122);doc.setLineWidth(0.75);
-    doc.line(M,pmBoxY+16,R,pmBoxY+16);
-    // Redraw each payment method on top of box
-    let ry=pmStartY;
-    payMethods.forEach((m)=>{
-      doc.setFontSize(9);doc.setFont('helvetica','bold');doc.setTextColor(30,30,30);
-      doc.text(m.label,M+4,ry);
-      ry+=12;
-      if(m.note){
-        doc.setFontSize(7.5);doc.setFont('helvetica','normal');doc.setTextColor(110,110,110);
-        const noteLines=doc.splitTextToSize(m.note, R-M-8);
-        doc.text(noteLines,M+4,ry);
-        ry+=noteLines.length*10;
+    doc.line(M,pmBoxY+17,R,pmBoxY+17);
+
+    // Draw each method in 2×2 grid
+    const gridStartY=pmBoxY+28;
+    [[0,1],[2,3]].forEach(([li,ri],rowIdx)=>{
+      const rowY=gridStartY+(rowIdx===0?0:row0H);
+      [li,ri].forEach((mi,colIdx)=>{
+        const m=payMethods[mi];
+        const cx=colIdx===0?col1X:col2X;
+        doc.setFontSize(8.5);doc.setFont('helvetica','bold');doc.setTextColor(30,30,30);
+        doc.text(m.label,cx,rowY);
+        if(m.note){
+          doc.setFontSize(7);doc.setFont('helvetica','normal');doc.setTextColor(110,110,110);
+          const nl=doc.splitTextToSize(m.note,colW);
+          doc.text(nl,cx,rowY+11);
+        }
+      });
+      // Divider between rows
+      if(rowIdx===0){
+        doc.setDrawColor(220,220,220);doc.setLineWidth(0.4);
+        doc.line(M,gridStartY+row0H-2,R,gridStartY+row0H-2);
       }
-      ry+=4;
     });
+
+    y=pmBoxY+pmBoxH;
 
     // Footer
     y+=14;
