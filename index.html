@@ -717,12 +717,34 @@
   <div class="tab-panel" id="tab-pricing">
     <div class="grid">
 
-      <!-- Step 1: Category -->
+      <!-- Step 0: Person -->
       <div class="card full" style="--card-accent:#7ed4a0;">
         <div class="card-label" style="color:#7ed4a0;">Glass Pricing Lookup</div>
         <div class="pricing-step">
           <div class="pricing-step-label">
-            <div class="pricing-step-num" id="step1num">1</div>
+            <div class="pricing-step-num" id="step0num">1</div>
+            Who is pricing this?
+          </div>
+          <div class="glass-category-btns">
+            <button class="cat-btn" onclick="selectPerson('chris')" id="personChris">
+              <span class="cat-icon">👤</span>
+              <span class="cat-name">Chris</span>
+              <span class="cat-sub">Standard pricing</span>
+            </button>
+            <button class="cat-btn" onclick="selectPerson('jessica')" id="personJessica">
+              <span class="cat-icon">👤</span>
+              <span class="cat-name">Jessica</span>
+              <span class="cat-sub">Custom pricing</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 1: Category -->
+      <div class="card full" id="step1card" style="display:none;">
+        <div class="pricing-step">
+          <div class="pricing-step-label">
+            <div class="pricing-step-num" id="step1num">2</div>
             Select Glass Category
           </div>
           <div class="glass-category-btns">
@@ -744,7 +766,7 @@
       <div class="card full" id="step2card" style="display:none;">
         <div class="pricing-step">
           <div class="pricing-step-label">
-            <div class="pricing-step-num" id="step2num">2</div>
+            <div class="pricing-step-num" id="step2num">3</div>
             Select Thickness
           </div>
           <div class="thickness-grid" id="thicknessGrid"></div>
@@ -755,7 +777,7 @@
       <div class="card full" id="step3card" style="display:none;">
         <div class="pricing-step">
           <div class="pricing-step-label">
-            <div class="pricing-step-num" id="step3num">3</div>
+            <div class="pricing-step-num" id="step3num">4</div>
             Select Treatment
           </div>
           <div class="treatment-grid" id="treatmentGrid"></div>
@@ -766,7 +788,7 @@
       <div class="card full" id="step4card" style="display:none;">
         <div class="pricing-step" style="margin-bottom:0;">
           <div class="pricing-step-label">
-            <div class="pricing-step-num" id="step4num">4</div>
+            <div class="pricing-step-num" id="step4num">5</div>
             Select Glass Type
           </div>
           <div class="glass-type-list" id="glassTypeList"></div>
@@ -1037,6 +1059,52 @@ function addPiece() {
 function getPieceW(p) { return toDecimal(p.wWhole, p.wFrac); }
 function getPieceH(p) { return toDecimal(p.hWhole, p.hFrac); }
 
+// ─────────────────────────────────────────────────
+// EDGEWORK DATA  (price per lineal inch)
+// col: 'thin' = 1/8"–1/4", 'mid' = 3/8", 'thick' = 1/2"
+// ─────────────────────────────────────────────────
+const EDGE_TYPES = [
+  { name: 'Seamed Edge on Annealed Glass', thin: 0.05, mid: 0.06, thick: 0.07 },
+  { name: 'Flat Grind',                    thin: 0.07, mid: 0.11, thick: 0.14 },
+  { name: 'Flat Polish',                   thin: 0.07, mid: 0.10, thick: 0.12 },
+  { name: 'Shape Grind',                   thin: 0.42, mid: 0.72, thick: 1.01 },
+  { name: 'Shape Polish',                  thin: 0.42, mid: 0.72, thick: 1.01 },
+  { name: 'Ground Mitre (05–45 degree)',   thin: 0.42, mid: 0.47, thick: 0.54 },
+  { name: 'Polished Mitre (05–45 degree)', thin: 0.42, mid: 0.47, thick: 0.54 },
+  { name: 'Hand Grind',                    thin: 1.19, mid: 1.49, thick: 1.61 },
+  { name: 'Hand Polish',                   thin: 1.19, mid: 1.49, thick: 1.61 },
+];
+
+// Map a thickness string to edge price column
+function edgeColForThickness(thicknessStr) {
+  const t = (thicknessStr || '').trim();
+  if (t === '3/8"' || t === '3/8') return 'mid';
+  if (t === '1/2"' || t === '1/2') return 'thick';
+  return 'thin'; // 1/8", 3/16", 1/4" all use thin column
+}
+
+function edgeOptionsHTML(selectedName, thicknessStr) {
+  const col = edgeColForThickness(thicknessStr);
+  let html = `<option value="">— No Edge —</option>`;
+  EDGE_TYPES.forEach(e => {
+    const price = e[col];
+    const sel = selectedName === e.name ? 'selected' : '';
+    html += `<option value="${e.name}" data-price="${price}" ${sel}>${e.name} ($${price.toFixed(2)}/in)</option>`;
+  });
+  return html;
+}
+
+function onEdgeSelect(i, selectEl) {
+  const opt = selectEl.options[selectEl.selectedIndex];
+  pieces[i].edgeName = opt.value;
+  pieces[i].edgeCpf  = opt.value ? parseFloat(opt.dataset.price) : 0;
+  calculate();
+  // Re-render just this piece's edge total display without full re-render
+  renderPieces();
+}
+
+
+
 function getPieceGlassTotal(p) {
   const w = getPieceW(p), h = getPieceH(p), qty = parseFloat(p.qty)||1;
   const rate = parseFloat(p.rate)||0;
@@ -1113,7 +1181,7 @@ function renderPieces() {
       <div class="piece-row-mid">
         <span class="edge-label">GLASS:</span>
         <input type="text" placeholder='Thickness (e.g. 3/8")' value="${p.thickness}"
-          oninput="pieces[${i}].thickness=this.value;calculate()" style="flex:1 1 100px;min-width:80px;">
+          oninput="pieces[${i}].thickness=this.value;renderPieces();calculate()" style="flex:1 1 100px;min-width:80px;">
         <input type="text" placeholder='Type (e.g. Clear)' value="${p.glassType}"
           oninput="pieces[${i}].glassType=this.value;calculate()" style="flex:1 1 100px;min-width:80px;">
         <span class="edge-label">$/FT²:</span>
@@ -1123,11 +1191,16 @@ function renderPieces() {
       </div>
       <div class="piece-row-bottom">
         <span class="edge-label">EDGE:</span>
-        <input type="text" class="edge-name-input" placeholder="Edge type (optional)" value="${p.edgeName}"
-          oninput="pieces[${i}].edgeName=this.value">
-        <input type="number" class="edge-cpf-input" placeholder="$/in" min="0" step="0.01" value="${p.edgeCpf}"
-          oninput="pieces[${i}].edgeCpf=this.value;calculate()">
-        ${perim > 0 ? `<span class="edge-label">${perim.toFixed(3)} in</span>` : ''}
+        <select class="dim-frac" style="flex:1;min-width:180px;max-width:100%;border-radius:8px;border:1px solid var(--border);height:38px;"
+          onchange="onEdgeSelect(${i}, this)">
+          ${edgeOptionsHTML(p.edgeName, p.thickness)}
+        </select>
+        ${p.edgeName ? `
+        <span class="edge-label">$/in:</span>
+        <input type="number" class="edge-cpf-input" placeholder="0.00" min="0" step="0.01" value="${parseFloat(p.edgeCpf)||''}"
+          oninput="pieces[${i}].edgeCpf=this.value;calculate()" title="Edit price per lineal inch">
+        ` : ''}
+        ${perim > 0 && p.edgeName ? `<span class="edge-label">${perim.toFixed(3)} in</span>` : ''}
         ${showEdge ? `<div class="piece-edge-total">${fmt(edgeTotal)}</div>` : ''}
       </div>`;
     list.appendChild(row);
@@ -2018,6 +2091,7 @@ const INSULATED_GLASS = {
 // PRICING TAB — STATE
 // ─────────────────────────────────────────────────
 let pricingState = {
+  person: null,      // 'chris' | 'jessica'
   category: null,    // 'flat' | 'insulated'
   thickness: null,
   treatment: null,   // 'annealed' | 'tempered' | 'tempered50'
@@ -2025,8 +2099,37 @@ let pricingState = {
   selectedAddons: [],
 };
 
+// Jessica's prices are 2× Chris's — applied at lookup time via getPrice()
+function getPrice(g, key) {
+  const base = g[key];
+  if (base == null) return null;
+  return pricingState.person === 'jessica' ? base * 2 : base;
+}
+
+function selectPerson(person) {
+  pricingState = { person, category: null, thickness: null, treatment: null, glassType: null, selectedAddons: [] };
+  document.getElementById('personChris').classList.toggle('selected', person === 'chris');
+  document.getElementById('personJessica').classList.toggle('selected', person === 'jessica');
+  document.getElementById('step0num').classList.add('done');
+  // Show category step
+  document.getElementById('step1card').style.display = '';
+  document.getElementById('step1card').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  // Reset downstream
+  document.getElementById('catFlat').classList.remove('selected');
+  document.getElementById('catInsulated').classList.remove('selected');
+  document.getElementById('step2card').style.display = 'none';
+  document.getElementById('step3card').style.display = 'none';
+  document.getElementById('step4card').style.display = 'none';
+  document.getElementById('addonsCard').style.display = 'none';
+  document.getElementById('priceResultCard').style.display = 'none';
+}
+
 function selectCategory(cat) {
-  pricingState = { category: cat, thickness: null, treatment: null, glassType: null, selectedAddons: [] };
+  pricingState.category = cat;
+  pricingState.thickness = null;
+  pricingState.treatment = null;
+  pricingState.glassType = null;
+  pricingState.selectedAddons = [];
   document.getElementById('catFlat').classList.toggle('selected', cat === 'flat');
   document.getElementById('catInsulated').classList.toggle('selected', cat === 'insulated');
   document.getElementById('step1num').classList.add('done');
@@ -2115,7 +2218,7 @@ function renderGlassTypeStep() {
   list.innerHTML = '';
 
   data.forEach(g => {
-    const price = g[treatment];
+    const price = getPrice(g, treatment);
     const btn = document.createElement('button');
     btn.className = 'glass-type-btn';
     const priceHTML = price != null
@@ -2159,7 +2262,7 @@ function renderAddons() {
   const list = document.getElementById('addonsList');
   list.innerHTML = '';
   addons.forEach(a => {
-    const price = a[treatment];
+    const price = getPrice(a, treatment);
     const row = document.createElement('div');
     row.className = 'addon-row';
     row.innerHTML = `
@@ -2190,16 +2293,16 @@ function toggleAddon(a, row) {
 }
 
 function renderPriceResult() {
-  const { glassType, thickness, treatment, treatmentLabel, category, selectedAddons } = pricingState;
+  const { glassType, thickness, treatment, treatmentLabel, category, selectedAddons, person } = pricingState;
   if (!glassType) return;
 
-  const basePrice = glassType[treatment] || 0;
-  const addonTotal = selectedAddons.reduce((s, a) => s + (a[treatment] || 0), 0);
+  const basePrice = getPrice(glassType, treatment) || 0;
+  const addonTotal = selectedAddons.reduce((s, a) => s + (getPrice(a, treatment) || 0), 0);
   const total = basePrice + addonTotal;
 
   document.getElementById('priceResultName').textContent = glassType.name;
   document.getElementById('priceResultSpecs').textContent =
-    `${category === 'flat' ? 'Flat Glass' : 'Insulated Glass'} · ${thickness} · ${treatmentLabel}`;
+    `${person === 'jessica' ? 'Jessica' : 'Chris'} · ${category === 'flat' ? 'Flat Glass' : 'Insulated Glass'} · ${thickness} · ${treatmentLabel}`;
   document.getElementById('priceResultValue').textContent = '$' + total.toFixed(2);
 
   if (selectedAddons.length > 0) {
@@ -2212,27 +2315,30 @@ function renderPriceResult() {
 }
 
 function sendPriceToBid() {
-  const { glassType, thickness, treatment, treatmentLabel, category, selectedAddons } = pricingState;
+  const { glassType, thickness, treatment, treatmentLabel, category, selectedAddons, person } = pricingState;
   if (!glassType) return;
 
-  const basePrice = glassType[treatment] || 0;
-  const addonTotal = selectedAddons.reduce((s, a) => s + (a[treatment] || 0), 0);
+  const basePrice = getPrice(glassType, treatment) || 0;
+  const addonTotal = selectedAddons.reduce((s, a) => s + (getPrice(a, treatment) || 0), 0);
   const total = basePrice + addonTotal;
 
-  // Apply to all pieces that don't have a rate yet, or offer to apply to all
   if (pieces.length === 0) { addPiece(); }
 
-  // Set rate on the most recently added piece (last one)
   const lastPiece = pieces[pieces.length - 1];
   lastPiece.rate = total.toFixed(2);
   lastPiece.thickness = thickness;
   lastPiece.glassType = glassType.name + (category === 'insulated' ? ' (IG)' : '') + ' · ' + treatmentLabel;
+  // Reset edge selection so dropdown re-prices for the new thickness
+  if (lastPiece.edgeName) {
+    const col = edgeColForThickness(thickness);
+    const edgeEntry = EDGE_TYPES.find(e => e.name === lastPiece.edgeName);
+    if (edgeEntry) lastPiece.edgeCpf = edgeEntry[col];
+  }
 
   renderPieces();
   calculate();
   switchTab('bid');
 
-  // Flash the piece
   setTimeout(() => {
     const rows = document.querySelectorAll('.piece-row');
     if (rows.length) {
