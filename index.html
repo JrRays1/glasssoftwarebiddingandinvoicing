@@ -175,8 +175,56 @@
   input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; }
   input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(255,255,255,0.06); }
 
+  /* ── FRACTION INPUT ── */
+  .dim-input-group {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    flex: 1 1 120px;
+    min-width: 110px;
+  }
+  .dim-whole {
+    width: 52px !important;
+    flex-shrink: 0;
+    padding: 0.6rem 0.5rem !important;
+    text-align: center;
+    border-radius: 8px 0 0 8px !important;
+  }
+  .dim-frac {
+    width: 74px;
+    flex-shrink: 0;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-left: none;
+    border-radius: 0 8px 8px 0;
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    font-size: 0.78rem;
+    padding: 0.6rem 0.3rem;
+    outline: none;
+    cursor: pointer;
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23777'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 6px center;
+    padding-right: 20px;
+    transition: border-color 0.2s;
+  }
+  .dim-frac:focus { border-color: var(--accent); outline: none; }
+  .dim-frac option { background: #242424; color: var(--text); }
+  .dim-label-in {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.7rem;
+    color: var(--muted);
+    white-space: nowrap;
+    flex-shrink: 0;
+    padding: 0 2px;
+    align-self: center;
+  }
+
   /* Pieces */
-  .pieces-scroll { max-height: 280px; overflow-y: auto; padding-right: 2px; }
+  .pieces-scroll { max-height: 320px; overflow-y: auto; padding-right: 2px; }
   .pieces-scroll::-webkit-scrollbar { width: 4px; }
   .pieces-scroll::-webkit-scrollbar-track { background: transparent; }
   .pieces-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
@@ -194,6 +242,20 @@
   .piece-row-mid { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
   .dim-sep { font-family: 'Bebas Neue', sans-serif; font-size: 1.2rem; color: var(--muted); }
   .piece-sqft { font-family: 'DM Mono', monospace; font-size: 0.75rem; color: var(--accent); background: rgba(255,255,255,0.07); border-radius: 5px; padding: 0.35rem 0.5rem; white-space: nowrap; min-width: 64px; text-align: center; }
+
+  /* Decimal display badge */
+  .dim-decimal-badge {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.62rem;
+    color: var(--muted);
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 4px;
+    padding: 0.2rem 0.4rem;
+    white-space: nowrap;
+    flex-shrink: 0;
+    align-self: center;
+  }
 
   @keyframes slideIn { from { opacity: 0; transform: translateX(-8px); } to { opacity: 1; transform: translateX(0); } }
 
@@ -342,6 +404,194 @@
   .btn-import { background: rgba(232,194,122,0.12); border: 1px solid rgba(232,194,122,0.4); border-radius: 6px; color: var(--invoice-accent); cursor: pointer; font-family: 'DM Mono', monospace; font-size: 0.72rem; letter-spacing: 0.08em; padding: 0.4rem 0.85rem; transition: all 0.15s; white-space: nowrap; }
   .btn-import:hover { background: rgba(232,194,122,0.2); }
 
+  /* ── PRICING TAB ── */
+  --pricing-accent: #7ed4a0;
+
+  .pricing-step {
+    margin-bottom: 1.25rem;
+  }
+  .pricing-step-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.62rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 0.6rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .pricing-step-num {
+    width: 20px; height: 20px;
+    border-radius: 50%;
+    background: rgba(126,212,160,0.15);
+    border: 1px solid rgba(126,212,160,0.4);
+    color: #7ed4a0;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 0.85rem;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .pricing-step-num.done { background: rgba(126,212,160,0.25); border-color: #7ed4a0; }
+
+  .glass-category-btns {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+  }
+  .cat-btn {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    color: var(--muted);
+    cursor: pointer;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.9rem;
+    font-weight: 500;
+    padding: 1rem;
+    text-align: center;
+    transition: all 0.2s;
+    position: relative;
+    overflow: hidden;
+  }
+  .cat-btn::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: transparent; transition: background 0.2s; }
+  .cat-btn:hover { border-color: rgba(126,212,160,0.4); color: var(--text); }
+  .cat-btn.selected { border-color: #7ed4a0; color: #7ed4a0; background: rgba(126,212,160,0.07); }
+  .cat-btn.selected::before { background: linear-gradient(90deg, #7ed4a0, transparent); }
+  .cat-btn .cat-icon { font-size: 1.6rem; display: block; margin-bottom: 0.35rem; }
+  .cat-btn .cat-name { font-family: 'Bebas Neue', sans-serif; font-size: 1.1rem; letter-spacing: 0.08em; display: block; }
+  .cat-btn .cat-sub { font-size: 0.7rem; color: var(--muted); font-family: 'DM Mono', monospace; margin-top: 0.15rem; }
+
+  .thickness-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+  .thick-btn {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--muted);
+    cursor: pointer;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.1rem;
+    letter-spacing: 0.08em;
+    padding: 0.55rem 1rem;
+    transition: all 0.15s;
+    min-width: 70px;
+    text-align: center;
+  }
+  .thick-btn:hover { border-color: rgba(126,212,160,0.4); color: var(--text); }
+  .thick-btn.selected { border-color: #7ed4a0; color: #7ed4a0; background: rgba(126,212,160,0.07); }
+
+  .treatment-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+  .treat-btn {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--muted);
+    cursor: pointer;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.8rem;
+    letter-spacing: 0.06em;
+    padding: 0.55rem 1rem;
+    transition: all 0.15s;
+    flex: 1;
+    text-align: center;
+  }
+  .treat-btn:hover { border-color: rgba(126,212,160,0.4); color: var(--text); }
+  .treat-btn.selected { border-color: #7ed4a0; color: #7ed4a0; background: rgba(126,212,160,0.07); }
+
+  .glass-type-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    max-height: 320px;
+    overflow-y: auto;
+    padding-right: 2px;
+  }
+  .glass-type-list::-webkit-scrollbar { width: 4px; }
+  .glass-type-list::-webkit-scrollbar-track { background: transparent; }
+  .glass-type-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  .glass-type-btn {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.88rem;
+    padding: 0.6rem 0.85rem;
+    text-align: left;
+    transition: all 0.15s;
+    animation: slideIn 0.15s ease both;
+  }
+  .glass-type-btn:hover { border-color: rgba(126,212,160,0.4); background: rgba(126,212,160,0.04); }
+  .glass-type-btn.selected { border-color: #7ed4a0; background: rgba(126,212,160,0.08); }
+  .glass-type-btn .type-price { font-family: 'Bebas Neue', sans-serif; font-size: 1.1rem; color: #7ed4a0; letter-spacing: 0.05em; }
+  .glass-type-btn .type-name { flex: 1; }
+  .glass-type-btn .type-na { font-family: 'DM Mono', monospace; font-size: 0.7rem; color: var(--muted); }
+
+  .price-result-card {
+    background: linear-gradient(135deg, rgba(126,212,160,0.1), rgba(126,212,160,0.02));
+    border: 1px solid rgba(126,212,160,0.35);
+    border-radius: 12px;
+    padding: 1.5rem;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+    animation: fadeUp 0.3s ease both;
+  }
+  .price-result-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, #7ed4a0, transparent); }
+  .price-result-label { font-family: 'DM Mono', monospace; font-size: 0.65rem; letter-spacing: 0.18em; text-transform: uppercase; color: #7ed4a0; margin-bottom: 0.4rem; }
+  .price-result-name { font-size: 1rem; color: var(--text); font-weight: 500; margin-bottom: 0.2rem; }
+  .price-result-specs { font-family: 'DM Mono', monospace; font-size: 0.72rem; color: var(--muted); margin-bottom: 1rem; }
+  .price-result-value { font-family: 'Bebas Neue', sans-serif; font-size: 3.2rem; letter-spacing: 0.02em; color: #7ed4a0; line-height: 1; }
+  .price-result-unit { font-family: 'DM Mono', monospace; font-size: 0.75rem; color: var(--muted); margin-top: 0.25rem; }
+  .btn-use-price {
+    margin-top: 1.25rem;
+    width: 100%;
+    background: #7ed4a0;
+    border: none;
+    border-radius: 8px;
+    color: #0f1f14;
+    cursor: pointer;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.1rem;
+    letter-spacing: 0.1em;
+    padding: 0.75rem;
+    transition: all 0.15s;
+  }
+  .btn-use-price:hover { background: #9fe0b4; transform: translateY(-1px); }
+
+  .addons-list { display: flex; flex-direction: column; gap: 0.35rem; margin-top: 0.75rem; }
+  .addon-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.83rem;
+    animation: slideIn 0.15s ease both;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .addon-row:hover { border-color: rgba(126,212,160,0.3); }
+  .addon-row.selected { border-color: #7ed4a0; background: rgba(126,212,160,0.06); }
+  .addon-price { font-family: 'DM Mono', monospace; font-size: 0.78rem; color: #7ed4a0; }
+  .addon-check { width: 16px; height: 16px; border: 1px solid var(--border); border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; flex-shrink: 0; transition: all 0.15s; }
+  .addon-row.selected .addon-check { background: #7ed4a0; border-color: #7ed4a0; color: #0f1f14; }
+
   /* Terms */
   .terms-select {
     width: 100%;
@@ -374,6 +624,7 @@
   <!-- Tabs -->
   <div class="tabs">
     <button class="tab-btn active" data-tab="bid" onclick="switchTab('bid')">📋 Bid Estimate</button>
+    <button class="tab-btn" data-tab="pricing" onclick="switchTab('pricing')">💰 Pricing</button>
     <button class="tab-btn" data-tab="invoice" onclick="switchTab('invoice')">🧾 Invoice<span class="tab-pill">NEW</span></button>
   </div>
 
@@ -411,6 +662,7 @@
       <input type="hidden" id="pricePerSqft" value="">
       <input type="hidden" id="glassThickness" value="">
       <input type="hidden" id="glassType" value="">
+
       <!-- Glass Pieces -->
       <div class="card full">
         <div class="card-label">Glass Pieces — Dimensions</div>
@@ -456,6 +708,88 @@
           <div class="grand-value" id="grandTotal">$0.00</div>
         </div>
         <button class="btn-print" onclick="saveBidPDF()">⬇ Save Bid as PDF</button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- PRICING TAB -->
+  <div class="tab-panel" id="tab-pricing">
+    <div class="grid">
+
+      <!-- Step 1: Category -->
+      <div class="card full" style="--card-accent:#7ed4a0;">
+        <div class="card-label" style="color:#7ed4a0;">Glass Pricing Lookup</div>
+        <div class="pricing-step">
+          <div class="pricing-step-label">
+            <div class="pricing-step-num" id="step1num">1</div>
+            Select Glass Category
+          </div>
+          <div class="glass-category-btns">
+            <button class="cat-btn" onclick="selectCategory('flat')" id="catFlat">
+              <span class="cat-icon">🪟</span>
+              <span class="cat-name">Flat Glass</span>
+              <span class="cat-sub">Single pane · Annealed or Tempered</span>
+            </button>
+            <button class="cat-btn" onclick="selectCategory('insulated')" id="catInsulated">
+              <span class="cat-icon">🧊</span>
+              <span class="cat-name">Insulated Glass</span>
+              <span class="cat-sub">Dual pane · IG unit pricing</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 2: Thickness -->
+      <div class="card full" id="step2card" style="display:none;">
+        <div class="pricing-step">
+          <div class="pricing-step-label">
+            <div class="pricing-step-num" id="step2num">2</div>
+            Select Thickness
+          </div>
+          <div class="thickness-grid" id="thicknessGrid"></div>
+        </div>
+      </div>
+
+      <!-- Step 3: Treatment -->
+      <div class="card full" id="step3card" style="display:none;">
+        <div class="pricing-step">
+          <div class="pricing-step-label">
+            <div class="pricing-step-num" id="step3num">3</div>
+            Select Treatment
+          </div>
+          <div class="treatment-grid" id="treatmentGrid"></div>
+        </div>
+      </div>
+
+      <!-- Step 4: Glass Type -->
+      <div class="card full" id="step4card" style="display:none;">
+        <div class="pricing-step" style="margin-bottom:0;">
+          <div class="pricing-step-label">
+            <div class="pricing-step-num" id="step4num">4</div>
+            Select Glass Type
+          </div>
+          <div class="glass-type-list" id="glassTypeList"></div>
+        </div>
+      </div>
+
+      <!-- Add-ons (insulated only) -->
+      <div class="card full" id="addonsCard" style="display:none;">
+        <div class="card-label" style="color:#7ed4a0;">Optional Add-ons <span style="font-size:0.6rem;color:var(--muted);font-family:'DM Mono',monospace;letter-spacing:0.06em;margin-left:0.25rem;">click to include in price</span></div>
+        <div class="addons-list" id="addonsList"></div>
+      </div>
+
+      <!-- Price Result -->
+      <div class="card full" id="priceResultCard" style="display:none;">
+        <div class="price-result-card">
+          <div class="price-result-label">Price Per Square Foot</div>
+          <div class="price-result-name" id="priceResultName">—</div>
+          <div class="price-result-specs" id="priceResultSpecs">—</div>
+          <div class="price-result-value" id="priceResultValue">—</div>
+          <div class="price-result-unit">per sq ft</div>
+          <div id="addonsSummary" style="margin-top:0.75rem;font-family:'DM Mono',monospace;font-size:0.72rem;color:var(--muted);"></div>
+          <button class="btn-use-price" onclick="sendPriceToBid()">→ Use This Price in Bid</button>
+        </div>
       </div>
 
     </div>
@@ -610,6 +944,50 @@
 
 <script>
 // ─────────────────────────────────────────────────
+// FRACTION HELPERS
+// ─────────────────────────────────────────────────
+// Fractional inch options (numerator/denominator, stored as decimal offset)
+const FRACTIONS = [
+  { label: '—',    val: 0 },
+  { label: '1/16', val: 1/16 },
+  { label: '1/8',  val: 1/8 },
+  { label: '3/16', val: 3/16 },
+  { label: '1/4',  val: 1/4 },
+  { label: '5/16', val: 5/16 },
+  { label: '3/8',  val: 3/8 },
+  { label: '7/16', val: 7/16 },
+  { label: '1/2',  val: 1/2 },
+  { label: '9/16', val: 9/16 },
+  { label: '5/8',  val: 5/8 },
+  { label: '11/16',val: 11/16 },
+  { label: '3/4',  val: 3/4 },
+  { label: '13/16',val: 13/16 },
+  { label: '7/8',  val: 7/8 },
+  { label: '15/16',val: 15/16 },
+];
+
+function fracOptionsHTML(selected) {
+  return FRACTIONS.map(f =>
+    `<option value="${f.val}" ${Math.abs(f.val - selected) < 0.001 ? 'selected' : ''}>${f.label}</option>`
+  ).join('');
+}
+
+// Convert whole + frac to decimal inches
+function toDecimal(whole, frac) {
+  return (parseFloat(whole) || 0) + (parseFloat(frac) || 0);
+}
+
+// Display string like "23 3/8"" or "24"""
+function dimDisplay(whole, frac) {
+  const w = parseFloat(whole) || 0;
+  const f = parseFloat(frac) || 0;
+  const fracObj = FRACTIONS.find(fr => Math.abs(fr.val - f) < 0.001);
+  const fracStr = fracObj && fracObj.val > 0 ? ' ' + fracObj.label : '';
+  if (!w && !f) return '—';
+  return w + fracStr + '"';
+}
+
+// ─────────────────────────────────────────────────
 // SHARED STATE
 // ─────────────────────────────────────────────────
 let pieces   = [];
@@ -651,29 +1029,36 @@ function syncJobInfo() {
 // ─────────────────────────────────────────────────
 function addPiece() {
   const globalRate = parseFloat(document.getElementById('pricePerSqft').value) || 0;
-  pieces.push({ id: uid(), w: '', h: '', qty: '1', rate: globalRate ? String(globalRate) : '', thickness: '', glassType: '', edgeName: '', edgeCpf: '' });
+  // w and h are now objects: { whole, frac }
+  pieces.push({ id: uid(), wWhole: '', wFrac: 0, hWhole: '', hFrac: 0, qty: '1', rate: globalRate ? String(globalRate) : '', thickness: '', glassType: '', edgeName: '', edgeCpf: '' });
   renderPieces();
 }
+
+function getPieceW(p) { return toDecimal(p.wWhole, p.wFrac); }
+function getPieceH(p) { return toDecimal(p.hWhole, p.hFrac); }
+
 function getPieceGlassTotal(p) {
-  const w = parseFloat(p.w)||0, h = parseFloat(p.h)||0, qty = parseFloat(p.qty)||1;
+  const w = getPieceW(p), h = getPieceH(p), qty = parseFloat(p.qty)||1;
   const rate = parseFloat(p.rate)||0;
   return (w * h / 144 * qty) * rate;
 }
 function removePiece(id) { pieces = pieces.filter(p => p.id !== id); renderPieces(); calculate(); }
 
 function getPieceDisplay(p) {
-  const w = parseFloat(p.w)||0, h = parseFloat(p.h)||0, qty = parseFloat(p.qty)||1;
+  const w = getPieceW(p), h = getPieceH(p), qty = parseFloat(p.qty)||1;
   if (!w || !h) return 'piece';
-  return (qty > 1 ? qty + '× ' : '') + w + 'x' + h + '"';
+  const wStr = dimDisplay(p.wWhole, p.wFrac);
+  const hStr = dimDisplay(p.hWhole, p.hFrac);
+  return (qty > 1 ? qty + '× ' : '') + wStr + ' × ' + hStr;
 }
 function getPiecePerimFt(p) {
-  const w = parseFloat(p.w)||0, h = parseFloat(p.h)||0, qty = parseFloat(p.qty)||1;
+  const w = getPieceW(p), h = getPieceH(p), qty = parseFloat(p.qty)||1;
   return (w && h) ? 2*(w+h)*qty : 0;
 }
 function getPieceEdgeTotal(p) { return getPiecePerimFt(p) * (parseFloat(p.edgeCpf)||0); }
 
 function getSqft(p) {
-  const w = parseFloat(p.w)||0, h = parseFloat(p.h)||0, qty = parseFloat(p.qty)||1;
+  const w = getPieceW(p), h = getPieceH(p), qty = parseFloat(p.qty)||1;
   if (!w || !h) return '—';
   return (w*h/144*qty).toFixed(3) + ' ft²';
 }
@@ -691,18 +1076,38 @@ function renderPieces() {
     const showEdge = perim > 0 && parseFloat(p.edgeCpf) > 0;
     const glassTotal = getPieceGlassTotal(p);
     const showGlass = glassTotal > 0;
+    const w = getPieceW(p), h = getPieceH(p);
+
+    // Decimal display for reference
+    const wDec = w ? w.toFixed(4).replace(/\.?0+$/, '') + '"' : '';
+    const hDec = h ? h.toFixed(4).replace(/\.?0+$/, '') + '"' : '';
+    const showDecimal = (p.wFrac > 0 || p.hFrac > 0) && w && h;
+
     const row = document.createElement('div');
     row.className = 'piece-row';
     row.innerHTML = `
       <div class="piece-row-top">
-        <input type="number" placeholder="W (in)" min="0" step="0.25" value="${p.w}"
-          oninput="pieces[${i}].w=this.value;updatePieceSqft('${p.id}');calculate()">
+        <!-- Width: whole + fraction -->
+        <div class="dim-input-group">
+          <input type="number" class="dim-whole" placeholder='W"' min="0" step="1" value="${p.wWhole}"
+            oninput="pieces[${i}].wWhole=this.value;updatePieceSqft('${p.id}');calculate()">
+          <select class="dim-frac" onchange="pieces[${i}].wFrac=parseFloat(this.value);updatePieceSqft('${p.id}');calculate()">
+            ${fracOptionsHTML(p.wFrac)}
+          </select>
+        </div>
         <span class="dim-sep">×</span>
-        <input type="number" placeholder="H (in)" min="0" step="0.25" value="${p.h}"
-          oninput="pieces[${i}].h=this.value;updatePieceSqft('${p.id}');calculate()">
+        <!-- Height: whole + fraction -->
+        <div class="dim-input-group">
+          <input type="number" class="dim-whole" placeholder='H"' min="0" step="1" value="${p.hWhole}"
+            oninput="pieces[${i}].hWhole=this.value;updatePieceSqft('${p.id}');calculate()">
+          <select class="dim-frac" onchange="pieces[${i}].hFrac=parseFloat(this.value);updatePieceSqft('${p.id}');calculate()">
+            ${fracOptionsHTML(p.hFrac)}
+          </select>
+        </div>
         <input type="number" placeholder="Qty" min="1" step="1" value="${p.qty||1}"
-          oninput="pieces[${i}].qty=this.value;updatePieceSqft('${p.id}');calculate()" style="max-width:58px;">
+          oninput="pieces[${i}].qty=this.value;updatePieceSqft('${p.id}');calculate()" style="max-width:58px;flex-shrink:0;">
         <div class="piece-sqft" id="sqft_${p.id}">${getSqft(p)}</div>
+        ${showDecimal ? `<div class="dim-decimal-badge">${wDec} × ${hDec}</div>` : ''}
         <button class="btn-remove" onclick="removePiece('${p.id}')">✕</button>
       </div>
       <div class="piece-row-mid">
@@ -722,7 +1127,7 @@ function renderPieces() {
           oninput="pieces[${i}].edgeName=this.value">
         <input type="number" class="edge-cpf-input" placeholder="$/in" min="0" step="0.01" value="${p.edgeCpf}"
           oninput="pieces[${i}].edgeCpf=this.value;calculate()">
-        ${perim > 0 ? `<span class="edge-label">${perim.toFixed(2)} in</span>` : ''}
+        ${perim > 0 ? `<span class="edge-label">${perim.toFixed(3)} in</span>` : ''}
         ${showEdge ? `<div class="piece-edge-total">${fmt(edgeTotal)}</div>` : ''}
       </div>`;
     list.appendChild(row);
@@ -731,7 +1136,7 @@ function renderPieces() {
 
 function totalSqft() {
   return pieces.reduce((s,p) => {
-    const w = parseFloat(p.w)||0, h = parseFloat(p.h)||0, qty = parseFloat(p.qty)||1;
+    const w = getPieceW(p), h = getPieceH(p), qty = parseFloat(p.qty)||1;
     return s + (w*h/144*qty);
   }, 0);
 }
@@ -823,7 +1228,6 @@ function calculate() {
   const hwTotal    = totalHardware();
   const edgeTotal  = totalEdging();
   const laborTotal = totalLabor();
-  // Labor is excluded from taxable base
   const taxableBase  = glassTotal + hwTotal + edgeTotal;
   const extTotal     = totalExtras(taxableBase);
   const taxableTotal = taxableBase + extTotal;
@@ -838,7 +1242,7 @@ function calculate() {
 
   const edgeLines = pieces.filter(p => getPieceEdgeTotal(p) > 0).map(p => {
     const perim = getPiecePerimFt(p), cpf = parseFloat(p.edgeCpf)||0;
-    return `<div class="line-item"><span>${p.edgeName||'Edging'} – ${getPieceDisplay(p)} (${perim.toFixed(2)} in × ${fmt(cpf)}/in)</span><span>${fmt(getPieceEdgeTotal(p))}</span></div>`;
+    return `<div class="line-item"><span>${p.edgeName||'Edging'} – ${getPieceDisplay(p)} (${perim.toFixed(3)} in × ${fmt(cpf)}/in)</span><span>${fmt(getPieceEdgeTotal(p))}</span></div>`;
   }).join('');
 
   const laborLines = labor.map(l =>
@@ -846,16 +1250,15 @@ function calculate() {
   ).join('');
 
   // Per-piece glass lines
-  const pieceLines = pieces.filter(p => parseFloat(p.w)&&parseFloat(p.h)).map(p => {
-    const sqft = (parseFloat(p.w)*parseFloat(p.h)/144*(parseFloat(p.qty)||1));
+  const pieceLines = pieces.filter(p => getPieceW(p) && getPieceH(p)).map(p => {
+    const w = getPieceW(p), h = getPieceH(p);
+    const sqft = (w * h / 144 * (parseFloat(p.qty)||1));
     const rate = parseFloat(p.rate)||0;
     const pieceTotal = getPieceGlassTotal(p);
-    const qty = parseFloat(p.qty)||1;
-    const dim = (qty>1?qty+'× ':'')+parseFloat(p.w)+'x'+parseFloat(p.h)+'"';
     const gparts = [p.thickness?p.thickness+'"':'', p.glassType].filter(Boolean).join(' · ');
     const rateStr = rate ? ` @ ${fmt(rate)}/ft²` : ' (no rate set)';
     return `<div class="line-item total-glass" style="padding-left:0.75rem;font-size:0.8rem;">
-      <span>${dim}${gparts?' · '+gparts:''} — ${sqft.toFixed(3)} ft²${rateStr}</span>
+      <span>${getPieceDisplay(p)}${gparts?' · '+gparts:''} — ${sqft.toFixed(3)} ft²${rateStr}</span>
       <span>${rate ? fmt(pieceTotal) : '—'}</span>
     </div>`;
   }).join('');
@@ -981,13 +1384,10 @@ function toggleInvTaxExempt() {
 // ─────────────────────────────────────────────────
 function importFromBid() {
   invItems = [];
-  // Import each piece as its own line item
-  pieces.filter(p=>parseFloat(p.w)&&parseFloat(p.h)).forEach(p => {
+  pieces.filter(p=>getPieceW(p)&&getPieceH(p)).forEach(p => {
     const qty=parseFloat(p.qty)||1;
-    const sqftP=(parseFloat(p.w)*parseFloat(p.h)/144*qty);
-    const dim=(qty>1?qty+'× ':'')+parseFloat(p.w)+'x'+parseFloat(p.h)+'"';
-    const gparts=[p.thickness?p.thickness+'"':'',p.glassType].filter(Boolean).join(' · ');
-    const desc='Glass — '+dim+(gparts?' · '+gparts:'');
+    const sqftP=(getPieceW(p)*getPieceH(p)/144*qty);
+    const desc='Glass — '+getPieceDisplay(p)+([p.thickness?p.thickness+'"':'',p.glassType].filter(Boolean).join(' · ')?(' · '+[p.thickness?p.thickness+'"':'',p.glassType].filter(Boolean).join(' · ')):'');
     invItems.push({ id: uid(), desc, qty, price: parseFloat(getPieceGlassTotal(p).toFixed(2))/qty });
   });
   pieces.filter(p=>getPieceEdgeTotal(p)>0).forEach(p => {
@@ -1001,11 +1401,9 @@ function importFromBid() {
     const v=parseFloat(e.value)||0, amt=e.type==='%'?base*(v/100):v;
     if (amt>0) invItems.push({ id: uid(), desc: e.name||'Additional Cost', qty: 1, price: amt });
   });
-  // Import labor items
   labor.forEach(l => {
     if (parseFloat(l.cost)>0) invItems.push({ id: uid(), desc: (l.name||'Labor')+' (tax-free)', qty: 1, price: parseFloat(l.cost)||0 });
   });
-  // Sync customer/job info
   const cname = document.getElementById('customerName').value;
   const jdesc = document.getElementById('jobDesc').value;
   const jloc  = document.getElementById('jobLocation').value;
@@ -1013,7 +1411,6 @@ function importFromBid() {
   if (jdesc) document.getElementById('invJobDesc').value    = jdesc;
   if (jloc)  document.getElementById('invJobAddress').value = jloc;
   if (jloc)  document.getElementById('invAddress').value    = jloc;
-  // Sync tax exempt
   invTaxExemptActive = window.taxExemptActive || false;
   const btn = document.getElementById('invTaxExemptBtn');
   if (invTaxExemptActive) {
@@ -1137,7 +1534,6 @@ function saveBidPDF() {
 
     let y = pdfHeader(doc, 'BID ESTIMATE', 'BID ESTIMATE  —  Serving Arizona Since 1988', displayDate);
 
-    // Customer bar
     const cname=document.getElementById('customerName').value.trim();
     const jdesc=document.getElementById('jobDesc').value.trim();
     const jloc =document.getElementById('jobLocation').value.trim();
@@ -1167,17 +1563,13 @@ function saveBidPDF() {
     function divider(){drawColor(180);doc.setLineWidth(0.75);doc.line(M,y,R,y);y+=14;}
 
     sectionLabel('Glass');
-    pieces.filter(p=>parseFloat(p.w)&&parseFloat(p.h)).forEach(p=>{
-      const qty=parseFloat(p.qty)||1;
-      const sqftP=(parseFloat(p.w)*parseFloat(p.h)/144*qty);
+    pieces.filter(p=>getPieceW(p)&&getPieceH(p)).forEach(p=>{
       const rate=parseFloat(p.rate)||0;
-      const dim=(qty>1?qty+'x ':'')+parseFloat(p.w)+'x'+parseFloat(p.h)+'"';
       const gparts=[p.thickness?p.thickness+'"':'',p.glassType].filter(Boolean).join(' · ');
-      const desc=dim+(gparts?' · '+gparts:'');
+      const desc=getPieceDisplay(p)+(gparts?' · '+gparts:'');
       row(desc, rate?fmt(getPieceGlassTotal(p)):'(no rate)');
     });
-    if(pieces.filter(p=>parseFloat(p.w)&&parseFloat(p.h)).length===0) row('No dimensions',fmt(0));
-    // Glass subtotal line
+    if(pieces.filter(p=>getPieceW(p)&&getPieceH(p)).length===0) row('No dimensions',fmt(0));
     doc.setFontSize(9);doc.setFont('helvetica','bold');gray(40);
     doc.text('Glass Total',M,y);doc.text(fmt(glassTotal),R,y,{align:'right'});y+=9*1.8;
     y+=6;
@@ -1232,57 +1624,38 @@ function saveBidPDF() {
       doc.setFont('helvetica','normal');gray(80);
       const nl=doc.splitTextToSize(bidNotes,R-M);doc.text(nl,M,y);y+=nl.length*12+10;
     }
-    // ── Acceptance Signature Block ──
     y+=20;
     doc.setFillColor(250,250,250);
     doc.setDrawColor(210,210,210);
     doc.setLineWidth(0.5);
     doc.roundedRect(M-12, y-10, pageW-(M-12)*2, 100, 5, 5, 'FD');
-
-    // Title
     doc.setFontSize(7.5);doc.setFont('helvetica','bold');gray(80);
     doc.text('ACCEPTANCE OF ESTIMATE', M, y+4);
     doc.setDrawColor(180,180,180);doc.setLineWidth(0.4);
     doc.line(M, y+8, R, y+8);
     y+=18;
-
-    // Acceptance text
     doc.setFontSize(8);doc.setFont('helvetica','normal');gray(100);
     const acceptText = 'By signing below, I authorize American Legacy Glass to proceed with the work described in this estimate at the price quoted. I understand that a 50% deposit is required before work begins.';
     const acceptLines = doc.splitTextToSize(acceptText, R-M);
     doc.text(acceptLines, M, y);
     y+=acceptLines.length*11+14;
-
-    // Signature lines — two columns
     const col1X = M;
     const col2X = pageW/2 + 10;
     const lineW  = (pageW/2) - M - 20;
-
-    // Left: Customer signature
     doc.setDrawColor(60,60,60);doc.setLineWidth(0.75);
     doc.line(col1X, y, col1X+lineW, y);
     doc.setFontSize(7);doc.setFont('helvetica','normal');gray(130);
     doc.text('Customer Signature', col1X, y+10);
-
-    // Right: Date
     doc.line(col2X, y, col2X+lineW, y);
     doc.text('Date', col2X, y+10);
-
     y+=28;
-
-    // Left: Printed name
     doc.setDrawColor(60,60,60);doc.setLineWidth(0.75);
     doc.line(col1X, y, col1X+lineW, y);
     doc.setFontSize(7);doc.setFont('helvetica','normal');gray(130);
     doc.text('Printed Name', col1X, y+10);
-
-    // Right: ALG rep
     doc.line(col2X, y, col2X+lineW, y);
     doc.text('American Legacy Glass Representative', col2X, y+10);
-
     y+=30;
-
-    // Footer
     doc.setFontSize(7.5);doc.setFont('helvetica','normal');gray(170);
     doc.text('American Legacy Glass  •  americanlegacyglass.com  •  Serving Arizona Since 1988',pageW/2,y,{align:'center'});
     const blob=doc.output('blob');
@@ -1311,7 +1684,6 @@ function saveInvoicePDF() {
     const displayDate = fmtDate(invDateV)||new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'});
     const dueDateDisplay = invTermsVal==='completed' ? 'Upon Completion' : fmtDate(dueV);
 
-    // Header
     doc.setFillColor(20,20,20);
     doc.rect(0,0,pageW,90,'F');
     doc.addImage(LOGO_B64,'PNG',8,4,82,82);
@@ -1321,7 +1693,6 @@ function saveInvoicePDF() {
     doc.text('INVOICE  —  Serving Arizona Since 1988',100,52);
     doc.text(displayDate,R,52,{align:'right'});
 
-    // Invoice # / status bar
     doc.setFillColor(232,194,122);doc.rect(0,90,pageW,28,'F');
     doc.setFontSize(10);doc.setFont('helvetica','bold');doc.setTextColor(20,20,20);
     doc.text('INVOICE '+invNum, M, 109);
@@ -1330,12 +1701,10 @@ function saveInvoicePDF() {
     if(termsLabel){doc.setFontSize(8);doc.setFont('helvetica','normal');doc.text(termsLabel,pageW/2,109,{align:'center'});}
     doc.setFontSize(10);doc.setFont('helvetica','bold');doc.text(statusLabel, R, 109, {align:'right'});
 
-    // Bill To / Job Info
     let y=135;
     function gray(v){doc.setTextColor(v,v,v);}
     function drawColor(v){doc.setDrawColor(v,v,v);}
 
-    // Two-column info
     const leftX=M, rightX=pageW/2+10;
     doc.setFontSize(7);doc.setFont('helvetica','bold');doc.setTextColor(150,120,60);
     doc.text('BILL TO',leftX,y);
@@ -1359,7 +1728,6 @@ function saveInvoicePDF() {
     billLines.forEach((l,i)=>{doc.text(l,leftX,y+i*13);});
     jobLines.forEach((l,i)=>{doc.text(l,rightX,y+i*13);});
 
-    // Due date block
     if(dueV||invTermsVal==='completed'){
       doc.setFontSize(8);doc.setFont('helvetica','bold');doc.setTextColor(150,120,60);
       doc.text('DUE DATE',R,y,{align:'right'});
@@ -1369,7 +1737,6 @@ function saveInvoicePDF() {
 
     y+=Math.max(billLines.length,jobLines.length)*13+24;
 
-    // Line items table header
     doc.setFillColor(232,194,122);
     doc.rect(M-8,y-10,R-M+16,20,'F');
     doc.setFontSize(8);doc.setFont('helvetica','bold');doc.setTextColor(40,20,5);
@@ -1378,7 +1745,6 @@ function saveInvoicePDF() {
     doc.text('TOTAL',R,y+4,{align:'right'});
     y+=22;
 
-    // Line item rows
     invItems.forEach((item,i)=>{
       if(i%2===0){doc.setFillColor(245,245,240);}else{doc.setFillColor(255,255,255);}
       doc.rect(M-8,y-10,R-M+16,18,'F');
@@ -1392,7 +1758,6 @@ function saveInvoicePDF() {
     });
     y+=12;
 
-    // Totals block (right-aligned)
     const totW=220, totX=R-totW;
     function totRow(label,value,bold){
       doc.setFontSize(9);doc.setFont('helvetica',bold?'bold':'normal');
@@ -1410,7 +1775,6 @@ function saveInvoicePDF() {
       y+=16;
     }
 
-    // Grand total box
     doc.setFillColor(20,20,20);
     doc.roundedRect(totX-8,y-10,R-totX+16,36,4,4,'F');
     doc.setFontSize(9);doc.setFont('helvetica','bold');doc.setTextColor(160,150,100);
@@ -1419,7 +1783,6 @@ function saveInvoicePDF() {
     doc.text(fmt(balance),R,y+10,{align:'right'});
     y+=46;
 
-    // 50% Deposit line
     const deposit=grand*0.5;
     doc.setFillColor(250,244,228);
     doc.roundedRect(totX-8,y-8,R-totX+16,26,3,3,'F');
@@ -1431,7 +1794,6 @@ function saveInvoicePDF() {
     doc.text(fmt(deposit),R,y+8,{align:'right'});
     y+=34;
 
-    // Payments list
     if(payments.length>0){
       y+=10;
       doc.setFontSize(7);doc.setFont('helvetica','bold');doc.setTextColor(120,120,120);
@@ -1446,7 +1808,6 @@ function saveInvoicePDF() {
       });
     }
 
-    // Notes & payment instructions
     const invNotes=document.getElementById('invNotes').value.trim();
     const payInstr=document.getElementById('invPayInstructions').value.trim();
     if(invNotes||payInstr){
@@ -1470,7 +1831,6 @@ function saveInvoicePDF() {
       y+=12;
     }
 
-    // Payment Methods block — 2×2 grid layout
     y+=18;
     const pmBoxY=y;
     const colW=(R-M)/2-6;
@@ -1483,27 +1843,23 @@ function saveInvoicePDF() {
       {label:'Zelle', note:'Zelle Tag: 1americanlegacy'},
     ];
 
-    // Calculate row heights for each column pair
     doc.setFontSize(7.5);doc.setFont('helvetica','normal');
     function pmRowH(m){ return 13+(m.note?doc.splitTextToSize(m.note,colW).length*9+2:0)+6; }
     const row0H=Math.max(pmRowH(payMethods[0]),pmRowH(payMethods[1]));
     const row1H=Math.max(pmRowH(payMethods[2]),pmRowH(payMethods[3]));
     const pmContentH=row0H+row1H;
-    const pmBoxH=pmContentH+38; // 24pt header + 14pt bottom pad
+    const pmBoxH=pmContentH+38;
 
-    // Draw box
     doc.setFillColor(245,245,245);
     doc.roundedRect(M-8,pmBoxY,R-M+16,pmBoxH,4,4,'F');
     doc.setDrawColor(210,210,210);doc.setLineWidth(0.5);
     doc.roundedRect(M-8,pmBoxY,R-M+16,pmBoxH,4,4,'S');
 
-    // Header
     doc.setFontSize(7.5);doc.setFont('helvetica','bold');doc.setTextColor(100,80,30);
     doc.text('PAYMENT METHODS ACCEPTED',M,pmBoxY+12);
     doc.setDrawColor(232,194,122);doc.setLineWidth(0.75);
     doc.line(M,pmBoxY+17,R,pmBoxY+17);
 
-    // Draw each method in 2×2 grid
     const gridStartY=pmBoxY+28;
     [[0,1],[2,3]].forEach(([li,ri],rowIdx)=>{
       const rowY=gridStartY+(rowIdx===0?0:row0H);
@@ -1518,12 +1874,10 @@ function saveInvoicePDF() {
           doc.text(nl,cx,rowY+11);
         }
       });
-      // No divider between rows
     });
 
     y=pmBoxY+pmBoxH;
 
-    // Footer
     y+=14;
     doc.setFontSize(7.5);doc.setFont('helvetica','normal');doc.setTextColor(170,170,170);
     doc.text('American Legacy Glass  •  americanlegacyglass.com  •  Serving Arizona Since 1988',pageW/2,y,{align:'center'});
@@ -1534,19 +1888,373 @@ function saveInvoicePDF() {
 }
 
 // ─────────────────────────────────────────────────
-// INIT
+// PRICING TAB — DATA
+// ─────────────────────────────────────────────────
+const FLAT_GLASS = {
+  '1/8"': [
+    { name: 'Clear',                    annealed: 4.76, tempered: 4.73 },
+    { name: 'Energy Advantage Low-E',   annealed: 7.45, tempered: 8.36 },
+    { name: 'Bronze / Grey',            annealed: 8.24, tempered: 9.15 },
+    { name: 'Midnight Gray',            annealed:15.27, tempered:16.81 },
+    { name: 'Pavia / Satin Etch',       annealed:11.90, tempered:12.81 },
+    { name: "Temper Customer's Glass",  annealed: null, tempered: 4.61 },
+  ],
+  '3/16"': [
+    { name: 'Clear',                    annealed: 5.55, tempered: 4.73 },
+    { name: 'Energy Advantage Low-E',   annealed: 7.56, tempered: 8.48 },
+    { name: 'Bronze',                   annealed: 8.54, tempered: 9.46 },
+    { name: 'Rain / Niagara',           annealed:13.91, tempered:14.83 },
+    { name: "Temper Customer's Glass",  annealed: null, tempered: 4.61 },
+  ],
+  '1/4"': [
+    { name: 'Clear',                    annealed: 5.46, tempered: 4.73, tempered50: 5.92 },
+    { name: 'Energy Advantage Low-E',   annealed: 8.79, tempered: 9.71, tempered50:12.13 },
+    { name: 'Bronze / Grey',            annealed: 7.57, tempered: 8.49, tempered50:10.61 },
+    { name: 'Solarcool Bronze/Grey',    annealed:12.08, tempered:13.00, tempered50:16.24 },
+    { name: 'Midnight Grey',            annealed:18.06, tempered:18.97, tempered50:23.72 },
+    { name: 'Azuria',                   annealed:15.01, tempered:15.92, tempered50:19.90 },
+    { name: 'Solarblue',                annealed:11.84, tempered:12.76, tempered50:15.95 },
+    { name: 'Solarcool Solarblue',      annealed:13.61, tempered:14.52, tempered50:18.15 },
+    { name: 'Pacifica',                 annealed:14.52, tempered:15.44, tempered50:19.29 },
+    { name: 'Solarcool Pacifica',       annealed:15.92, tempered:16.84, tempered50:21.05 },
+    { name: 'Atlantica',                annealed:11.19, tempered:12.10, tempered50:15.13 },
+    { name: 'Rain / Niagara',           annealed:16.05, tempered:16.96, tempered50:21.20 },
+    { name: 'Mirror',                   annealed:12.08, tempered: null },
+    { name: 'Pavia / Satin Etch',       annealed:20.14, tempered:21.05, tempered50:26.31 },
+    { name: 'Starphire (Low Iron)',     annealed: 9.15, tempered:10.07, tempered50:12.59 },
+    { name: 'Mirropane',                annealed:23.49, tempered:24.41, tempered50:30.51 },
+    { name: 'Black/Warm Gray Ceramic Frit Spandrel', annealed: null, tempered:18.31 },
+    { name: 'White Ceramic Frit Spandrel',           annealed: null, tempered:20.75 },
+    { name: 'Clear Laminated',          annealed:16.17, tempered: null },
+    { name: 'White Laminated',          annealed:19.53, tempered: null },
+    { name: "Temper Customer's Glass",  annealed: null, tempered: 4.61 },
+  ],
+  '3/8"': [
+    { name: 'Clear',                    annealed: 6.50, tempered: 6.78 },
+    { name: 'Pavia / Satin Etch',       annealed:22.58, tempered:24.10 },
+    { name: 'Starphire (Low Iron)',     annealed:17.45, tempered:18.92 },
+    { name: 'Rain / Niagara',           annealed:30.87, tempered:32.34 },
+    { name: "Temper Customer's Glass",  annealed: null, tempered: 6.70 },
+  ],
+  '1/2"': [
+    { name: 'Clear',                    annealed: 7.51, tempered: 7.91 },
+    { name: 'Starphire (Low Iron)',     annealed:20.07, tempered:21.54 },
+    { name: 'Pavia / Satin Etch',       annealed:32.22, tempered:33.69 },
+    { name: "Temper Customer's Glass",  annealed: null, tempered: 8.95 },
+  ],
+};
+
+const INSULATED_GLASS = {
+  '1/8"': {
+    types: [
+      { name: 'Clear',                        annealed:10.00, tempered:11.90 },
+      { name: 'Energy Advantage Low-E',        annealed:12.81, tempered:14.52 },
+      { name: 'Solarban 60 / Climaguard 7036', annealed:12.08, tempered:15.56 },
+      { name: 'Solarban 70 / Climaguard 6227', annealed:12.81, tempered:16.48 },
+      { name: 'Bronze / Grey',                 annealed:13.61, tempered:15.26 },
+      { name: 'P516 / Pattern 62',             annealed:15.13, tempered:16.78 },
+      { name: 'Pavia / Satin Etch',            annealed:17.39, tempered:19.22 },
+    ],
+    addons: [
+      { name: 'Add - Energy Advantage Low-E',        annealed:2.32, tempered:2.32 },
+      { name: 'Add - Solarban 60 / Climaguard 7036', annealed:3.24, tempered:3.24 },
+      { name: 'Add - Solarban 70 / Climaguard 6227', annealed:4.05, tempered:4.05 },
+      { name: 'Add - Argon Gas Fill',                annealed:3.65, tempered:3.65 },
+      { name: 'Add - Temper Outboard Lite Only',     annealed:0.79, tempered:null },
+    ],
+  },
+  '3/16"': {
+    types: [
+      { name: 'Clear',                        annealed:11.72, tempered:14.03 },
+      { name: 'Energy Advantage Low-E',        annealed:17.27, tempered:19.53 },
+      { name: 'Solarban 60 / Climaguard 7036', annealed:15.09, tempered:17.94 },
+      { name: 'Solarban 70 / Climaguard 6227', annealed:17.10, tempered:19.96 },
+      { name: 'Bronze',                        annealed:14.64, tempered:16.96 },
+      { name: 'P516 / P62',                   annealed:20.01, tempered:22.40 },
+      { name: 'Rain / Niagara',               annealed:20.01, tempered:22.40 },
+    ],
+    addons: [
+      { name: 'Add - Energy Advantage Low-E',        annealed:4.86, tempered:4.86 },
+      { name: 'Add - Solarban 60 / Climaguard 7036', annealed:3.46, tempered:3.46 },
+      { name: 'Add - Solarban 70 / Climaguard 6227', annealed:5.24, tempered:5.24 },
+      { name: 'Add - Argon Gas Fill',                annealed:3.65, tempered:3.65 },
+      { name: 'Add - Temper Outboard Lite Only',     annealed:0.79, tempered:null },
+    ],
+  },
+  '1/4"': {
+    types: [
+      { name: 'Clear',                             annealed: 9.71, tempered:13.73, tempered50:17.16 },
+      { name: 'Energy Advantage Low-E',             annealed:12.51, tempered:17.09, tempered50:21.36 },
+      { name: 'Solarban 60 Low-e / SN-68',          annealed:12.33, tempered:17.39, tempered50:21.74 },
+      { name: 'Solarban 70 Low-e / SNX 6227',       annealed:14.34, tempered:19.22, tempered50:24.03 },
+      { name: 'Bronze / Grey / Solexia',            annealed:12.38, tempered:16.17, tempered50:20.21 },
+      { name: 'Solarcool Bronze/Grey',              annealed:15.56, tempered:20.44, tempered50:25.55 },
+      { name: 'Midnight Grey',                      annealed:20.44, tempered:26.54, tempered50:33.18 },
+      { name: 'Azuria',                             annealed:18.00, tempered:23.49, tempered50:29.37 },
+      { name: 'Solarblue',                          annealed:15.20, tempered:20.14, tempered50:25.17 },
+      { name: 'Solarcool Solarblue',               annealed:16.60, tempered:21.97, tempered50:27.46 },
+      { name: 'Pacifica',                           annealed:17.33, tempered:22.88, tempered50:28.60 },
+      { name: 'Solarcool Pacifica',                annealed:18.61, tempered:24.41, tempered50:30.51 },
+      { name: 'Atlantica',                          annealed:14.52, tempered:19.65, tempered50:24.56 },
+      { name: 'Rain / Niagara',                    annealed:18.67, tempered:24.41, tempered50:30.51 },
+      { name: 'Pavia / Satin Etch',                annealed:22.27, tempered:28.68, tempered50:35.85 },
+      { name: 'Starphire (Low Iron)',              annealed:12.81, tempered:17.39, tempered50:21.74 },
+      { name: 'Mirropane',                         annealed:25.02, tempered:31.73, tempered50:39.66 },
+    ],
+    addons: [
+      { name: 'Add - Energy Advantage Low-E',             annealed:2.97, tempered:2.97 },
+      { name: 'Add - Solarban 60 Low-e / SN-68',          annealed:3.24, tempered:3.24 },
+      { name: 'Add - Solarban 70 Low-e / SNX 6227',       annealed:4.86, tempered:4.86 },
+      { name: 'Add - 1/4" Clear Laminated .030',          annealed:8.23, tempered:null },
+      { name: 'Add - Argon Gas Fill',                     annealed:3.65, tempered:3.65 },
+      { name: 'Add - Heat Strengthen Outboard Lite Only', annealed:0.79, tempered:null },
+      { name: 'Add for Black/Warm Gray Ceramic Frit',     annealed:null, tempered:8.98 },
+      { name: 'Add for White Ceramic Frit',               annealed:null, tempered:10.98 },
+    ],
+  },
+};
+
+// ─────────────────────────────────────────────────
+// PRICING TAB — STATE
+// ─────────────────────────────────────────────────
+let pricingState = {
+  category: null,    // 'flat' | 'insulated'
+  thickness: null,
+  treatment: null,   // 'annealed' | 'tempered' | 'tempered50'
+  glassType: null,
+  selectedAddons: [],
+};
+
+function selectCategory(cat) {
+  pricingState = { category: cat, thickness: null, treatment: null, glassType: null, selectedAddons: [] };
+  document.getElementById('catFlat').classList.toggle('selected', cat === 'flat');
+  document.getElementById('catInsulated').classList.toggle('selected', cat === 'insulated');
+  document.getElementById('step1num').classList.add('done');
+  renderThicknessStep();
+  document.getElementById('step3card').style.display = 'none';
+  document.getElementById('step4card').style.display = 'none';
+  document.getElementById('addonsCard').style.display = 'none';
+  document.getElementById('priceResultCard').style.display = 'none';
+}
+
+function renderThicknessStep() {
+  const data = pricingState.category === 'flat' ? FLAT_GLASS : INSULATED_GLASS;
+  const thicknesses = Object.keys(data);
+  const grid = document.getElementById('thicknessGrid');
+  grid.innerHTML = '';
+  thicknesses.forEach(t => {
+    const b = document.createElement('button');
+    b.className = 'thick-btn';
+    b.textContent = t;
+    b.onclick = () => selectThickness(t);
+    grid.appendChild(b);
+  });
+  document.getElementById('step2card').style.display = '';
+  document.getElementById('step2card').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function selectThickness(t) {
+  pricingState.thickness = t;
+  pricingState.treatment = null;
+  pricingState.glassType = null;
+  pricingState.selectedAddons = [];
+  document.querySelectorAll('.thick-btn').forEach(b => b.classList.toggle('selected', b.textContent === t));
+  document.getElementById('step2num').classList.add('done');
+  renderTreatmentStep();
+  document.getElementById('step4card').style.display = 'none';
+  document.getElementById('addonsCard').style.display = 'none';
+  document.getElementById('priceResultCard').style.display = 'none';
+}
+
+function renderTreatmentStep() {
+  const cat = pricingState.category;
+  const thickness = pricingState.thickness;
+  const data = cat === 'flat' ? FLAT_GLASS[thickness] : INSULATED_GLASS[thickness].types;
+
+  // Determine which treatments are available for this thickness
+  const hasAnnealed  = data.some(g => g.annealed != null);
+  const hasTempered  = data.some(g => g.tempered != null);
+  const hasTem50     = data.some(g => g.tempered50 != null);
+
+  const grid = document.getElementById('treatmentGrid');
+  grid.innerHTML = '';
+
+  const treatments = [];
+  if (hasAnnealed) treatments.push({ key: 'annealed', label: 'Annealed' });
+  if (hasTempered) treatments.push({ key: 'tempered', label: 'Tempered' });
+  if (hasTem50)    treatments.push({ key: 'tempered50', label: 'Tempered > 50 sq ft' });
+
+  treatments.forEach(tr => {
+    const b = document.createElement('button');
+    b.className = 'treat-btn';
+    b.textContent = tr.label;
+    b.onclick = () => selectTreatment(tr.key, tr.label);
+    grid.appendChild(b);
+  });
+
+  document.getElementById('step3card').style.display = '';
+  document.getElementById('step3card').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function selectTreatment(key, label) {
+  pricingState.treatment = key;
+  pricingState.treatmentLabel = label;
+  pricingState.glassType = null;
+  pricingState.selectedAddons = [];
+  document.querySelectorAll('.treat-btn').forEach(b => b.classList.toggle('selected', b.textContent === label));
+  document.getElementById('step3num').classList.add('done');
+  renderGlassTypeStep();
+  document.getElementById('addonsCard').style.display = 'none';
+  document.getElementById('priceResultCard').style.display = 'none';
+}
+
+function renderGlassTypeStep() {
+  const { category, thickness, treatment } = pricingState;
+  const data = category === 'flat' ? FLAT_GLASS[thickness] : INSULATED_GLASS[thickness].types;
+  const list = document.getElementById('glassTypeList');
+  list.innerHTML = '';
+
+  data.forEach(g => {
+    const price = g[treatment];
+    const btn = document.createElement('button');
+    btn.className = 'glass-type-btn';
+    const priceHTML = price != null
+      ? `<span class="type-price">$${price.toFixed(2)}</span>`
+      : `<span class="type-na">N/A</span>`;
+    btn.innerHTML = `<span class="type-name">${g.name}</span>${priceHTML}`;
+    if (price == null) { btn.style.opacity = '0.45'; btn.style.cursor = 'default'; }
+    else btn.onclick = () => selectGlassType(g);
+    list.appendChild(btn);
+  });
+
+  document.getElementById('step4card').style.display = '';
+  document.getElementById('step4card').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function selectGlassType(g) {
+  pricingState.glassType = g;
+  pricingState.selectedAddons = [];
+  document.querySelectorAll('.glass-type-btn').forEach(b => {
+    b.classList.toggle('selected', b.querySelector('.type-name').textContent === g.name);
+  });
+  document.getElementById('step4num').classList.add('done');
+
+  // Show add-ons for insulated
+  if (pricingState.category === 'insulated') {
+    renderAddons();
+  } else {
+    document.getElementById('addonsCard').style.display = 'none';
+  }
+
+  renderPriceResult();
+  document.getElementById('priceResultCard').style.display = '';
+  document.getElementById('priceResultCard').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function renderAddons() {
+  const { thickness, treatment } = pricingState;
+  const addons = INSULATED_GLASS[thickness].addons || [];
+  if (!addons.length) { document.getElementById('addonsCard').style.display = 'none'; return; }
+
+  const list = document.getElementById('addonsList');
+  list.innerHTML = '';
+  addons.forEach(a => {
+    const price = a[treatment];
+    const row = document.createElement('div');
+    row.className = 'addon-row';
+    row.innerHTML = `
+      <span>${a.name}</span>
+      <div style="display:flex;align-items:center;gap:0.6rem;">
+        <span class="addon-price">${price != null ? '+$'+price.toFixed(2) : 'N/A'}</span>
+        <div class="addon-check">✓</div>
+      </div>`;
+    if (price == null) { row.style.opacity = '0.4'; row.style.cursor = 'default'; }
+    else row.onclick = () => toggleAddon(a, row);
+    list.appendChild(row);
+  });
+
+  document.getElementById('addonsCard').style.display = '';
+}
+
+function toggleAddon(a, row) {
+  const { treatment } = pricingState;
+  const idx = pricingState.selectedAddons.findIndex(x => x.name === a.name);
+  if (idx >= 0) {
+    pricingState.selectedAddons.splice(idx, 1);
+    row.classList.remove('selected');
+  } else {
+    pricingState.selectedAddons.push(a);
+    row.classList.add('selected');
+  }
+  renderPriceResult();
+}
+
+function renderPriceResult() {
+  const { glassType, thickness, treatment, treatmentLabel, category, selectedAddons } = pricingState;
+  if (!glassType) return;
+
+  const basePrice = glassType[treatment] || 0;
+  const addonTotal = selectedAddons.reduce((s, a) => s + (a[treatment] || 0), 0);
+  const total = basePrice + addonTotal;
+
+  document.getElementById('priceResultName').textContent = glassType.name;
+  document.getElementById('priceResultSpecs').textContent =
+    `${category === 'flat' ? 'Flat Glass' : 'Insulated Glass'} · ${thickness} · ${treatmentLabel}`;
+  document.getElementById('priceResultValue').textContent = '$' + total.toFixed(2);
+
+  if (selectedAddons.length > 0) {
+    document.getElementById('addonsSummary').textContent =
+      'Base $' + basePrice.toFixed(2) + ' + add-ons $' + addonTotal.toFixed(2) +
+      ' (' + selectedAddons.map(a => a.name.replace('Add - ','').replace('Add for ','')).join(', ') + ')';
+  } else {
+    document.getElementById('addonsSummary').textContent = '';
+  }
+}
+
+function sendPriceToBid() {
+  const { glassType, thickness, treatment, treatmentLabel, category, selectedAddons } = pricingState;
+  if (!glassType) return;
+
+  const basePrice = glassType[treatment] || 0;
+  const addonTotal = selectedAddons.reduce((s, a) => s + (a[treatment] || 0), 0);
+  const total = basePrice + addonTotal;
+
+  // Apply to all pieces that don't have a rate yet, or offer to apply to all
+  if (pieces.length === 0) { addPiece(); }
+
+  // Set rate on the most recently added piece (last one)
+  const lastPiece = pieces[pieces.length - 1];
+  lastPiece.rate = total.toFixed(2);
+  lastPiece.thickness = thickness;
+  lastPiece.glassType = glassType.name + (category === 'insulated' ? ' (IG)' : '') + ' · ' + treatmentLabel;
+
+  renderPieces();
+  calculate();
+  switchTab('bid');
+
+  // Flash the piece
+  setTimeout(() => {
+    const rows = document.querySelectorAll('.piece-row');
+    if (rows.length) {
+      const last = rows[rows.length - 1];
+      last.style.transition = 'border-color 0.3s';
+      last.style.borderColor = '#7ed4a0';
+      setTimeout(() => last.style.borderColor = '', 1500);
+    }
+  }, 100);
+}
+
+// ─────────────────────────────────────────────────
 // ─────────────────────────────────────────────────
 addPiece();
 calculate();
 calcInvoice();
 document.getElementById('bidDate').valueAsDate  = new Date();
 document.getElementById('invDate').valueAsDate  = new Date();
-// Auto-set due date Net30
 (function(){
   const d=new Date(); d.setDate(d.getDate()+30);
   document.getElementById('invDueDate').valueAsDate=d;
 })();
-// Auto-generate invoice number
 document.getElementById('invNumber').value = 'INV-' + String(Math.floor(Math.random()*9000)+1000);
 </script>
 </body>
