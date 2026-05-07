@@ -2009,12 +2009,13 @@ function importFromBid() {
   pieces.filter(p=>getPieceW(p)&&getPieceH(p)).forEach(p => {
     const qty=parseFloat(p.qty)||1;
     const desc='Glass — '+getPieceDisplay(p)+([p.thickness?p.thickness+'"':'',p.glassType].filter(Boolean).join(' · ')?(' · '+[p.thickness?p.thickness+'"':'',p.glassType].filter(Boolean).join(' · ')):'');
-    // Glass already has Jessica's multiplier baked into the rate, so only apply mkup
-    invItems.push({ id: uid(), desc, qty, price: parseFloat((getPieceGlassTotal(p) * mkup).toFixed(2))/qty });
+    const basePrice = parseFloat(getPieceGlassTotal(p).toFixed(2))/qty;
+    const markedPrice = parseFloat((getPieceGlassTotal(p) * mkup).toFixed(2))/qty;
+    invItems.push({ id: uid(), desc, qty, price: markedPrice, basePrice });
   });
   pieces.filter(p=>getPieceEdgeTotal(p)>0).forEach(p => {
-    // Edge total already includes Jessica's pm via edgeCpf, so only apply mkup
-    invItems.push({ id: uid(), desc: (p.edgeName||'Edging')+' – '+getPieceDisplay(p), qty: 1, price: getPieceEdgeTotal(p) * mkup, isEdge: true });
+    const basePrice = getPieceEdgeTotal(p);
+    invItems.push({ id: uid(), desc: (p.edgeName||'Edging')+' – '+getPieceDisplay(p), qty: 1, price: basePrice * mkup, basePrice, isEdge: true });
   });
   // Fabrication — apply both pm (for Jessica) and mkup (for Chris)
   pieces.filter(p=>p.fabrications&&Object.keys(p.fabrications).length>0).forEach(p=>{
@@ -2023,18 +2024,22 @@ function importFromBid() {
       for(const g of FABRICATION_TYPES){
         const item=g.items.find(it=>it.name===fabName);
         if(item){
-          invItems.push({ id: uid(), desc: fabName+' – '+getPieceDisplay(p), qty: fabQty, price: (item[col]||0) * pm * mkup, isFab: true });
+          const basePrice = (item[col]||0) * pm;
+          invItems.push({ id: uid(), desc: fabName+' – '+getPieceDisplay(p), qty: fabQty, price: basePrice * mkup, basePrice, isFab: true });
         }
       }
     });
   });
   hardware.forEach(h => {
-    if (parseFloat(h.cost)>0) invItems.push({ id: uid(), desc: h.name||'Hardware', qty: 1, price: (parseFloat(h.cost)||0) * mkup });
+    if (parseFloat(h.cost)>0) {
+      const basePrice = parseFloat(h.cost)||0;
+      invItems.push({ id: uid(), desc: h.name||'Hardware', qty: 1, price: basePrice * mkup, basePrice });
+    }
   });
   const base = totalGlass() + totalHardware() + totalEdging();
   extras.forEach(e => {
-    const v=parseFloat(e.value)||0, amt=(e.type==='%'?base*(v/100):v) * mkup;
-    if (amt>0) invItems.push({ id: uid(), desc: e.name||'Additional Cost', qty: 1, price: amt });
+    const v=parseFloat(e.value)||0, baseAmt=e.type==='%'?base*(v/100):v;
+    if (baseAmt>0) invItems.push({ id: uid(), desc: e.name||'Additional Cost', qty: 1, price: baseAmt * mkup, basePrice: baseAmt });
   });
   labor.forEach(l => {
     if (parseFloat(l.cost)>0) invItems.push({ id: uid(), desc: (l.name||'Labor')+' (tax-free)', qty: 1, price: parseFloat(l.cost)||0, taxFree: true });
@@ -2069,7 +2074,14 @@ function calcInvoice() {
   const taxableSubtotal = taxableItems.reduce((s,item) => s+(parseFloat(item.qty)||0)*(parseFloat(item.price)||0), 0);
   const taxFreeSubtotal = taxFreeItems.reduce((s,item) => s+(parseFloat(item.qty)||0)*(parseFloat(item.price)||0), 0);
   const subtotal = taxableSubtotal + taxFreeSubtotal;
-  const taxAmt   = taxableSubtotal * (taxRate/100);
+  // If items have basePrice stored, tax on the pre-markup base (Chris's rule)
+  // Otherwise tax on full price (Jessica, or manually entered items)
+  const taxableBase = taxableItems.reduce((s,item) => {
+    const qty = parseFloat(item.qty)||0;
+    const base = item.basePrice != null ? item.basePrice : (parseFloat(item.price)||0);
+    return s + qty * base;
+  }, 0);
+  const taxAmt   = taxableBase * (taxRate/100);
   const grand    = subtotal + taxAmt;
   const paid     = totalPayments();
   const balance  = grand - paid;
@@ -2084,7 +2096,7 @@ function calcInvoice() {
   document.getElementById('invBreakdown').innerHTML = `
     ${itemLines}
     <div class="divider"></div>
-    <div class="line-item"><span>Taxable Subtotal</span><span>${fmt(taxableSubtotal)}</span></div>
+    <div class="line-item"><span>Taxable Subtotal</span><span>${fmt(taxableBase)}</span></div>
     <div class="line-item"><span>${invTaxExemptActive?'Tax Exempt':'Tax (9.10%)'}</span><span>${invTaxExemptActive?'—':fmt(taxAmt)}</span></div>
     ${taxFreeSubtotal > 0 ? `<div class="line-item" style="color:#7ab8e8;"><span>Labor (tax-free)</span><span>${fmt(taxFreeSubtotal)}</span></div>` : ''}
     <div class="divider"></div>
@@ -2351,7 +2363,12 @@ function saveInvoicePDF() {
     const taxFreeSubtotal= taxFreeItems.reduce((s,item)=>s+(parseFloat(item.qty)||0)*(parseFloat(item.price)||0),0);
     const subtotal       = taxableSubtotal + taxFreeSubtotal;
     const taxRate=invTaxExemptActive?0:9.1;
-    const taxAmt=taxableSubtotal*(taxRate/100), grand=subtotal+taxAmt, paid=totalPayments(), balance=Math.max(0,grand-paid);
+    const taxableBase=taxableItems.reduce((s,item)=>{
+      const qty=parseFloat(item.qty)||0;
+      const base=item.basePrice!=null?item.basePrice:(parseFloat(item.price)||0);
+      return s+qty*base;
+    },0);
+    const taxAmt=taxableBase*(taxRate/100), grand=subtotal+taxAmt, paid=totalPayments(), balance=Math.max(0,grand-paid);
 
     const invNum   = document.getElementById('invNumber').value||'INV-0001';
     const invDateV = document.getElementById('invDate').value;
