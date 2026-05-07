@@ -1208,6 +1208,19 @@ onAuthStateChanged(auth, user => {
           <div class="price-result-label">Price Per Square Foot</div>
           <div class="price-result-name" id="priceResultName">—</div>
           <div class="price-result-specs" id="priceResultSpecs">—</div>
+
+          <!-- Chris margin input — only shown for Chris -->
+          <div id="chrisMarginRow" style="display:none;margin:0.75rem auto 0.5rem;max-width:260px;">
+            <div style="font-family:'DM Mono',monospace;font-size:0.65rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);margin-bottom:0.4rem;">Profit Margin %</div>
+            <div style="display:flex;align-items:center;gap:0.5rem;">
+              <input type="number" id="chrisMargin" min="0" max="200" step="1" value="0" placeholder="0"
+                oninput="renderPriceResult()"
+                style="width:90px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'DM Mono',monospace;font-size:1.1rem;padding:0.5rem 0.75rem;outline:none;text-align:center;-moz-appearance:textfield;">
+              <span style="font-family:'DM Mono',monospace;font-size:0.8rem;color:var(--muted);">%</span>
+              <div id="chrisMarginBreakdown" style="font-family:'DM Mono',monospace;font-size:0.68rem;color:var(--muted);text-align:left;line-height:1.5;"></div>
+            </div>
+          </div>
+
           <div class="price-result-value" id="priceResultValue">—</div>
           <div class="price-result-unit">per sq ft</div>
           <div id="addonsSummary" style="margin-top:0.75rem;font-family:'DM Mono',monospace;font-size:0.72rem;color:var(--muted);"></div>
@@ -1489,11 +1502,21 @@ function edgeColForThickness(thicknessStr) {
   return 'thin'; // 1/8", 3/16", 1/4" all use thin column
 }
 
+// Apply person-based pricing to edging & fabrication base prices
+function getPersonPrice(basePrice) {
+  if (basePrice == null) return null;
+  const person = pricingState.person || 'chris';
+  if (person === 'jessica') return basePrice * 2;
+  if (person === 'chris')   return applyChrisPricing(basePrice);
+  return basePrice;
+}
+
 function edgeOptionsHTML(selectedName, thicknessStr) {
   const col = edgeColForThickness(thicknessStr);
   let html = `<option value="">— No Edge —</option>`;
   EDGE_TYPES.forEach(e => {
-    const price = e[col];
+    const basePrice = e[col];
+    const price = getPersonPrice(basePrice);
     const sel = selectedName === e.name ? 'selected' : '';
     html += `<option value="${e.name}" data-price="${price}" ${sel}>${e.name} ($${price.toFixed(2)}/in)</option>`;
   });
@@ -1552,7 +1575,10 @@ function getPieceFabTotal(p) {
   return Object.entries(p.fabrications).reduce((s, [fabName, fabQty]) => {
     for (const g of FABRICATION_TYPES) {
       const item = g.items.find(it => it.name === fabName);
-      if (item) return s + (item[col] || 0) * (fabQty || 1);
+      if (item) {
+        const price = getPersonPrice(item[col]) || 0;
+        return s + price * (fabQty || 1);
+      }
     }
     return s;
   }, 0);
@@ -1687,7 +1713,8 @@ function renderPieces() {
             return `<div class="fab-group-label">${g.group}</div>
             ${g.items.map(item => {
               const col = fabColForThickness(p.thickness);
-              const price = item[col];
+              const basePrice = item[col];
+              const price = getPersonPrice(basePrice);
               const fabQty = (p.fabrications && p.fabrications[item.name]) || 0;
               const active = fabQty > 0;
               const naStyle = price == null ? 'opacity:0.4;pointer-events:none;' : '';
@@ -2200,7 +2227,7 @@ function saveBidPDF() {
           for(const g of FABRICATION_TYPES){
             const item=g.items.find(it=>it.name===fabName);
             if(item){
-              const price=(item[col]||0)*fabQty;
+              const price = (getPersonPrice(item[col])||0) * fabQty;
               doc.setFontSize(8.5);doc.setFont('helvetica','normal');gray(120);
               doc.text('   + '+fabName+(fabQty>1?' x'+fabQty:''),M+8,y);
               gray(60);doc.text(fmt(price),R,y,{align:'right'});
@@ -2876,18 +2903,44 @@ function toggleAddon(a, row) {
   renderPriceResult();
 }
 
+function getChrisMargin() {
+  return (parseFloat(document.getElementById('chrisMargin').value) || 0) / 100;
+}
+
+function applyChrisPricing(baseTotal) {
+  const surcharge = 1.15;
+  const margin = 1 + getChrisMargin();
+  return baseTotal * surcharge * margin;
+}
+
 function renderPriceResult() {
   const { glassType, thickness, treatment, treatmentLabel, category, selectedAddons, person } = pricingState;
   if (!glassType) return;
 
-  const basePrice = getPrice(glassType, treatment) || 0;
+  const basePrice  = getPrice(glassType, treatment) || 0;
   const addonTotal = selectedAddons.reduce((s, a) => s + (getPrice(a, treatment) || 0), 0);
-  const total = basePrice + addonTotal;
+  const rawTotal   = basePrice + addonTotal;
+
+  // Show/hide Chris margin row
+  const marginRow = document.getElementById('chrisMarginRow');
+  marginRow.style.display = person === 'chris' ? '' : 'none';
+
+  let finalTotal = rawTotal;
+  if (person === 'chris') {
+    finalTotal = applyChrisPricing(rawTotal);
+    // Show breakdown
+    const margin = getChrisMargin() * 100;
+    const afterSurcharge = rawTotal * 1.15;
+    document.getElementById('chrisMarginBreakdown').innerHTML =
+      `Base: $${rawTotal.toFixed(2)}<br>` +
+      `+15% surcharge: $${afterSurcharge.toFixed(2)}<br>` +
+      (margin > 0 ? `+${margin.toFixed(0)}% margin: $${finalTotal.toFixed(2)}` : '');
+  }
 
   document.getElementById('priceResultName').textContent = glassType.name;
   document.getElementById('priceResultSpecs').textContent =
     `${person === 'jessica' ? 'Jessica' : 'Chris'} · ${category === 'flat' ? 'Flat Glass' : 'Insulated Glass'} · ${thickness} · ${treatmentLabel}`;
-  document.getElementById('priceResultValue').textContent = '$' + total.toFixed(2);
+  document.getElementById('priceResultValue').textContent = '$' + finalTotal.toFixed(2);
 
   if (selectedAddons.length > 0) {
     document.getElementById('addonsSummary').textContent =
@@ -2902,21 +2955,23 @@ function sendPriceToBid() {
   const { glassType, thickness, treatment, treatmentLabel, category, selectedAddons, person } = pricingState;
   if (!glassType) return;
 
-  const basePrice = getPrice(glassType, treatment) || 0;
+  const basePrice  = getPrice(glassType, treatment) || 0;
   const addonTotal = selectedAddons.reduce((s, a) => s + (getPrice(a, treatment) || 0), 0);
-  const total = basePrice + addonTotal;
+  const rawTotal   = basePrice + addonTotal;
+
+  // Apply Chris's surcharge + margin silently
+  const finalTotal = person === 'chris' ? applyChrisPricing(rawTotal) : rawTotal;
 
   if (pieces.length === 0) { addPiece(); }
 
   const lastPiece = pieces[pieces.length - 1];
-  lastPiece.rate = total.toFixed(2);
+  lastPiece.rate = finalTotal.toFixed(2);
   lastPiece.thickness = thickness;
   lastPiece.glassType = glassType.name + (category === 'insulated' ? ' (IG)' : '') + ' · ' + treatmentLabel;
-  // Reset edge selection so dropdown re-prices for the new thickness
   if (lastPiece.edgeName) {
     const col = edgeColForThickness(thickness);
     const edgeEntry = EDGE_TYPES.find(e => e.name === lastPiece.edgeName);
-    if (edgeEntry) lastPiece.edgeCpf = edgeEntry[col];
+    if (edgeEntry) lastPiece.edgeCpf = getPersonPrice(edgeEntry[col]);
   }
 
   renderPieces();
