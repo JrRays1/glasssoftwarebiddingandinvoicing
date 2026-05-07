@@ -1549,6 +1549,251 @@ function updatePieceSqft(id) {
   if (el && p) el.textContent = getSqft(p);
 }
 
+const FLAT_GLASS = {
+  '1/8"': [
+    { name: 'Clear',                    annealed: 4.76, tempered: 4.73 },
+    { name: 'Energy Advantage Low-E',   annealed: 7.45, tempered: 8.36 },
+    { name: 'Bronze / Grey',            annealed: 8.24, tempered: 9.15 },
+    { name: 'Midnight Gray',            annealed:15.27, tempered:16.81 },
+    { name: 'Pavia / Satin Etch',       annealed:11.90, tempered:12.81 },
+    { name: "Temper Customer's Glass",  annealed: null, tempered: 4.61 },
+  ],
+  '3/16"': [
+    { name: 'Clear',                    annealed: 5.55, tempered: 4.73 },
+    { name: 'Energy Advantage Low-E',   annealed: 7.56, tempered: 8.48 },
+    { name: 'Bronze',                   annealed: 8.54, tempered: 9.46 },
+    { name: 'Rain / Niagara',           annealed:13.91, tempered:14.83 },
+    { name: "Temper Customer's Glass",  annealed: null, tempered: 4.61 },
+  ],
+  '1/4"': [
+    { name: 'Clear',                    annealed: 5.46, tempered: 4.73, tempered50: 5.92 },
+    { name: 'Energy Advantage Low-E',   annealed: 8.79, tempered: 9.71, tempered50:12.13 },
+    { name: 'Bronze / Grey',            annealed: 7.57, tempered: 8.49, tempered50:10.61 },
+    { name: 'Solarcool Bronze/Grey',    annealed:12.08, tempered:13.00, tempered50:16.24 },
+    { name: 'Midnight Grey',            annealed:18.06, tempered:18.97, tempered50:23.72 },
+    { name: 'Azuria',                   annealed:15.01, tempered:15.92, tempered50:19.90 },
+    { name: 'Solarblue',                annealed:11.84, tempered:12.76, tempered50:15.95 },
+    { name: 'Solarcool Solarblue',      annealed:13.61, tempered:14.52, tempered50:18.15 },
+    { name: 'Pacifica',                 annealed:14.52, tempered:15.44, tempered50:19.29 },
+    { name: 'Solarcool Pacifica',       annealed:15.92, tempered:16.84, tempered50:21.05 },
+    { name: 'Atlantica',                annealed:11.19, tempered:12.10, tempered50:15.13 },
+    { name: 'Rain / Niagara',           annealed:16.05, tempered:16.96, tempered50:21.20 },
+    { name: 'Mirror',                   annealed:12.08, tempered: null },
+    { name: 'Pavia / Satin Etch',       annealed:20.14, tempered:21.05, tempered50:26.31 },
+    { name: 'Starphire (Low Iron)',     annealed: 9.15, tempered:10.07, tempered50:12.59 },
+    { name: 'Mirropane',                annealed:23.49, tempered:24.41, tempered50:30.51 },
+    { name: 'Black/Warm Gray Ceramic Frit Spandrel', annealed: null, tempered:18.31 },
+    { name: 'White Ceramic Frit Spandrel',           annealed: null, tempered:20.75 },
+    { name: 'Clear Laminated',          annealed:16.17, tempered: null },
+    { name: 'White Laminated',          annealed:19.53, tempered: null },
+    { name: "Temper Customer's Glass",  annealed: null, tempered: 4.61 },
+  ],
+  '3/8"': [
+    { name: 'Clear',                    annealed: 6.50, tempered: 6.78 },
+    { name: 'Pavia / Satin Etch',       annealed:22.58, tempered:24.10 },
+    { name: 'Starphire (Low Iron)',     annealed:17.45, tempered:18.92 },
+    { name: 'Rain / Niagara',           annealed:30.87, tempered:32.34 },
+    { name: "Temper Customer's Glass",  annealed: null, tempered: 6.70 },
+  ],
+  '1/2"': [
+    { name: 'Clear',                    annealed: 7.51, tempered: 7.91 },
+    { name: 'Starphire (Low Iron)',     annealed:20.07, tempered:21.54 },
+    { name: 'Pavia / Satin Etch',       annealed:32.22, tempered:33.69 },
+    { name: "Temper Customer's Glass",  annealed: null, tempered: 8.95 },
+  ],
+};
+
+const INSULATED_GLASS = {
+  '1/8"': {
+    types: [
+      { name: 'Clear',                        annealed:10.00, tempered:11.90 },
+      { name: 'Energy Advantage Low-E',        annealed:12.81, tempered:14.52 },
+      { name: 'Solarban 60 / Climaguard 7036', annealed:12.08, tempered:15.56 },
+      { name: 'Solarban 70 / Climaguard 6227', annealed:12.81, tempered:16.48 },
+      { name: 'Bronze / Grey',                 annealed:13.61, tempered:15.26 },
+      { name: 'P516 / Pattern 62',             annealed:15.13, tempered:16.78 },
+      { name: 'Pavia / Satin Etch',            annealed:17.39, tempered:19.22 },
+    ],
+    addons: [
+      { name: 'Add - Energy Advantage Low-E',        annealed:2.32, tempered:2.32 },
+      { name: 'Add - Solarban 60 / Climaguard 7036', annealed:3.24, tempered:3.24 },
+      { name: 'Add - Solarban 70 / Climaguard 6227', annealed:4.05, tempered:4.05 },
+      { name: 'Add - Argon Gas Fill',                annealed:3.65, tempered:3.65 },
+      { name: 'Add - Temper Outboard Lite Only',     annealed:0.79, tempered:null },
+    ],
+  },
+  '3/16"': {
+    types: [
+      { name: 'Clear',                        annealed:11.72, tempered:14.03 },
+      { name: 'Energy Advantage Low-E',        annealed:17.27, tempered:19.53 },
+      { name: 'Solarban 60 / Climaguard 7036', annealed:15.09, tempered:17.94 },
+      { name: 'Solarban 70 / Climaguard 6227', annealed:17.10, tempered:19.96 },
+      { name: 'Bronze',                        annealed:14.64, tempered:16.96 },
+      { name: 'P516 / P62',                   annealed:20.01, tempered:22.40 },
+      { name: 'Rain / Niagara',               annealed:20.01, tempered:22.40 },
+    ],
+    addons: [
+      { name: 'Add - Energy Advantage Low-E',        annealed:4.86, tempered:4.86 },
+      { name: 'Add - Solarban 60 / Climaguard 7036', annealed:3.46, tempered:3.46 },
+      { name: 'Add - Solarban 70 / Climaguard 6227', annealed:5.24, tempered:5.24 },
+      { name: 'Add - Argon Gas Fill',                annealed:3.65, tempered:3.65 },
+      { name: 'Add - Temper Outboard Lite Only',     annealed:0.79, tempered:null },
+    ],
+  },
+  '1/4"': {
+    types: [
+      { name: 'Clear',                             annealed: 9.71, tempered:13.73, tempered50:17.16 },
+      { name: 'Energy Advantage Low-E',             annealed:12.51, tempered:17.09, tempered50:21.36 },
+      { name: 'Solarban 60 Low-e / SN-68',          annealed:12.33, tempered:17.39, tempered50:21.74 },
+      { name: 'Solarban 70 Low-e / SNX 6227',       annealed:14.34, tempered:19.22, tempered50:24.03 },
+      { name: 'Bronze / Grey / Solexia',            annealed:12.38, tempered:16.17, tempered50:20.21 },
+      { name: 'Solarcool Bronze/Grey',              annealed:15.56, tempered:20.44, tempered50:25.55 },
+      { name: 'Midnight Grey',                      annealed:20.44, tempered:26.54, tempered50:33.18 },
+      { name: 'Azuria',                             annealed:18.00, tempered:23.49, tempered50:29.37 },
+      { name: 'Solarblue',                          annealed:15.20, tempered:20.14, tempered50:25.17 },
+      { name: 'Solarcool Solarblue',               annealed:16.60, tempered:21.97, tempered50:27.46 },
+      { name: 'Pacifica',                           annealed:17.33, tempered:22.88, tempered50:28.60 },
+      { name: 'Solarcool Pacifica',                annealed:18.61, tempered:24.41, tempered50:30.51 },
+      { name: 'Atlantica',                          annealed:14.52, tempered:19.65, tempered50:24.56 },
+      { name: 'Rain / Niagara',                    annealed:18.67, tempered:24.41, tempered50:30.51 },
+      { name: 'Pavia / Satin Etch',                annealed:22.27, tempered:28.68, tempered50:35.85 },
+      { name: 'Starphire (Low Iron)',              annealed:12.81, tempered:17.39, tempered50:21.74 },
+      { name: 'Mirropane',                         annealed:25.02, tempered:31.73, tempered50:39.66 },
+    ],
+    addons: [
+      { name: 'Add - Energy Advantage Low-E',             annealed:2.97, tempered:2.97 },
+      { name: 'Add - Solarban 60 Low-e / SN-68',          annealed:3.24, tempered:3.24 },
+      { name: 'Add - Solarban 70 Low-e / SNX 6227',       annealed:4.86, tempered:4.86 },
+      { name: 'Add - 1/4" Clear Laminated .030',          annealed:8.23, tempered:null },
+      { name: 'Add - Argon Gas Fill',                     annealed:3.65, tempered:3.65 },
+      { name: 'Add - Heat Strengthen Outboard Lite Only', annealed:0.79, tempered:null },
+      { name: 'Add for Black/Warm Gray Ceramic Frit',     annealed:null, tempered:8.98 },
+      { name: 'Add for White Ceramic Frit',               annealed:null, tempered:10.98 },
+    ],
+  },
+};
+
+// ─────────────────────────────────────────────────
+// INLINE GLASS SELECTION HELPERS
+// ─────────────────────────────────────────────────
+
+
+function getGlassThicknesses() {
+  return ['1/8"', '3/16"', '1/4"', '3/8"', '1/2"'];
+}
+
+function getGlassCategories(thickness) {
+  const hasFlat = !!FLAT_GLASS[thickness];
+  const hasIG   = !!INSULATED_GLASS[thickness];
+  const cats = [];
+  if (hasFlat) cats.push({ val: 'flat', label: 'Flat Glass' });
+  if (hasIG)   cats.push({ val: 'insulated', label: 'Insulated (IG)' });
+  return cats;
+}
+
+function getGlassTreatments(thickness, category) {
+  const data = category === 'flat' ? FLAT_GLASS[thickness] : (INSULATED_GLASS[thickness]?.types || []);
+  const treatments = [];
+  if (data.some(g => g.annealed != null)) treatments.push({ val: 'annealed', label: 'Annealed' });
+  if (data.some(g => g.tempered != null)) treatments.push({ val: 'tempered', label: 'Tempered' });
+  if (data.some(g => g.tempered50 != null)) treatments.push({ val: 'tempered50', label: 'Tempered >50 ft²' });
+  return treatments;
+}
+
+function getGlassTypes(thickness, category, treatment) {
+  const data = category === 'flat' ? FLAT_GLASS[thickness] : (INSULATED_GLASS[thickness]?.types || []);
+  return data.filter(g => g[treatment] != null);
+}
+
+function getGlassAddons(thickness, category) {
+  if (category !== 'insulated') return [];
+  return INSULATED_GLASS[thickness]?.addons || [];
+}
+
+function applyInlineGlassSelection(i) {
+  const p = pieces[i];
+  if (!p.thickness || !p.glassCategory || !p.glassTreatment || !p.glassTypeName) return;
+  const data = p.glassCategory === 'flat' ? FLAT_GLASS[p.thickness] : (INSULATED_GLASS[p.thickness]?.types || []);
+  const glassObj = data.find(g => g.name === p.glassTypeName);
+  if (!glassObj) return;
+  let baseRate = glassObj[p.glassTreatment];
+  if (baseRate == null) return;
+  // Apply Jessica multiplier for glass (same as getPrice())
+  if (activePerson === 'jessica') baseRate *= 2;
+  // Add selected addons
+  if (p.glassAddons && p.glassAddons.length && p.glassCategory === 'insulated') {
+    const addons = getGlassAddons(p.thickness, p.glassCategory);
+    p.glassAddons.forEach(aName => {
+      const addon = addons.find(a => a.name === aName);
+      if (addon && addon[p.glassTreatment] != null) {
+        let addonPrice = addon[p.glassTreatment];
+        if (activePerson === 'jessica') addonPrice *= 2;
+        baseRate += addonPrice;
+      }
+    });
+  }
+  pieces[i].rate = baseRate.toFixed(2);
+  // Update glass type display string
+  const treatLabel = { annealed: 'Annealed', tempered: 'Tempered', tempered50: 'Tempered >50ft²' }[p.glassTreatment] || '';
+  pieces[i].glassType = p.glassTypeName + (p.glassCategory === 'insulated' ? ' (IG)' : '') + ' · ' + treatLabel;
+  // Re-price edge for new thickness
+  if (p.edgeName) {
+    const col = edgeColForThickness(p.thickness);
+    const edgeEntry = EDGE_TYPES.find(e => e.name === p.edgeName);
+    if (edgeEntry) pieces[i].edgeCpf = edgeEntry[col] * personMultiplier();
+  }
+  calculate();
+  renderPieces();
+}
+
+function onInlineThicknessChange(i, val) {
+  pieces[i].thickness = val;
+  pieces[i].glassCategory = '';
+  pieces[i].glassTreatment = '';
+  pieces[i].glassTypeName = '';
+  pieces[i].glassAddons = [];
+  pieces[i].rate = '';
+  pieces[i].glassType = '';
+  renderPieces();
+  calculate();
+}
+
+function onInlineCategoryChange(i, val) {
+  pieces[i].glassCategory = val;
+  pieces[i].glassTreatment = '';
+  pieces[i].glassTypeName = '';
+  pieces[i].glassAddons = [];
+  pieces[i].rate = '';
+  pieces[i].glassType = '';
+  renderPieces();
+  calculate();
+}
+
+function onInlineTreatmentChange(i, val) {
+  pieces[i].glassTreatment = val;
+  pieces[i].glassTypeName = '';
+  pieces[i].glassAddons = [];
+  pieces[i].rate = '';
+  pieces[i].glassType = '';
+  renderPieces();
+  calculate();
+}
+
+function onInlineGlassTypeChange(i, val) {
+  pieces[i].glassTypeName = val;
+  pieces[i].glassAddons = [];
+  applyInlineGlassSelection(i);
+}
+
+function toggleInlineAddon(i, addonName) {
+  if (!pieces[i].glassAddons) pieces[i].glassAddons = [];
+  const idx = pieces[i].glassAddons.indexOf(addonName);
+  if (idx >= 0) pieces[i].glassAddons.splice(idx, 1);
+  else pieces[i].glassAddons.push(addonName);
+  applyInlineGlassSelection(i);
+}
+
+
 function buildGlassDropdowns(p, i) {
   // Thickness
   let thickOpts = '<option value="">Thickness</option>';
@@ -2577,247 +2822,6 @@ function saveInvoicePDF() {
 // ─────────────────────────────────────────────────
 // PRICING TAB — DATA
 // ─────────────────────────────────────────────────
-const FLAT_GLASS = {
-  '1/8"': [
-    { name: 'Clear',                    annealed: 4.76, tempered: 4.73 },
-    { name: 'Energy Advantage Low-E',   annealed: 7.45, tempered: 8.36 },
-    { name: 'Bronze / Grey',            annealed: 8.24, tempered: 9.15 },
-    { name: 'Midnight Gray',            annealed:15.27, tempered:16.81 },
-    { name: 'Pavia / Satin Etch',       annealed:11.90, tempered:12.81 },
-    { name: "Temper Customer's Glass",  annealed: null, tempered: 4.61 },
-  ],
-  '3/16"': [
-    { name: 'Clear',                    annealed: 5.55, tempered: 4.73 },
-    { name: 'Energy Advantage Low-E',   annealed: 7.56, tempered: 8.48 },
-    { name: 'Bronze',                   annealed: 8.54, tempered: 9.46 },
-    { name: 'Rain / Niagara',           annealed:13.91, tempered:14.83 },
-    { name: "Temper Customer's Glass",  annealed: null, tempered: 4.61 },
-  ],
-  '1/4"': [
-    { name: 'Clear',                    annealed: 5.46, tempered: 4.73, tempered50: 5.92 },
-    { name: 'Energy Advantage Low-E',   annealed: 8.79, tempered: 9.71, tempered50:12.13 },
-    { name: 'Bronze / Grey',            annealed: 7.57, tempered: 8.49, tempered50:10.61 },
-    { name: 'Solarcool Bronze/Grey',    annealed:12.08, tempered:13.00, tempered50:16.24 },
-    { name: 'Midnight Grey',            annealed:18.06, tempered:18.97, tempered50:23.72 },
-    { name: 'Azuria',                   annealed:15.01, tempered:15.92, tempered50:19.90 },
-    { name: 'Solarblue',                annealed:11.84, tempered:12.76, tempered50:15.95 },
-    { name: 'Solarcool Solarblue',      annealed:13.61, tempered:14.52, tempered50:18.15 },
-    { name: 'Pacifica',                 annealed:14.52, tempered:15.44, tempered50:19.29 },
-    { name: 'Solarcool Pacifica',       annealed:15.92, tempered:16.84, tempered50:21.05 },
-    { name: 'Atlantica',                annealed:11.19, tempered:12.10, tempered50:15.13 },
-    { name: 'Rain / Niagara',           annealed:16.05, tempered:16.96, tempered50:21.20 },
-    { name: 'Mirror',                   annealed:12.08, tempered: null },
-    { name: 'Pavia / Satin Etch',       annealed:20.14, tempered:21.05, tempered50:26.31 },
-    { name: 'Starphire (Low Iron)',     annealed: 9.15, tempered:10.07, tempered50:12.59 },
-    { name: 'Mirropane',                annealed:23.49, tempered:24.41, tempered50:30.51 },
-    { name: 'Black/Warm Gray Ceramic Frit Spandrel', annealed: null, tempered:18.31 },
-    { name: 'White Ceramic Frit Spandrel',           annealed: null, tempered:20.75 },
-    { name: 'Clear Laminated',          annealed:16.17, tempered: null },
-    { name: 'White Laminated',          annealed:19.53, tempered: null },
-    { name: "Temper Customer's Glass",  annealed: null, tempered: 4.61 },
-  ],
-  '3/8"': [
-    { name: 'Clear',                    annealed: 6.50, tempered: 6.78 },
-    { name: 'Pavia / Satin Etch',       annealed:22.58, tempered:24.10 },
-    { name: 'Starphire (Low Iron)',     annealed:17.45, tempered:18.92 },
-    { name: 'Rain / Niagara',           annealed:30.87, tempered:32.34 },
-    { name: "Temper Customer's Glass",  annealed: null, tempered: 6.70 },
-  ],
-  '1/2"': [
-    { name: 'Clear',                    annealed: 7.51, tempered: 7.91 },
-    { name: 'Starphire (Low Iron)',     annealed:20.07, tempered:21.54 },
-    { name: 'Pavia / Satin Etch',       annealed:32.22, tempered:33.69 },
-    { name: "Temper Customer's Glass",  annealed: null, tempered: 8.95 },
-  ],
-};
-
-const INSULATED_GLASS = {
-  '1/8"': {
-    types: [
-      { name: 'Clear',                        annealed:10.00, tempered:11.90 },
-      { name: 'Energy Advantage Low-E',        annealed:12.81, tempered:14.52 },
-      { name: 'Solarban 60 / Climaguard 7036', annealed:12.08, tempered:15.56 },
-      { name: 'Solarban 70 / Climaguard 6227', annealed:12.81, tempered:16.48 },
-      { name: 'Bronze / Grey',                 annealed:13.61, tempered:15.26 },
-      { name: 'P516 / Pattern 62',             annealed:15.13, tempered:16.78 },
-      { name: 'Pavia / Satin Etch',            annealed:17.39, tempered:19.22 },
-    ],
-    addons: [
-      { name: 'Add - Energy Advantage Low-E',        annealed:2.32, tempered:2.32 },
-      { name: 'Add - Solarban 60 / Climaguard 7036', annealed:3.24, tempered:3.24 },
-      { name: 'Add - Solarban 70 / Climaguard 6227', annealed:4.05, tempered:4.05 },
-      { name: 'Add - Argon Gas Fill',                annealed:3.65, tempered:3.65 },
-      { name: 'Add - Temper Outboard Lite Only',     annealed:0.79, tempered:null },
-    ],
-  },
-  '3/16"': {
-    types: [
-      { name: 'Clear',                        annealed:11.72, tempered:14.03 },
-      { name: 'Energy Advantage Low-E',        annealed:17.27, tempered:19.53 },
-      { name: 'Solarban 60 / Climaguard 7036', annealed:15.09, tempered:17.94 },
-      { name: 'Solarban 70 / Climaguard 6227', annealed:17.10, tempered:19.96 },
-      { name: 'Bronze',                        annealed:14.64, tempered:16.96 },
-      { name: 'P516 / P62',                   annealed:20.01, tempered:22.40 },
-      { name: 'Rain / Niagara',               annealed:20.01, tempered:22.40 },
-    ],
-    addons: [
-      { name: 'Add - Energy Advantage Low-E',        annealed:4.86, tempered:4.86 },
-      { name: 'Add - Solarban 60 / Climaguard 7036', annealed:3.46, tempered:3.46 },
-      { name: 'Add - Solarban 70 / Climaguard 6227', annealed:5.24, tempered:5.24 },
-      { name: 'Add - Argon Gas Fill',                annealed:3.65, tempered:3.65 },
-      { name: 'Add - Temper Outboard Lite Only',     annealed:0.79, tempered:null },
-    ],
-  },
-  '1/4"': {
-    types: [
-      { name: 'Clear',                             annealed: 9.71, tempered:13.73, tempered50:17.16 },
-      { name: 'Energy Advantage Low-E',             annealed:12.51, tempered:17.09, tempered50:21.36 },
-      { name: 'Solarban 60 Low-e / SN-68',          annealed:12.33, tempered:17.39, tempered50:21.74 },
-      { name: 'Solarban 70 Low-e / SNX 6227',       annealed:14.34, tempered:19.22, tempered50:24.03 },
-      { name: 'Bronze / Grey / Solexia',            annealed:12.38, tempered:16.17, tempered50:20.21 },
-      { name: 'Solarcool Bronze/Grey',              annealed:15.56, tempered:20.44, tempered50:25.55 },
-      { name: 'Midnight Grey',                      annealed:20.44, tempered:26.54, tempered50:33.18 },
-      { name: 'Azuria',                             annealed:18.00, tempered:23.49, tempered50:29.37 },
-      { name: 'Solarblue',                          annealed:15.20, tempered:20.14, tempered50:25.17 },
-      { name: 'Solarcool Solarblue',               annealed:16.60, tempered:21.97, tempered50:27.46 },
-      { name: 'Pacifica',                           annealed:17.33, tempered:22.88, tempered50:28.60 },
-      { name: 'Solarcool Pacifica',                annealed:18.61, tempered:24.41, tempered50:30.51 },
-      { name: 'Atlantica',                          annealed:14.52, tempered:19.65, tempered50:24.56 },
-      { name: 'Rain / Niagara',                    annealed:18.67, tempered:24.41, tempered50:30.51 },
-      { name: 'Pavia / Satin Etch',                annealed:22.27, tempered:28.68, tempered50:35.85 },
-      { name: 'Starphire (Low Iron)',              annealed:12.81, tempered:17.39, tempered50:21.74 },
-      { name: 'Mirropane',                         annealed:25.02, tempered:31.73, tempered50:39.66 },
-    ],
-    addons: [
-      { name: 'Add - Energy Advantage Low-E',             annealed:2.97, tempered:2.97 },
-      { name: 'Add - Solarban 60 Low-e / SN-68',          annealed:3.24, tempered:3.24 },
-      { name: 'Add - Solarban 70 Low-e / SNX 6227',       annealed:4.86, tempered:4.86 },
-      { name: 'Add - 1/4" Clear Laminated .030',          annealed:8.23, tempered:null },
-      { name: 'Add - Argon Gas Fill',                     annealed:3.65, tempered:3.65 },
-      { name: 'Add - Heat Strengthen Outboard Lite Only', annealed:0.79, tempered:null },
-      { name: 'Add for Black/Warm Gray Ceramic Frit',     annealed:null, tempered:8.98 },
-      { name: 'Add for White Ceramic Frit',               annealed:null, tempered:10.98 },
-    ],
-  },
-};
-
-// ─────────────────────────────────────────────────
-// INLINE GLASS SELECTION HELPERS
-// ─────────────────────────────────────────────────
-function getGlassThicknesses() {
-  return ['1/8"', '3/16"', '1/4"', '3/8"', '1/2"'];
-}
-
-function getGlassCategories(thickness) {
-  const hasFlat = !!FLAT_GLASS[thickness];
-  const hasIG   = !!INSULATED_GLASS[thickness];
-  const cats = [];
-  if (hasFlat) cats.push({ val: 'flat', label: 'Flat Glass' });
-  if (hasIG)   cats.push({ val: 'insulated', label: 'Insulated (IG)' });
-  return cats;
-}
-
-function getGlassTreatments(thickness, category) {
-  const data = category === 'flat' ? FLAT_GLASS[thickness] : (INSULATED_GLASS[thickness]?.types || []);
-  const treatments = [];
-  if (data.some(g => g.annealed != null)) treatments.push({ val: 'annealed', label: 'Annealed' });
-  if (data.some(g => g.tempered != null)) treatments.push({ val: 'tempered', label: 'Tempered' });
-  if (data.some(g => g.tempered50 != null)) treatments.push({ val: 'tempered50', label: 'Tempered >50 ft²' });
-  return treatments;
-}
-
-function getGlassTypes(thickness, category, treatment) {
-  const data = category === 'flat' ? FLAT_GLASS[thickness] : (INSULATED_GLASS[thickness]?.types || []);
-  return data.filter(g => g[treatment] != null);
-}
-
-function getGlassAddons(thickness, category) {
-  if (category !== 'insulated') return [];
-  return INSULATED_GLASS[thickness]?.addons || [];
-}
-
-function applyInlineGlassSelection(i) {
-  const p = pieces[i];
-  if (!p.thickness || !p.glassCategory || !p.glassTreatment || !p.glassTypeName) return;
-  const data = p.glassCategory === 'flat' ? FLAT_GLASS[p.thickness] : (INSULATED_GLASS[p.thickness]?.types || []);
-  const glassObj = data.find(g => g.name === p.glassTypeName);
-  if (!glassObj) return;
-  let baseRate = glassObj[p.glassTreatment];
-  if (baseRate == null) return;
-  // Apply Jessica multiplier for glass (same as getPrice())
-  if (activePerson === 'jessica') baseRate *= 2;
-  // Add selected addons
-  if (p.glassAddons && p.glassAddons.length && p.glassCategory === 'insulated') {
-    const addons = getGlassAddons(p.thickness, p.glassCategory);
-    p.glassAddons.forEach(aName => {
-      const addon = addons.find(a => a.name === aName);
-      if (addon && addon[p.glassTreatment] != null) {
-        let addonPrice = addon[p.glassTreatment];
-        if (activePerson === 'jessica') addonPrice *= 2;
-        baseRate += addonPrice;
-      }
-    });
-  }
-  pieces[i].rate = baseRate.toFixed(2);
-  // Update glass type display string
-  const treatLabel = { annealed: 'Annealed', tempered: 'Tempered', tempered50: 'Tempered >50ft²' }[p.glassTreatment] || '';
-  pieces[i].glassType = p.glassTypeName + (p.glassCategory === 'insulated' ? ' (IG)' : '') + ' · ' + treatLabel;
-  // Re-price edge for new thickness
-  if (p.edgeName) {
-    const col = edgeColForThickness(p.thickness);
-    const edgeEntry = EDGE_TYPES.find(e => e.name === p.edgeName);
-    if (edgeEntry) pieces[i].edgeCpf = edgeEntry[col] * personMultiplier();
-  }
-  calculate();
-  renderPieces();
-}
-
-function onInlineThicknessChange(i, val) {
-  pieces[i].thickness = val;
-  pieces[i].glassCategory = '';
-  pieces[i].glassTreatment = '';
-  pieces[i].glassTypeName = '';
-  pieces[i].glassAddons = [];
-  pieces[i].rate = '';
-  pieces[i].glassType = '';
-  renderPieces();
-  calculate();
-}
-
-function onInlineCategoryChange(i, val) {
-  pieces[i].glassCategory = val;
-  pieces[i].glassTreatment = '';
-  pieces[i].glassTypeName = '';
-  pieces[i].glassAddons = [];
-  pieces[i].rate = '';
-  pieces[i].glassType = '';
-  renderPieces();
-  calculate();
-}
-
-function onInlineTreatmentChange(i, val) {
-  pieces[i].glassTreatment = val;
-  pieces[i].glassTypeName = '';
-  pieces[i].glassAddons = [];
-  pieces[i].rate = '';
-  pieces[i].glassType = '';
-  renderPieces();
-  calculate();
-}
-
-function onInlineGlassTypeChange(i, val) {
-  pieces[i].glassTypeName = val;
-  pieces[i].glassAddons = [];
-  applyInlineGlassSelection(i);
-}
-
-function toggleInlineAddon(i, addonName) {
-  if (!pieces[i].glassAddons) pieces[i].glassAddons = [];
-  const idx = pieces[i].glassAddons.indexOf(addonName);
-  if (idx >= 0) pieces[i].glassAddons.splice(idx, 1);
-  else pieces[i].glassAddons.push(addonName);
-  applyInlineGlassSelection(i);
-}
 
 // ─────────────────────────────────────────────────
 // PRICING TAB — STATE
