@@ -3166,6 +3166,7 @@ function getBidSnapshot() {
     margin:   parseFloat(document.getElementById('bidMargin')?.value) || 0,
     surcharge:parseFloat(document.getElementById('bidSurcharge')?.value) || 0,
     taxExempt,
+    person:   activePerson,
     pieces:   JSON.parse(JSON.stringify(pieces)),
     hardware: JSON.parse(JSON.stringify(hardware)),
     labor:    JSON.parse(JSON.stringify(labor)),
@@ -3337,6 +3338,7 @@ function openJob(id) {
     if (job.date) document.getElementById('bidDate').value = job.date;
     if (job.margin)    document.getElementById('bidMargin').value    = job.margin;
     if (job.surcharge) document.getElementById('bidSurcharge').value = job.surcharge;
+    setActivePerson(job.person || 'chris');
     // Re-apply inline glass selections after loading
     pieces.forEach((p, i) => { if (!p.glassCategory) p.glassCategory = ''; if (!p.glassTreatment) p.glassTreatment = ''; if (!p.glassTypeName) p.glassTypeName = ''; if (!p.glassAddons) p.glassAddons = []; });
     renderPieces(); renderHardware(); renderLabor(); renderExtras(); calculate();
