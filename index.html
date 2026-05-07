@@ -9,6 +9,7 @@
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.12.1/firebase-app.js";
 import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, getDocs, query, orderBy } from "https://www.gstatic.com/firebasejs/12.12.1/firebase-firestore.js";
+import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.12.1/firebase-auth.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCA4Fk7aLGnrd5U2T0-dmbrr6BimVC1TK8",
@@ -19,11 +20,13 @@ const firebaseConfig = {
   appId: "1:849136314530:web:91f69219a4096a61428ffb"
 };
 
-const app = initializeApp(firebaseConfig);
-const db  = getFirestore(app);
+const app  = initializeApp(firebaseConfig);
+const db   = getFirestore(app);
+const auth = getAuth(app);
 
-// Expose db and Firestore helpers to global scope for use in non-module script
+// Expose to global scope
 window._db         = db;
+window._auth       = auth;
 window._collection = collection;
 window._addDoc     = addDoc;
 window._updateDoc  = updateDoc;
@@ -32,10 +35,19 @@ window._doc        = doc;
 window._getDocs    = getDocs;
 window._query      = query;
 window._orderBy    = orderBy;
+window._signInWithEmailAndPassword = signInWithEmailAndPassword;
+window._signOut    = signOut;
 
-// Load jobs once Firebase is ready
-window.addEventListener('DOMContentLoaded', () => {
-  if (window.loadJobs) window.loadJobs();
+// Watch auth state — show app or login screen
+onAuthStateChanged(auth, user => {
+  if (user) {
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('appContainer').style.display = '';
+    if (window.loadJobs) window.loadJobs();
+  } else {
+    document.getElementById('loginScreen').style.display = 'flex';
+    document.getElementById('appContainer').style.display = 'none';
+  }
 });
 </script>
 <style>
@@ -793,6 +805,72 @@ window.addEventListener('DOMContentLoaded', () => {
   .toast.success { border-color: #7ed4a0; color: #7ed4a0; }
   .toast.error { border-color: var(--danger); color: #e06060; }
 
+  /* ── LOGIN SCREEN ── */
+  #loginScreen {
+    position: fixed;
+    inset: 0;
+    background: var(--bg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    background-image:
+      radial-gradient(ellipse 80% 50% at 50% -10%, rgba(255,255,255,0.04) 0%, transparent 60%),
+      repeating-linear-gradient(0deg, transparent, transparent 39px, rgba(80,80,80,0.2) 39px, rgba(80,80,80,0.2) 40px),
+      repeating-linear-gradient(90deg, transparent, transparent 39px, rgba(80,80,80,0.1) 39px, rgba(80,80,80,0.1) 40px);
+  }
+  .login-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 2.5rem 2rem;
+    width: 100%;
+    max-width: 380px;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+    animation: fadeUp 0.4s ease both;
+  }
+  .login-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, var(--accent), transparent); }
+  .login-logo { width: 80px; height: 80px; object-fit: contain; margin-bottom: 1rem; }
+  .login-title { font-family: 'Bebas Neue', sans-serif; font-size: 1.8rem; letter-spacing: 0.05em; margin-bottom: 0.25rem; }
+  .login-sub { font-family: 'DM Mono', monospace; font-size: 0.7rem; color: var(--muted); letter-spacing: 0.12em; text-transform: uppercase; margin-bottom: 2rem; }
+  .login-label { font-family: 'DM Mono', monospace; font-size: 0.7rem; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; text-align: left; display: block; margin-bottom: 0.4rem; }
+  .login-input {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    font-size: 1.2rem;
+    letter-spacing: 0.2em;
+    padding: 0.75rem 1rem;
+    text-align: center;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    margin-bottom: 1rem;
+  }
+  .login-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(255,255,255,0.06); }
+  .login-input.error { border-color: var(--danger); box-shadow: 0 0 0 3px rgba(204,51,51,0.1); }
+  .btn-login {
+    width: 100%;
+    background: var(--accent);
+    border: none;
+    border-radius: 8px;
+    color: #0f0f0f;
+    cursor: pointer;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.2rem;
+    letter-spacing: 0.1em;
+    padding: 0.8rem;
+    transition: all 0.15s;
+    margin-top: 0.5rem;
+  }
+  .btn-login:hover { background: #ddd; transform: translateY(-1px); }
+  .btn-login:disabled { opacity: 0.5; cursor: default; transform: none; }
+  .login-error { color: #e06060; font-family: 'DM Mono', monospace; font-size: 0.75rem; margin-top: 0.75rem; min-height: 1.2em; }
+
   .terms-select {
     width: 100%;
     background: var(--surface2);
@@ -811,6 +889,23 @@ window.addEventListener('DOMContentLoaded', () => {
 </style>
 </head>
 <body>
+
+<!-- LOGIN SCREEN -->
+<div id="loginScreen" style="display:none;">
+  <div class="login-card">
+    <img src="logo.png" alt="American Legacy Glass" class="login-logo">
+    <div class="login-title">American Legacy <span style="color:var(--accent)">Glass</span></div>
+    <div class="login-sub">Estimating & Invoicing Tool</div>
+    <label class="login-label">Enter PIN to continue</label>
+    <input type="password" class="login-input" id="loginPin" placeholder="••••••" maxlength="20"
+      onkeydown="if(event.key==='Enter')doLogin()">
+    <button class="btn-login" id="btnLogin" onclick="doLogin()">Login</button>
+    <div class="login-error" id="loginError"></div>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div id="appContainer" style="display:none;">
 <div class="container">
   <header>
     <img src="logo.png" alt="American Legacy Glass" style="width:80px;height:80px;object-fit:contain;flex-shrink:0;">
@@ -828,6 +923,7 @@ window.addEventListener('DOMContentLoaded', () => {
         </button>
       </div>
       <button onclick="resetBid()" style="background:none;border:1px solid var(--border);border-radius:8px;color:var(--muted);cursor:pointer;font-family:'DM Mono',monospace;font-size:0.72rem;letter-spacing:0.08em;padding:0.45rem 0.9rem;transition:all 0.15s;white-space:nowrap;" onmouseover="this.style.borderColor='var(--danger)';this.style.color='var(--danger)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">↺ NEW BID</button>
+      <button onclick="doLogout()" style="background:none;border:1px solid var(--border);border-radius:8px;color:var(--muted);cursor:pointer;font-family:'DM Mono',monospace;font-size:0.72rem;letter-spacing:0.08em;padding:0.45rem 0.9rem;transition:all 0.15s;white-space:nowrap;" onmouseover="this.style.borderColor='var(--danger)';this.style.color='var(--danger)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">⎋ Logout</button>
     </div>
   </header>
 
@@ -2878,6 +2974,37 @@ async function deleteJob(e, id) {
 }
 
 // ─────────────────────────────────────────────────
+// LOGIN / AUTH
+// ─────────────────────────────────────────────────
+async function doLogin() {
+  const pin = document.getElementById('loginPin').value.trim();
+  if (!pin) return;
+  const btn = document.getElementById('btnLogin');
+  const errEl = document.getElementById('loginError');
+  const inputEl = document.getElementById('loginPin');
+  btn.disabled = true;
+  btn.textContent = 'Logging in…';
+  errEl.textContent = '';
+  inputEl.classList.remove('error');
+  try {
+    await window._signInWithEmailAndPassword(window._auth, 'alg@login.com', pin);
+    // onAuthStateChanged will handle showing the app
+  } catch(e) {
+    inputEl.classList.add('error');
+    errEl.textContent = 'Incorrect PIN. Please try again.';
+    btn.disabled = false;
+    btn.textContent = 'Login';
+    inputEl.value = '';
+    inputEl.focus();
+  }
+}
+
+async function doLogout() {
+  if (!confirm('Log out?')) return;
+  await window._signOut(window._auth);
+}
+
+// ─────────────────────────────────────────────────
 // INIT — load jobs after Firebase module ready
 // ─────────────────────────────────────────────────
 setTimeout(() => { if (window.loadJobs && window._db) window.loadJobs(); }, 1000);
@@ -2893,5 +3020,6 @@ document.getElementById('invDate').valueAsDate  = new Date();
 })();
 document.getElementById('invNumber').value = 'INV-' + String(Math.floor(Math.random()*9000)+1000);
 </script>
+</div><!-- end appContainer -->
 </body>
 </html>
