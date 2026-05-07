@@ -2473,8 +2473,14 @@ function saveBidPDF() {
     if(jloc){ doc.setFont('helvetica','normal'); doc.setTextColor(80,80,80); doc.text('Location: '+jloc, M, infoY); infoY += 16; }
     if(contactLine){
       doc.setFontSize(8.5); doc.setFont('helvetica','normal'); doc.setTextColor(80,80,80);
-      if(cphone) { doc.text('📞 '+cphone, M, infoY); }
-      if(cemail) { doc.text('✉  '+cemail, cphone ? pageW/2 : M, infoY, cphone ? {align:'center'} : {}); }
+      if(cphone && cemail) {
+        doc.text('Ph: '+cphone, M, infoY);
+        doc.text('Email: '+cemail, pageW/2, infoY);
+      } else if(cphone) {
+        doc.text('Ph: '+cphone, M, infoY);
+      } else if(cemail) {
+        doc.text('Email: '+cemail, M, infoY);
+      }
     }
     y = 90 + infoBarH + 15;
 
