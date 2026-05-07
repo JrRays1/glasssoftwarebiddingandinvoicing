@@ -1986,14 +1986,6 @@ function importFromBid() {
   pieces.filter(p=>getPieceEdgeTotal(p)>0).forEach(p => {
     invItems.push({ id: uid(), desc: (p.edgeName||'Edging')+' – '+getPieceDisplay(p), qty: 1, price: getPieceEdgeTotal(p), isEdge: true });
   });
-  hardware.forEach(h => {
-    if (parseFloat(h.cost)>0) invItems.push({ id: uid(), desc: h.name||'Hardware', qty: 1, price: parseFloat(h.cost)||0 });
-  });
-  const base = totalGlass() + totalHardware() + totalEdging();
-  extras.forEach(e => {
-    const v=parseFloat(e.value)||0, amt=e.type==='%'?base*(v/100):v;
-    if (amt>0) invItems.push({ id: uid(), desc: e.name||'Additional Cost', qty: 1, price: amt });
-  });
   // Fabrication items — flagged as isFab
   pieces.filter(p=>p.fabrications&&Object.keys(p.fabrications).length>0).forEach(p=>{
     const col=fabColForThickness(p.thickness);
@@ -2001,10 +1993,18 @@ function importFromBid() {
       for(const g of FABRICATION_TYPES){
         const item=g.items.find(it=>it.name===fabName);
         if(item){
-          invItems.push({ id: uid(), desc: fabName+(fabQty>1?' ×'+fabQty:'')+' – '+getPieceDisplay(p), qty: 1, price: (item[col]||0)*fabQty, isFab: true });
+          invItems.push({ id: uid(), desc: fabName+' – '+getPieceDisplay(p), qty: fabQty, price: (item[col]||0), isFab: true });
         }
       }
     });
+  });
+  hardware.forEach(h => {
+    if (parseFloat(h.cost)>0) invItems.push({ id: uid(), desc: h.name||'Hardware', qty: 1, price: parseFloat(h.cost)||0 });
+  });
+  const base = totalGlass() + totalHardware() + totalEdging();
+  extras.forEach(e => {
+    const v=parseFloat(e.value)||0, amt=e.type==='%'?base*(v/100):v;
+    if (amt>0) invItems.push({ id: uid(), desc: e.name||'Additional Cost', qty: 1, price: amt });
   });
   labor.forEach(l => {
     if (parseFloat(l.cost)>0) invItems.push({ id: uid(), desc: (l.name||'Labor')+' (tax-free)', qty: 1, price: parseFloat(l.cost)||0, taxFree: true });
