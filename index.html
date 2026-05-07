@@ -1458,7 +1458,7 @@ function syncJobInfo() {
 function addPiece() {
   const globalRate = parseFloat(document.getElementById('pricePerSqft').value) || 0;
   // w and h are now objects: { whole, frac }
-  pieces.push({ id: uid(), wWhole: '', wFrac: 0, hWhole: '', hFrac: 0, qty: '1', rate: globalRate ? String(globalRate) : '', thickness: '', glassType: '', edgeName: '', edgeCpf: '', fabrications: [] });
+  pieces.push({ id: uid(), wWhole: '', wFrac: 0, hWhole: '', hFrac: 0, qty: '1', rate: globalRate ? String(globalRate) : '', thickness: '', glassType: '', edgeName: '', edgeCpf: '', fabrications: {} });
   renderPieces();
 }
 
@@ -1545,44 +1545,36 @@ function fabColForThickness(thicknessStr) {
   return 'thin';
 }
 
+// fabrications is now an object: { 'Corner Notch': 2, 'Finger Notch': 1, ... }
 function getPieceFabTotal(p) {
-  if (!p.fabrications || !p.fabrications.length) return 0;
+  if (!p.fabrications || !Object.keys(p.fabrications).length) return 0;
   const col = fabColForThickness(p.thickness);
-  const qty = parseFloat(p.qty) || 1;
-  return p.fabrications.reduce((s, fabName) => {
+  return Object.entries(p.fabrications).reduce((s, [fabName, fabQty]) => {
     for (const g of FABRICATION_TYPES) {
       const item = g.items.find(it => it.name === fabName);
-      if (item) return s + (item[col] || 0) * qty;
+      if (item) return s + (item[col] || 0) * (fabQty || 1);
     }
     return s;
   }, 0);
 }
 
 function toggleFabrication(i, fabName) {
-  if (!pieces[i].fabrications) pieces[i].fabrications = [];
-  const idx = pieces[i].fabrications.indexOf(fabName);
-  if (idx >= 0) pieces[i].fabrications.splice(idx, 1);
-  else pieces[i].fabrications.push(fabName);
+  if (!pieces[i].fabrications) pieces[i].fabrications = {};
+  if (pieces[i].fabrications[fabName]) delete pieces[i].fabrications[fabName];
+  else pieces[i].fabrications[fabName] = 1;
   calculate();
   renderPieces();
 }
 
-function fabOptionsHTML(selectedFabs, thicknessStr) {
-  const col = fabColForThickness(thicknessStr);
-  const sel = selectedFabs || [];
-  let html = '';
-  FABRICATION_TYPES.forEach(g => {
-    html += `<div class="fab-group-label">${g.group}</div>`;
-    g.items.forEach(item => {
-      const price = item[col];
-      const active = sel.includes(item.name);
-      const naStyle = price == null ? 'opacity:0.4;cursor:default;' : '';
-      html += `<div class="fab-chip ${active ? 'active' : ''}" ${price != null ? `onclick="toggleFabrication(${-1}, '${item.name.replace(/'/g, "\\'")}')"` : ''} style="${naStyle}" data-fab="${item.name.replace(/"/g, '&quot;')}">
-        ${item.name}${price != null ? `<span class="fab-chip-price">$${price.toFixed(2)}</span>` : '<span class="fab-chip-price">N/A</span>'}
-      </div>`;
-    });
-  });
-  return html;
+function setFabQty(i, fabName, qty) {
+  if (!pieces[i].fabrications) pieces[i].fabrications = {};
+  const n = parseInt(qty) || 0;
+  if (n <= 0) delete pieces[i].fabrications[fabName];
+  else pieces[i].fabrications[fabName] = n;
+  calculate();
+  // Don't re-render to avoid losing focus — just recalc display
+  const badge = document.getElementById('fabtotal_' + pieces[i].id);
+  if (badge) badge.textContent = Object.keys(pieces[i].fabrications).length + ' selected · ' + fmt(getPieceFabTotal(pieces[i]));
 }
 
 
@@ -1686,25 +1678,44 @@ function renderPieces() {
         ${showEdge ? `<div class="piece-edge-total">${fmt(edgeTotal)}</div>` : ''}
       </div>
       <div class="fab-section">
-        <div class="fab-section-toggle ${(p.fabrications&&p.fabrications.length)?'open':''}" onclick="this.classList.toggle('open');this.nextElementSibling.classList.toggle('open');">
+        <div class="fab-section-toggle ${(p.fabrications&&Object.keys(p.fabrications).length)?'open':''}" onclick="this.classList.toggle('open');this.nextElementSibling.classList.toggle('open');">
           <span class="fab-toggle-arrow">▶</span>
           <span>FABRICATION</span>
-          ${p.fabrications && p.fabrications.length ? `<span class="fab-total-badge">${p.fabrications.length} selected · ${fmt(getPieceFabTotal(p))}</span>` : ''}
+          ${p.fabrications && Object.keys(p.fabrications).length ? `<span class="fab-total-badge" id="fabtotal_${p.id}">${Object.keys(p.fabrications).length} selected · ${fmt(getPieceFabTotal(p))}</span>` : `<span id="fabtotal_${p.id}"></span>`}
         </div>
-        <div class="fab-panel ${(p.fabrications&&p.fabrications.length)?'open':''}">
-          ${FABRICATION_TYPES.map(g => `
-            <div class="fab-group-label">${g.group}</div>
+        <div class="fab-panel ${(p.fabrications&&Object.keys(p.fabrications).length)?'open':''}">
+          ${FABRICATION_TYPES.map(g => {
+            const isSpecial = g.group === 'Special Fabrication';
+            return `<div class="fab-group-label">${g.group}</div>
             ${g.items.map(item => {
               const col = fabColForThickness(p.thickness);
               const price = item[col];
-              const active = p.fabrications && p.fabrications.includes(item.name);
+              const fabQty = (p.fabrications && p.fabrications[item.name]) || 0;
+              const active = fabQty > 0;
               const naStyle = price == null ? 'opacity:0.4;pointer-events:none;' : '';
-              return `<div class="fab-chip ${active?'active':''}" style="${naStyle}" onclick="toggleFabrication(${i},'${item.name.replace(/'/g,"\\'").replace(/"/g,'\\"')}')">
-                ${item.name}
-                <span class="fab-chip-price">${price != null ? '$'+price.toFixed(2) : 'N/A'}</span>
-              </div>`;
-            }).join('')}
-          `).join('')}
+              const safeName = item.name.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+
+              if (isSpecial) {
+                // Quantity stepper for special fabrication
+                return `<div class="fab-chip ${active?'active':''}" style="${naStyle};padding:0.25rem 0.4rem 0.25rem 0.6rem;">
+                  <span style="flex:1;">${item.name}</span>
+                  <span class="fab-chip-price" style="margin-right:0.4rem;">${price != null ? '$'+price.toFixed(2)+' ea' : 'N/A'}</span>
+                  <div style="display:flex;align-items:center;gap:0;border:1px solid ${active?'rgba(255,255,255,0.3)':'var(--border)'};border-radius:5px;overflow:hidden;flex-shrink:0;">
+                    <button onclick="setFabQty(${i},'${safeName}',${fabQty-1})" style="background:rgba(255,255,255,0.06);border:none;color:var(--text);cursor:pointer;font-size:0.85rem;width:22px;height:22px;display:flex;align-items:center;justify-content:center;transition:background 0.1s;" onmouseover="this.style.background='rgba(255,255,255,0.14)'" onmouseout="this.style.background='rgba(255,255,255,0.06)'">−</button>
+                    <span style="font-family:'DM Mono',monospace;font-size:0.78rem;min-width:18px;text-align:center;padding:0 2px;color:${active?'var(--accent)':'var(--muted)'};">${fabQty||0}</span>
+                    <button onclick="setFabQty(${i},'${safeName}',${fabQty+1})" style="background:rgba(255,255,255,0.06);border:none;color:var(--text);cursor:pointer;font-size:0.85rem;width:22px;height:22px;display:flex;align-items:center;justify-content:center;transition:background 0.1s;" onmouseover="this.style.background='rgba(255,255,255,0.14)'" onmouseout="this.style.background='rgba(255,255,255,0.06)'">+</button>
+                  </div>
+                  ${active ? `<span style="font-family:'DM Mono',monospace;font-size:0.72rem;color:var(--accent);margin-left:0.4rem;flex-shrink:0;">${fmt((price||0)*fabQty)}</span>` : ''}
+                </div>`;
+              } else {
+                // Simple chip toggle for regular fabrication
+                return `<div class="fab-chip ${active?'active':''}" style="${naStyle}" onclick="toggleFabrication(${i},'${safeName}')">
+                  ${item.name}
+                  <span class="fab-chip-price">${price != null ? '$'+price.toFixed(2) : 'N/A'}</span>
+                </div>`;
+              }
+            }).join('')}`;
+          }).join('')}
         </div>
       </div>`;
     list.appendChild(row);
@@ -2184,17 +2195,18 @@ function saveBidPDF() {
     else hardware.forEach(h=>row(h.name||'Hardware item',fmt(parseFloat(h.cost)||0)));
     y+=6;
     // Fabrication per piece
-    const fabPieces = pieces.filter(p => p.fabrications && p.fabrications.length > 0);
+    const fabPieces = pieces.filter(p => p.fabrications && Object.keys(p.fabrications).length > 0);
     if(fabPieces.length > 0){
       sectionLabel('Fabrication');
       fabPieces.forEach(p => {
         const col = fabColForThickness(p.thickness);
-        p.fabrications.forEach(fabName => {
+        Object.entries(p.fabrications).forEach(([fabName, fabQty]) => {
           for(const g of FABRICATION_TYPES){
             const item = g.items.find(it => it.name === fabName);
             if(item){
-              const price = (item[col]||0) * (parseFloat(p.qty)||1);
-              row(fabName + ' – ' + getPieceDisplay(p), fmt(price));
+              const price = (item[col]||0) * fabQty;
+              const label = fabName + (fabQty > 1 ? ' ×'+fabQty : '') + ' – ' + getPieceDisplay(p);
+              row(label, fmt(price));
             }
           }
         });
