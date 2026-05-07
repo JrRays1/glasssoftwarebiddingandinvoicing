@@ -1379,123 +1379,7 @@ function addPiece() {
 
 function getPieceW(p) { return toDecimal(p.wWhole, p.wFrac); }
 
-// ─────────────────────────────────────────────────
-// INLINE GLASS SELECTION HELPERS
-// ─────────────────────────────────────────────────
-function getGlassThicknesses() {
-  return ['1/8"', '3/16"', '1/4"', '3/8"', '1/2"'];
-}
 
-function getGlassCategories(thickness) {
-  const hasFlat = !!FLAT_GLASS[thickness];
-  const hasIG   = !!INSULATED_GLASS[thickness];
-  const cats = [];
-  if (hasFlat) cats.push({ val: 'flat', label: 'Flat Glass' });
-  if (hasIG)   cats.push({ val: 'insulated', label: 'Insulated (IG)' });
-  return cats;
-}
-
-function getGlassTreatments(thickness, category) {
-  const data = category === 'flat' ? FLAT_GLASS[thickness] : (INSULATED_GLASS[thickness]?.types || []);
-  const treatments = [];
-  if (data.some(g => g.annealed != null)) treatments.push({ val: 'annealed', label: 'Annealed' });
-  if (data.some(g => g.tempered != null)) treatments.push({ val: 'tempered', label: 'Tempered' });
-  if (data.some(g => g.tempered50 != null)) treatments.push({ val: 'tempered50', label: 'Tempered >50 ft²' });
-  return treatments;
-}
-
-function getGlassTypes(thickness, category, treatment) {
-  const data = category === 'flat' ? FLAT_GLASS[thickness] : (INSULATED_GLASS[thickness]?.types || []);
-  return data.filter(g => g[treatment] != null);
-}
-
-function getGlassAddons(thickness, category) {
-  if (category !== 'insulated') return [];
-  return INSULATED_GLASS[thickness]?.addons || [];
-}
-
-function applyInlineGlassSelection(i) {
-  const p = pieces[i];
-  if (!p.thickness || !p.glassCategory || !p.glassTreatment || !p.glassTypeName) return;
-  const data = p.glassCategory === 'flat' ? FLAT_GLASS[p.thickness] : (INSULATED_GLASS[p.thickness]?.types || []);
-  const glassObj = data.find(g => g.name === p.glassTypeName);
-  if (!glassObj) return;
-  let baseRate = glassObj[p.glassTreatment];
-  if (baseRate == null) return;
-  // Apply Jessica multiplier for glass (same as getPrice())
-  if (activePerson === 'jessica') baseRate *= 2;
-  // Add selected addons
-  if (p.glassAddons && p.glassAddons.length && p.glassCategory === 'insulated') {
-    const addons = getGlassAddons(p.thickness, p.glassCategory);
-    p.glassAddons.forEach(aName => {
-      const addon = addons.find(a => a.name === aName);
-      if (addon && addon[p.glassTreatment] != null) {
-        let addonPrice = addon[p.glassTreatment];
-        if (activePerson === 'jessica') addonPrice *= 2;
-        baseRate += addonPrice;
-      }
-    });
-  }
-  pieces[i].rate = baseRate.toFixed(2);
-  // Update glass type display string
-  const treatLabel = { annealed: 'Annealed', tempered: 'Tempered', tempered50: 'Tempered >50ft²' }[p.glassTreatment] || '';
-  pieces[i].glassType = p.glassTypeName + (p.glassCategory === 'insulated' ? ' (IG)' : '') + ' · ' + treatLabel;
-  // Re-price edge for new thickness
-  if (p.edgeName) {
-    const col = edgeColForThickness(p.thickness);
-    const edgeEntry = EDGE_TYPES.find(e => e.name === p.edgeName);
-    if (edgeEntry) pieces[i].edgeCpf = edgeEntry[col] * personMultiplier();
-  }
-  calculate();
-  renderPieces();
-}
-
-function onInlineThicknessChange(i, val) {
-  pieces[i].thickness = val;
-  pieces[i].glassCategory = '';
-  pieces[i].glassTreatment = '';
-  pieces[i].glassTypeName = '';
-  pieces[i].glassAddons = [];
-  pieces[i].rate = '';
-  pieces[i].glassType = '';
-  renderPieces();
-  calculate();
-}
-
-function onInlineCategoryChange(i, val) {
-  pieces[i].glassCategory = val;
-  pieces[i].glassTreatment = '';
-  pieces[i].glassTypeName = '';
-  pieces[i].glassAddons = [];
-  pieces[i].rate = '';
-  pieces[i].glassType = '';
-  renderPieces();
-  calculate();
-}
-
-function onInlineTreatmentChange(i, val) {
-  pieces[i].glassTreatment = val;
-  pieces[i].glassTypeName = '';
-  pieces[i].glassAddons = [];
-  pieces[i].rate = '';
-  pieces[i].glassType = '';
-  renderPieces();
-  calculate();
-}
-
-function onInlineGlassTypeChange(i, val) {
-  pieces[i].glassTypeName = val;
-  pieces[i].glassAddons = [];
-  applyInlineGlassSelection(i);
-}
-
-function toggleInlineAddon(i, addonName) {
-  if (!pieces[i].glassAddons) pieces[i].glassAddons = [];
-  const idx = pieces[i].glassAddons.indexOf(addonName);
-  if (idx >= 0) pieces[i].glassAddons.splice(idx, 1);
-  else pieces[i].glassAddons.push(addonName);
-  applyInlineGlassSelection(i);
-}
 function getPieceH(p) { return toDecimal(p.hWhole, p.hFrac); }
 
 // ─────────────────────────────────────────────────
@@ -1719,7 +1603,8 @@ function renderPieces() {
           if (price == null) return '';
           const finalPrice = activePerson === 'jessica' ? price * 2 : price;
           const active = p.glassAddons && p.glassAddons.includes(a.name);
-          return `<div class="fab-chip ${active?'active':''}" onclick="toggleInlineAddon(${i}, '${a.name.replace(/'/g,"\'")}')">
+          const encodedAddon = encodeURIComponent(a.name);
+          return `<div class="fab-chip ${active?'active':''} inline-addon-chip" data-pi="${i}" data-addon="${encodedAddon}">
             ${a.name.replace('Add - ','').replace('Add for ','')}
             <span class="fab-chip-price">+$${finalPrice.toFixed(2)}</span>
           </div>`;
@@ -2772,6 +2657,124 @@ const INSULATED_GLASS = {
 };
 
 // ─────────────────────────────────────────────────
+// INLINE GLASS SELECTION HELPERS
+// ─────────────────────────────────────────────────
+function getGlassThicknesses() {
+  return ['1/8"', '3/16"', '1/4"', '3/8"', '1/2"'];
+}
+
+function getGlassCategories(thickness) {
+  const hasFlat = !!FLAT_GLASS[thickness];
+  const hasIG   = !!INSULATED_GLASS[thickness];
+  const cats = [];
+  if (hasFlat) cats.push({ val: 'flat', label: 'Flat Glass' });
+  if (hasIG)   cats.push({ val: 'insulated', label: 'Insulated (IG)' });
+  return cats;
+}
+
+function getGlassTreatments(thickness, category) {
+  const data = category === 'flat' ? FLAT_GLASS[thickness] : (INSULATED_GLASS[thickness]?.types || []);
+  const treatments = [];
+  if (data.some(g => g.annealed != null)) treatments.push({ val: 'annealed', label: 'Annealed' });
+  if (data.some(g => g.tempered != null)) treatments.push({ val: 'tempered', label: 'Tempered' });
+  if (data.some(g => g.tempered50 != null)) treatments.push({ val: 'tempered50', label: 'Tempered >50 ft²' });
+  return treatments;
+}
+
+function getGlassTypes(thickness, category, treatment) {
+  const data = category === 'flat' ? FLAT_GLASS[thickness] : (INSULATED_GLASS[thickness]?.types || []);
+  return data.filter(g => g[treatment] != null);
+}
+
+function getGlassAddons(thickness, category) {
+  if (category !== 'insulated') return [];
+  return INSULATED_GLASS[thickness]?.addons || [];
+}
+
+function applyInlineGlassSelection(i) {
+  const p = pieces[i];
+  if (!p.thickness || !p.glassCategory || !p.glassTreatment || !p.glassTypeName) return;
+  const data = p.glassCategory === 'flat' ? FLAT_GLASS[p.thickness] : (INSULATED_GLASS[p.thickness]?.types || []);
+  const glassObj = data.find(g => g.name === p.glassTypeName);
+  if (!glassObj) return;
+  let baseRate = glassObj[p.glassTreatment];
+  if (baseRate == null) return;
+  // Apply Jessica multiplier for glass (same as getPrice())
+  if (activePerson === 'jessica') baseRate *= 2;
+  // Add selected addons
+  if (p.glassAddons && p.glassAddons.length && p.glassCategory === 'insulated') {
+    const addons = getGlassAddons(p.thickness, p.glassCategory);
+    p.glassAddons.forEach(aName => {
+      const addon = addons.find(a => a.name === aName);
+      if (addon && addon[p.glassTreatment] != null) {
+        let addonPrice = addon[p.glassTreatment];
+        if (activePerson === 'jessica') addonPrice *= 2;
+        baseRate += addonPrice;
+      }
+    });
+  }
+  pieces[i].rate = baseRate.toFixed(2);
+  // Update glass type display string
+  const treatLabel = { annealed: 'Annealed', tempered: 'Tempered', tempered50: 'Tempered >50ft²' }[p.glassTreatment] || '';
+  pieces[i].glassType = p.glassTypeName + (p.glassCategory === 'insulated' ? ' (IG)' : '') + ' · ' + treatLabel;
+  // Re-price edge for new thickness
+  if (p.edgeName) {
+    const col = edgeColForThickness(p.thickness);
+    const edgeEntry = EDGE_TYPES.find(e => e.name === p.edgeName);
+    if (edgeEntry) pieces[i].edgeCpf = edgeEntry[col] * personMultiplier();
+  }
+  calculate();
+  renderPieces();
+}
+
+function onInlineThicknessChange(i, val) {
+  pieces[i].thickness = val;
+  pieces[i].glassCategory = '';
+  pieces[i].glassTreatment = '';
+  pieces[i].glassTypeName = '';
+  pieces[i].glassAddons = [];
+  pieces[i].rate = '';
+  pieces[i].glassType = '';
+  renderPieces();
+  calculate();
+}
+
+function onInlineCategoryChange(i, val) {
+  pieces[i].glassCategory = val;
+  pieces[i].glassTreatment = '';
+  pieces[i].glassTypeName = '';
+  pieces[i].glassAddons = [];
+  pieces[i].rate = '';
+  pieces[i].glassType = '';
+  renderPieces();
+  calculate();
+}
+
+function onInlineTreatmentChange(i, val) {
+  pieces[i].glassTreatment = val;
+  pieces[i].glassTypeName = '';
+  pieces[i].glassAddons = [];
+  pieces[i].rate = '';
+  pieces[i].glassType = '';
+  renderPieces();
+  calculate();
+}
+
+function onInlineGlassTypeChange(i, val) {
+  pieces[i].glassTypeName = val;
+  pieces[i].glassAddons = [];
+  applyInlineGlassSelection(i);
+}
+
+function toggleInlineAddon(i, addonName) {
+  if (!pieces[i].glassAddons) pieces[i].glassAddons = [];
+  const idx = pieces[i].glassAddons.indexOf(addonName);
+  if (idx >= 0) pieces[i].glassAddons.splice(idx, 1);
+  else pieces[i].glassAddons.push(addonName);
+  applyInlineGlassSelection(i);
+}
+
+// ─────────────────────────────────────────────────
 // PRICING TAB — STATE
 // ─────────────────────────────────────────────────
 let pricingState = {
@@ -3380,6 +3383,13 @@ document.getElementById('piecesList').addEventListener('click', function(e) {
     const pi   = parseInt(chip.dataset.pi);
     const name = decodeURIComponent(chip.dataset.name);
     toggleFabrication(pi, name);
+  }
+  // Inline glass addon chips
+  const addonChip = e.target.closest('.inline-addon-chip');
+  if (addonChip) {
+    const pi   = parseInt(addonChip.dataset.pi);
+    const name = decodeURIComponent(addonChip.dataset.addon);
+    toggleInlineAddon(pi, name);
   }
 });
 </script>
