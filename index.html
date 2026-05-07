@@ -1747,43 +1747,55 @@ function applyInlineGlassSelection(i) {
 }
 
 function onInlineThicknessChange(i, val) {
-  pieces[i].thickness = val;
-  pieces[i].glassCategory = '';
-  pieces[i].glassTreatment = '';
-  pieces[i].glassTypeName = '';
-  pieces[i].glassAddons = [];
-  pieces[i].rate = '';
-  pieces[i].glassType = '';
-  renderPieces();
-  calculate();
+  try {
+    pieces[i].thickness = val;
+    pieces[i].glassCategory = '';
+    pieces[i].glassTreatment = '';
+    pieces[i].glassTypeName = '';
+    pieces[i].glassAddons = [];
+    pieces[i].rate = '';
+    pieces[i].glassType = '';
+    renderPieces();
+    calculate();
+  } catch(err) { console.error('onInlineThicknessChange error:', err); }
 }
+window.onInlineThicknessChange = onInlineThicknessChange;
 
 function onInlineCategoryChange(i, val) {
-  pieces[i].glassCategory = val;
-  pieces[i].glassTreatment = '';
-  pieces[i].glassTypeName = '';
-  pieces[i].glassAddons = [];
-  pieces[i].rate = '';
-  pieces[i].glassType = '';
-  renderPieces();
-  calculate();
+  try {
+    pieces[i].glassCategory = val;
+    pieces[i].glassTreatment = '';
+    pieces[i].glassTypeName = '';
+    pieces[i].glassAddons = [];
+    pieces[i].rate = '';
+    pieces[i].glassType = '';
+    renderPieces();
+    calculate();
+  } catch(err) { console.error('onInlineCategoryChange error:', err); }
 }
+window.onInlineCategoryChange = onInlineCategoryChange;
 
 function onInlineTreatmentChange(i, val) {
-  pieces[i].glassTreatment = val;
-  pieces[i].glassTypeName = '';
-  pieces[i].glassAddons = [];
-  pieces[i].rate = '';
-  pieces[i].glassType = '';
-  renderPieces();
-  calculate();
+  try {
+    pieces[i].glassTreatment = val;
+    pieces[i].glassTypeName = '';
+    pieces[i].glassAddons = [];
+    pieces[i].rate = '';
+    pieces[i].glassType = '';
+    renderPieces();
+    calculate();
+  } catch(err) { console.error('onInlineTreatmentChange error:', err); }
 }
+window.onInlineTreatmentChange = onInlineTreatmentChange;
 
 function onInlineGlassTypeChange(i, val) {
-  pieces[i].glassTypeName = val;
-  pieces[i].glassAddons = [];
-  applyInlineGlassSelection(i);
+  try {
+    pieces[i].glassTypeName = val;
+    pieces[i].glassAddons = [];
+    applyInlineGlassSelection(i);
+  } catch(err) { console.error('onInlineGlassTypeChange error:', err); }
 }
+window.onInlineGlassTypeChange = onInlineGlassTypeChange;
 
 function toggleInlineAddon(i, addonName) {
   if (!pieces[i].glassAddons) pieces[i].glassAddons = [];
@@ -1795,10 +1807,13 @@ function toggleInlineAddon(i, addonName) {
 
 
 function buildGlassDropdowns(p, i) {
+  // Encode a string for safe use inside an HTML attribute (double-quote safe)
+  function attrEncode(s) { return s.replace(/&/g,'&amp;').replace(/"/g,'&quot;'); }
+
   // Thickness
   let thickOpts = '<option value="">Thickness</option>';
   getGlassThicknesses().forEach(function(t) {
-    thickOpts += '<option value="' + t + '"' + (p.thickness === t ? ' selected' : '') + '>' + t + '</option>';
+    thickOpts += '<option value="' + attrEncode(t) + '"' + (p.thickness === t ? ' selected' : '') + '>' + t + '</option>';
   });
   let html = '<select class="glass-sel" data-action="thickness" data-pi="' + i + '" onchange="onInlineThicknessChange(' + i + ', this.value)">' + thickOpts + '</select>';
 
@@ -1806,7 +1821,7 @@ function buildGlassDropdowns(p, i) {
   if (p.thickness) {
     let catOpts = '<option value="">Category</option>';
     getGlassCategories(p.thickness).forEach(function(c) {
-      catOpts += '<option value="' + c.val + '"' + (p.glassCategory === c.val ? ' selected' : '') + '>' + c.label + '</option>';
+      catOpts += '<option value="' + attrEncode(c.val) + '"' + (p.glassCategory === c.val ? ' selected' : '') + '>' + c.label + '</option>';
     });
     html += '<select class="glass-sel" data-action="category" data-pi="' + i + '" onchange="onInlineCategoryChange(' + i + ', this.value)">' + catOpts + '</select>';
   }
@@ -1815,7 +1830,7 @@ function buildGlassDropdowns(p, i) {
   if (p.thickness && p.glassCategory) {
     let treatOpts = '<option value="">Treatment</option>';
     getGlassTreatments(p.thickness, p.glassCategory).forEach(function(t) {
-      treatOpts += '<option value="' + t.val + '"' + (p.glassTreatment === t.val ? ' selected' : '') + '>' + t.label + '</option>';
+      treatOpts += '<option value="' + attrEncode(t.val) + '"' + (p.glassTreatment === t.val ? ' selected' : '') + '>' + t.label + '</option>';
     });
     html += '<select class="glass-sel" data-action="treatment" data-pi="' + i + '" onchange="onInlineTreatmentChange(' + i + ', this.value)">' + treatOpts + '</select>';
   }
@@ -1824,7 +1839,7 @@ function buildGlassDropdowns(p, i) {
   if (p.thickness && p.glassCategory && p.glassTreatment) {
     let typeOpts = '<option value="">Glass Type</option>';
     getGlassTypes(p.thickness, p.glassCategory, p.glassTreatment).forEach(function(g) {
-      typeOpts += '<option value="' + g.name + '"' + (p.glassTypeName === g.name ? ' selected' : '') + '>' + g.name + '</option>';
+      typeOpts += '<option value="' + attrEncode(g.name) + '"' + (p.glassTypeName === g.name ? ' selected' : '') + '>' + g.name + '</option>';
     });
     html += '<select class="glass-sel glass-sel-type" data-action="glasstype" data-pi="' + i + '" onchange="onInlineGlassTypeChange(' + i + ', this.value)">' + typeOpts + '</select>';
   }
