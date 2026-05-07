@@ -1572,9 +1572,7 @@ function setFabQty(i, fabName, qty) {
   if (n <= 0) delete pieces[i].fabrications[fabName];
   else pieces[i].fabrications[fabName] = n;
   calculate();
-  // Don't re-render to avoid losing focus — just recalc display
-  const badge = document.getElementById('fabtotal_' + pieces[i].id);
-  if (badge) badge.textContent = Object.keys(pieces[i].fabrications).length + ' selected · ' + fmt(getPieceFabTotal(pieces[i]));
+  renderPieces();
 }
 
 
@@ -1681,7 +1679,7 @@ function renderPieces() {
         <div class="fab-section-toggle ${(p.fabrications&&Object.keys(p.fabrications).length)?'open':''}" onclick="this.classList.toggle('open');this.nextElementSibling.classList.toggle('open');">
           <span class="fab-toggle-arrow">▶</span>
           <span>FABRICATION</span>
-          ${p.fabrications && Object.keys(p.fabrications).length ? `<span class="fab-total-badge" id="fabtotal_${p.id}">${Object.keys(p.fabrications).length} selected · ${fmt(getPieceFabTotal(p))}</span>` : `<span id="fabtotal_${p.id}"></span>`}
+          ${p.fabrications && Object.keys(p.fabrications).length ? `<span class="fab-total-badge">${Object.keys(p.fabrications).length} selected · ${fmt(getPieceFabTotal(p))}</span>` : ''}
         </div>
         <div class="fab-panel ${(p.fabrications&&Object.keys(p.fabrications).length)?'open':''}">
           ${FABRICATION_TYPES.map(g => {
@@ -1693,23 +1691,20 @@ function renderPieces() {
               const fabQty = (p.fabrications && p.fabrications[item.name]) || 0;
               const active = fabQty > 0;
               const naStyle = price == null ? 'opacity:0.4;pointer-events:none;' : '';
-              const safeName = item.name.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
-
+              const encodedName = encodeURIComponent(item.name);
               if (isSpecial) {
-                // Quantity stepper for special fabrication
-                return `<div class="fab-chip ${active?'active':''}" style="${naStyle};padding:0.25rem 0.4rem 0.25rem 0.6rem;">
-                  <span style="flex:1;">${item.name}</span>
-                  <span class="fab-chip-price" style="margin-right:0.4rem;">${price != null ? '$'+price.toFixed(2)+' ea' : 'N/A'}</span>
-                  <div style="display:flex;align-items:center;gap:0;border:1px solid ${active?'rgba(255,255,255,0.3)':'var(--border)'};border-radius:5px;overflow:hidden;flex-shrink:0;">
-                    <button onclick="setFabQty(${i},'${safeName}',${fabQty-1})" style="background:rgba(255,255,255,0.06);border:none;color:var(--text);cursor:pointer;font-size:0.85rem;width:22px;height:22px;display:flex;align-items:center;justify-content:center;transition:background 0.1s;" onmouseover="this.style.background='rgba(255,255,255,0.14)'" onmouseout="this.style.background='rgba(255,255,255,0.06)'">−</button>
-                    <span style="font-family:'DM Mono',monospace;font-size:0.78rem;min-width:18px;text-align:center;padding:0 2px;color:${active?'var(--accent)':'var(--muted)'};">${fabQty||0}</span>
-                    <button onclick="setFabQty(${i},'${safeName}',${fabQty+1})" style="background:rgba(255,255,255,0.06);border:none;color:var(--text);cursor:pointer;font-size:0.85rem;width:22px;height:22px;display:flex;align-items:center;justify-content:center;transition:background 0.1s;" onmouseover="this.style.background='rgba(255,255,255,0.14)'" onmouseout="this.style.background='rgba(255,255,255,0.06)'">+</button>
+                return `<div class="fab-chip ${active?'active':''}" style="${naStyle};padding:0.25rem 0.4rem 0.25rem 0.6rem;display:flex;align-items:center;gap:0.4rem;">
+                  <span style="flex:1;font-size:0.75rem;">${item.name}</span>
+                  <span class="fab-chip-price">${price != null ? '$'+price.toFixed(2)+' ea' : 'N/A'}</span>
+                  <div style="display:flex;align-items:center;border:1px solid ${active?'rgba(255,255,255,0.3)':'var(--border)'};border-radius:5px;overflow:hidden;flex-shrink:0;">
+                    <button class="fab-qty-btn" data-pi="${i}" data-name="${encodedName}" data-delta="-1" style="background:rgba(255,255,255,0.06);border:none;color:var(--text);cursor:pointer;font-size:0.9rem;width:24px;height:24px;display:flex;align-items:center;justify-content:center;">−</button>
+                    <span style="font-family:'DM Mono',monospace;font-size:0.8rem;min-width:20px;text-align:center;color:${active?'var(--accent)':'var(--muted)'};">${fabQty}</span>
+                    <button class="fab-qty-btn" data-pi="${i}" data-name="${encodedName}" data-delta="1" style="background:rgba(255,255,255,0.06);border:none;color:var(--text);cursor:pointer;font-size:0.9rem;width:24px;height:24px;display:flex;align-items:center;justify-content:center;">+</button>
                   </div>
-                  ${active ? `<span style="font-family:'DM Mono',monospace;font-size:0.72rem;color:var(--accent);margin-left:0.4rem;flex-shrink:0;">${fmt((price||0)*fabQty)}</span>` : ''}
+                  ${active ? `<span style="font-family:'DM Mono',monospace;font-size:0.72rem;color:var(--accent);flex-shrink:0;">${fmt((price||0)*fabQty)}</span>` : ''}
                 </div>`;
               } else {
-                // Simple chip toggle for regular fabrication
-                return `<div class="fab-chip ${active?'active':''}" style="${naStyle}" onclick="toggleFabrication(${i},'${safeName}')">
+                return `<div class="fab-chip fab-toggle-chip ${active?'active':''}" data-pi="${i}" data-name="${encodedName}" style="${naStyle}">
                   ${item.name}
                   <span class="fab-chip-price">${price != null ? '$'+price.toFixed(2) : 'N/A'}</span>
                 </div>`;
@@ -3231,6 +3226,29 @@ document.getElementById('invDate').valueAsDate  = new Date();
   document.getElementById('invDueDate').valueAsDate=d;
 })();
 document.getElementById('invNumber').value = 'INV-' + String(Math.floor(Math.random()*9000)+1000);
+
+// Event delegation for fabrication buttons (avoids string escaping issues)
+document.getElementById('piecesList').addEventListener('click', function(e) {
+  // Qty stepper buttons
+  const qtyBtn = e.target.closest('.fab-qty-btn');
+  if (qtyBtn) {
+    e.stopPropagation();
+    const pi    = parseInt(qtyBtn.dataset.pi);
+    const name  = decodeURIComponent(qtyBtn.dataset.name);
+    const delta = parseInt(qtyBtn.dataset.delta);
+    if (!pieces[pi].fabrications) pieces[pi].fabrications = {};
+    const current = pieces[pi].fabrications[name] || 0;
+    setFabQty(pi, name, current + delta);
+    return;
+  }
+  // Toggle chips (regular fabrication)
+  const chip = e.target.closest('.fab-toggle-chip');
+  if (chip) {
+    const pi   = parseInt(chip.dataset.pi);
+    const name = decodeURIComponent(chip.dataset.name);
+    toggleFabrication(pi, name);
+  }
+});
 </script>
 </div><!-- end appContainer -->
 </body>
