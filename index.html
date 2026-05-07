@@ -2000,33 +2000,40 @@ function toggleInvTaxExempt() {
 // ─────────────────────────────────────────────────
 function importFromBid() {
   invItems = [];
+  // Apply both Jessica's person multiplier and Chris's margin/surcharge markup
+  const pm   = personMultiplier();
+  const marginPct    = parseFloat(document.getElementById('bidMargin')?.value) || 0;
+  const surchargePct = parseFloat(document.getElementById('bidSurcharge')?.value) || 0;
+  const mkup = 1 + (marginPct + surchargePct) / 100;
+
   pieces.filter(p=>getPieceW(p)&&getPieceH(p)).forEach(p => {
     const qty=parseFloat(p.qty)||1;
-    const sqftP=(getPieceW(p)*getPieceH(p)/144*qty);
     const desc='Glass — '+getPieceDisplay(p)+([p.thickness?p.thickness+'"':'',p.glassType].filter(Boolean).join(' · ')?(' · '+[p.thickness?p.thickness+'"':'',p.glassType].filter(Boolean).join(' · ')):'');
-    invItems.push({ id: uid(), desc, qty, price: parseFloat(getPieceGlassTotal(p).toFixed(2))/qty });
+    // Glass already has Jessica's multiplier baked into the rate, so only apply mkup
+    invItems.push({ id: uid(), desc, qty, price: parseFloat((getPieceGlassTotal(p) * mkup).toFixed(2))/qty });
   });
   pieces.filter(p=>getPieceEdgeTotal(p)>0).forEach(p => {
-    invItems.push({ id: uid(), desc: (p.edgeName||'Edging')+' – '+getPieceDisplay(p), qty: 1, price: getPieceEdgeTotal(p), isEdge: true });
+    // Edge total already includes Jessica's pm via edgeCpf, so only apply mkup
+    invItems.push({ id: uid(), desc: (p.edgeName||'Edging')+' – '+getPieceDisplay(p), qty: 1, price: getPieceEdgeTotal(p) * mkup, isEdge: true });
   });
-  // Fabrication items — flagged as isFab
+  // Fabrication — apply both pm (for Jessica) and mkup (for Chris)
   pieces.filter(p=>p.fabrications&&Object.keys(p.fabrications).length>0).forEach(p=>{
     const col=fabColForThickness(p.thickness);
     Object.entries(p.fabrications).forEach(([fabName,fabQty])=>{
       for(const g of FABRICATION_TYPES){
         const item=g.items.find(it=>it.name===fabName);
         if(item){
-          invItems.push({ id: uid(), desc: fabName+' – '+getPieceDisplay(p), qty: fabQty, price: (item[col]||0), isFab: true });
+          invItems.push({ id: uid(), desc: fabName+' – '+getPieceDisplay(p), qty: fabQty, price: (item[col]||0) * pm * mkup, isFab: true });
         }
       }
     });
   });
   hardware.forEach(h => {
-    if (parseFloat(h.cost)>0) invItems.push({ id: uid(), desc: h.name||'Hardware', qty: 1, price: parseFloat(h.cost)||0 });
+    if (parseFloat(h.cost)>0) invItems.push({ id: uid(), desc: h.name||'Hardware', qty: 1, price: (parseFloat(h.cost)||0) * mkup });
   });
   const base = totalGlass() + totalHardware() + totalEdging();
   extras.forEach(e => {
-    const v=parseFloat(e.value)||0, amt=e.type==='%'?base*(v/100):v;
+    const v=parseFloat(e.value)||0, amt=(e.type==='%'?base*(v/100):v) * mkup;
     if (amt>0) invItems.push({ id: uid(), desc: e.name||'Additional Cost', qty: 1, price: amt });
   });
   labor.forEach(l => {
