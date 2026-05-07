@@ -2189,7 +2189,7 @@ function saveBidPDF() {
       // Edging sub-line (indented)
       if(getPieceEdgeTotal(p)>0){
         doc.setFontSize(8.5);doc.setFont('helvetica','normal');gray(120);
-        doc.text('   + '+(p.edgeName||'Edging')+' ('+getPiecePerimFt(p).toFixed(2)+' in)',M+8,y);
+        doc.text('   + '+(p.edgeName||'Edging'),M+8,y);
         gray(60);doc.text(fmt(getPieceEdgeTotal(p)),R,y,{align:'right'});
         y+=8.5*1.8;
       }
@@ -2396,7 +2396,10 @@ function saveInvoicePDF() {
       gray(item.isEdge||item.isFab?100:30);
       const indent = (item.isEdge||item.isFab) ? M+10 : M;
       const prefix = (item.isEdge||item.isFab) ? '+ ' : '';
-      const descLines=doc.splitTextToSize((prefix)+(item.desc||'—'), 250);
+      // Strip " – WxH" dimension suffix from edge/fab sub-items
+      let displayDesc = item.desc || '—';
+      if (item.isEdge||item.isFab) displayDesc = displayDesc.replace(/\s*–\s*[\d\s/x"×]+.*$/, '').trim();
+      const descLines=doc.splitTextToSize((prefix)+displayDesc, 250);
       doc.text(descLines[0]||'—',indent,y+2);
       const qty=parseFloat(item.qty)||0, price=parseFloat(item.price)||0;
       if(qty!==1) doc.text(qty%1===0?String(qty):qty.toFixed(2),M+310,y+2,{align:'right'});
