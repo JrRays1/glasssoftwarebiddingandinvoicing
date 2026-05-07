@@ -1053,6 +1053,12 @@ onAuthStateChanged(auth, user => {
             <label>Tax Exempt</label>
             <button id="taxExemptBtn" onclick="toggleTaxExempt()" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--muted);cursor:pointer;font-family:'DM Mono',monospace;font-size:0.8rem;padding:0.6rem 0.85rem;text-align:left;transition:all 0.2s;">○ Not Exempt</button>
           </div>
+          <div class="field" style="margin-bottom:0;display:flex;flex-direction:column;justify-content:flex-end;">
+            <label>Pricing Person</label>
+            <div style="display:flex;gap:0.4rem;">
+              <button id="chipChris" class="person-chip active-chris" onclick="setActivePerson('chris')"><div class="person-dot"></div>Chris</button>
+              <button id="chipJessica" class="person-chip" onclick="setActivePerson('jessica')"><div class="person-dot"></div>Jessica</button>
+            </div>
         </div>
       </div>
 
@@ -1503,7 +1509,7 @@ function edgeOptionsHTML(selectedName, thicknessStr) {
 function onEdgeSelect(i, selectEl) {
   const opt = selectEl.options[selectEl.selectedIndex];
   pieces[i].edgeName = opt.value;
-  pieces[i].edgeCpf  = opt.value ? parseFloat(opt.dataset.price) : 0;
+  pieces[i].edgeCpf  = opt.value ? parseFloat(opt.dataset.price) * personMultiplier() : 0;
   calculate();
   renderPieces();
 }
@@ -1552,7 +1558,7 @@ function getPieceFabTotal(p) {
   return Object.entries(p.fabrications).reduce((s, [fabName, fabQty]) => {
     for (const g of FABRICATION_TYPES) {
       const item = g.items.find(it => it.name === fabName);
-      if (item) return s + (item[col] || 0) * (fabQty || 1);
+      if (item) return s + (item[col] || 0) * (fabQty || 1) * personMultiplier();
     }
     return s;
   }, 0);
@@ -1687,7 +1693,7 @@ function renderPieces() {
             return `<div class="fab-group-label">${g.group}</div>
             ${g.items.map(item => {
               const col = fabColForThickness(p.thickness);
-              const price = item[col];
+              const price = item[col] != null ? item[col] * personMultiplier() : null;
               const fabQty = (p.fabrications && p.fabrications[item.name]) || 0;
               const active = fabQty > 0;
               const naStyle = price == null ? 'opacity:0.4;pointer-events:none;' : '';
@@ -2916,7 +2922,7 @@ function sendPriceToBid() {
   if (lastPiece.edgeName) {
     const col = edgeColForThickness(thickness);
     const edgeEntry = EDGE_TYPES.find(e => e.name === lastPiece.edgeName);
-    if (edgeEntry) lastPiece.edgeCpf = edgeEntry[col];
+    if (edgeEntry) lastPiece.edgeCpf = edgeEntry[col] * personMultiplier();
   }
 
   renderPieces();
@@ -2936,9 +2942,12 @@ function sendPriceToBid() {
 }
 
 // ─────────────────────────────────────────────────
-// ACTIVE PERSON (pricing tab only)
+// ACTIVE PERSON (app-wide — affects glass, edging & fabrication pricing)
 // ─────────────────────────────────────────────────
 let activePerson = 'chris';
+
+// Returns 2 for Jessica, 1 for Chris — applied to edging and fabrication prices
+function personMultiplier() { return activePerson === 'jessica' ? 2 : 1; }
 
 function setActivePerson(p) {
   activePerson = p;
@@ -2949,6 +2958,7 @@ function setActivePerson(p) {
   // If pricing tab is mid-flow, re-render glass types with new prices
   if (pricingState.glassType) renderGlassTypeStep();
   else if (pricingState.treatment) renderGlassTypeStep();
+  renderPieces(); calculate(); // re-render so edging/fab prices update
   // Sync pricing tab person buttons
   const pc = document.getElementById('personChris');
   const pj = document.getElementById('personJessica');
