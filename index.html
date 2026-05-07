@@ -1061,6 +1061,14 @@ onAuthStateChanged(auth, user => {
             <label>Customer Name</label>
             <input type="text" id="customerName" placeholder="e.g. John Smith" oninput="syncJobInfo()">
           </div>
+          <div class="field" style="flex:1;min-width:160px;margin-bottom:0;">
+            <label>Phone</label>
+            <input type="text" id="customerPhone" placeholder="e.g. (602) 555-0000">
+          </div>
+          <div class="field" style="flex:1;min-width:180px;margin-bottom:0;">
+            <label>Email</label>
+            <input type="text" id="customerEmail" placeholder="e.g. john@email.com">
+          </div>
           <div class="field" style="flex:1;min-width:180px;margin-bottom:0;">
             <label>Job Description</label>
             <input type="text" id="jobDesc" placeholder="e.g. Shower enclosure" oninput="syncJobInfo()">
@@ -1382,13 +1390,19 @@ window.switchTab = switchTab;
 // SYNC JOB INFO → INVOICE
 // ─────────────────────────────────────────────────
 function syncJobInfo() {
-  const name = document.getElementById('customerName').value;
-  const desc = document.getElementById('jobDesc').value;
-  const loc  = document.getElementById('jobLocation').value;
+  const name  = document.getElementById('customerName').value;
+  const desc  = document.getElementById('jobDesc').value;
+  const loc   = document.getElementById('jobLocation').value;
+  const phone = document.getElementById('customerPhone').value;
+  const email = document.getElementById('customerEmail').value;
   if (!document.getElementById('invCustomer').value)    document.getElementById('invCustomer').value    = name;
   if (!document.getElementById('invJobDesc').value)     document.getElementById('invJobDesc').value     = desc;
   if (!document.getElementById('invJobAddress').value)  document.getElementById('invJobAddress').value  = loc;
   if (!document.getElementById('invAddress').value)     document.getElementById('invAddress').value     = loc;
+  if (!document.getElementById('invContact').value) {
+    const contact = [phone, email].filter(Boolean).join('  ·  ');
+    if (contact) document.getElementById('invContact').value = contact;
+  }
 }
 
 // ─────────────────────────────────────────────────
@@ -2372,7 +2386,7 @@ function resetBid() {
   pieces=[]; hardware=[]; labor=[]; extras=[]; invItems=[]; payments=[];
   invStatus='draft'; invTaxExemptActive=false;
   currentJobId = null; window._currentJobType = null;
-  ['customerName','jobDesc','jobLocation','pricePerSqft','glassThickness','glassType','bidNotes','bidMargin','bidSurcharge',
+  ['customerName','customerPhone','customerEmail','jobDesc','jobLocation','pricePerSqft','glassThickness','glassType','bidNotes','bidMargin','bidSurcharge',
    'invCustomer','invCompany','invAddress','invCityState','invContact',
    'invJobDesc','invJobAddress','invPO','invNotes','invPayInstructions','invNumber'].forEach(id => {
     const el=document.getElementById(id); if(el) el.value='';
@@ -2437,14 +2451,31 @@ function saveBidPDF() {
     let y = pdfHeader(doc, 'BID ESTIMATE', 'BID ESTIMATE  —  Serving Arizona Since 1988', displayDate);
 
     const cname=document.getElementById('customerName').value.trim();
+    const cphone=document.getElementById('customerPhone').value.trim();
+    const cemail=document.getElementById('customerEmail').value.trim();
     const jdesc=document.getElementById('jobDesc').value.trim();
     const jloc =document.getElementById('jobLocation').value.trim();
-    const infoBarH = jloc ? 40 : 30;
+
+    // Build contact line
+    const contactParts = [cphone, cemail].filter(Boolean);
+    const contactLine = contactParts.join('  ·  ');
+
+    // Calculate info bar height based on how many lines we need
+    const infoLines = [cname||jdesc, jloc, contactLine].filter(Boolean).length;
+    const infoBarH = 14 + infoLines * 16;
+
     doc.setFillColor(235,238,242); doc.rect(0,90,pageW,infoBarH,'F');
+    let infoY = 106;
     doc.setFontSize(9); doc.setFont('helvetica','bold'); doc.setTextColor(40,40,40);
-    if(cname) doc.text('Customer: '+cname, M, 106);
-    if(jdesc) doc.text('Job: '+jdesc, pageW/2, 106, {align:'center'});
-    if(jloc){ doc.setFont('helvetica','normal'); doc.setTextColor(80,80,80); doc.text('Location: '+jloc, M, 120); }
+    if(cname) { doc.text('Customer: '+cname, M, infoY); }
+    if(jdesc) { doc.text('Job: '+jdesc, pageW/2, infoY, {align:'center'}); }
+    infoY += 16;
+    if(jloc){ doc.setFont('helvetica','normal'); doc.setTextColor(80,80,80); doc.text('Location: '+jloc, M, infoY); infoY += 16; }
+    if(contactLine){
+      doc.setFontSize(8.5); doc.setFont('helvetica','normal'); doc.setTextColor(80,80,80);
+      if(cphone) { doc.text('📞 '+cphone, M, infoY); }
+      if(cemail) { doc.text('✉  '+cemail, cphone ? pageW/2 : M, infoY, cphone ? {align:'center'} : {}); }
+    }
     y = 90 + infoBarH + 15;
 
     function gray(v){doc.setTextColor(v,v,v);}
@@ -3157,6 +3188,8 @@ function getBidSnapshot() {
   return {
     type: 'bid',
     customer: document.getElementById('customerName').value.trim() || 'Unnamed',
+    phone:    document.getElementById('customerPhone').value.trim(),
+    email:    document.getElementById('customerEmail').value.trim(),
     jobDesc:  document.getElementById('jobDesc').value.trim(),
     location: document.getElementById('jobLocation').value.trim(),
     date:     document.getElementById('bidDate').value,
@@ -3330,8 +3363,8 @@ function openJob(id) {
     texBtn.style.cssText = job.taxExempt
       ? 'background:rgba(255,255,255,0.1);border:1px solid var(--accent);border-radius:8px;color:var(--accent);cursor:pointer;font-family:DM Mono,monospace;font-size:0.8rem;padding:0.6rem 0.85rem;text-align:left;'
       : 'background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--muted);cursor:pointer;font-family:DM Mono,monospace;font-size:0.8rem;padding:0.6rem 0.85rem;text-align:left;';
-    ['customerName','jobDesc','jobLocation','bidNotes'].forEach(id => {
-      const map = {customerName:'customer',jobDesc:'jobDesc',jobLocation:'location',bidNotes:'notes'};
+    ['customerName','jobDesc','jobLocation','bidNotes','customerPhone','customerEmail'].forEach(id => {
+      const map = {customerName:'customer',jobDesc:'jobDesc',jobLocation:'location',bidNotes:'notes',customerPhone:'phone',customerEmail:'email'};
       const el = document.getElementById(id);
       if (el) el.value = job[map[id]] || '';
     });
