@@ -980,7 +980,7 @@ onAuthStateChanged(auth, user => {
   <!-- Tabs -->
   <div class="tabs">
     <button class="tab-btn" data-tab="dashboard" onclick="switchTab('dashboard')">🏠 Dashboard</button>
-    <button class="tab-btn" data-tab="pricing" onclick="switchTab('pricing')">💰 Pricing</button>
+
     <button class="tab-btn active" data-tab="bid" onclick="switchTab('bid')">📋 Bid Estimate</button>
     <button class="tab-btn" data-tab="invoice" onclick="switchTab('invoice')">🧾 Invoice</button>
   </div>
@@ -1132,111 +1132,8 @@ onAuthStateChanged(auth, user => {
     </div>
   </div>
 
-  <!-- PRICING TAB -->
-  <div class="tab-panel" id="tab-pricing">
-    <div class="grid">
-
-      <!-- Step 0: Person -->
-      <div class="card full" style="--card-accent:#7ed4a0;">
-        <div class="card-label" style="color:#7ed4a0;">Glass Pricing Lookup</div>
-        <div class="pricing-step">
-          <div class="pricing-step-label">
-            <div class="pricing-step-num" id="step0num">1</div>
-            Who is pricing this?
-          </div>
-          <div class="glass-category-btns">
-            <button class="cat-btn" onclick="selectPerson('chris')" id="personChris">
-              <span class="cat-icon">👤</span>
-              <span class="cat-name">Chris</span>
-              <span class="cat-sub">Standard pricing</span>
-            </button>
-            <button class="cat-btn" onclick="selectPerson('jessica')" id="personJessica">
-              <span class="cat-icon">👤</span>
-              <span class="cat-name">Jessica</span>
-              <span class="cat-sub">Custom pricing</span>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <!-- Step 1: Category -->
-      <div class="card full" id="step1card" style="display:none;">
-        <div class="pricing-step">
-          <div class="pricing-step-label">
-            <div class="pricing-step-num" id="step1num">2</div>
-            Select Glass Category
-          </div>
-          <div class="glass-category-btns">
-            <button class="cat-btn" onclick="selectCategory('flat')" id="catFlat">
-              <span class="cat-icon">🪟</span>
-              <span class="cat-name">Flat Glass</span>
-              <span class="cat-sub">Single pane · Annealed or Tempered</span>
-            </button>
-            <button class="cat-btn" onclick="selectCategory('insulated')" id="catInsulated">
-              <span class="cat-icon">🧊</span>
-              <span class="cat-name">Insulated Glass</span>
-              <span class="cat-sub">Dual pane · IG unit pricing</span>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <!-- Step 2: Thickness -->
-      <div class="card full" id="step2card" style="display:none;">
-        <div class="pricing-step">
-          <div class="pricing-step-label">
-            <div class="pricing-step-num" id="step2num">3</div>
-            Select Thickness
-          </div>
-          <div class="thickness-grid" id="thicknessGrid"></div>
-        </div>
-      </div>
-
-      <!-- Step 3: Treatment -->
-      <div class="card full" id="step3card" style="display:none;">
-        <div class="pricing-step">
-          <div class="pricing-step-label">
-            <div class="pricing-step-num" id="step3num">4</div>
-            Select Treatment
-          </div>
-          <div class="treatment-grid" id="treatmentGrid"></div>
-        </div>
-      </div>
-
-      <!-- Step 4: Glass Type -->
-      <div class="card full" id="step4card" style="display:none;">
-        <div class="pricing-step" style="margin-bottom:0;">
-          <div class="pricing-step-label">
-            <div class="pricing-step-num" id="step4num">5</div>
-            Select Glass Type
-          </div>
-          <div class="glass-type-list" id="glassTypeList"></div>
-        </div>
-      </div>
-
-      <!-- Add-ons (insulated only) -->
-      <div class="card full" id="addonsCard" style="display:none;">
-        <div class="card-label" style="color:#7ed4a0;">Optional Add-ons <span style="font-size:0.6rem;color:var(--muted);font-family:'DM Mono',monospace;letter-spacing:0.06em;margin-left:0.25rem;">click to include in price</span></div>
-        <div class="addons-list" id="addonsList"></div>
-      </div>
-
-      <!-- Price Result -->
-      <div class="card full" id="priceResultCard" style="display:none;">
-        <div class="price-result-card">
-          <div class="price-result-label">Price Per Square Foot</div>
-          <div class="price-result-name" id="priceResultName">—</div>
-          <div class="price-result-specs" id="priceResultSpecs">—</div>
-          <div class="price-result-value" id="priceResultValue">—</div>
-          <div class="price-result-unit">per sq ft</div>
-          <div id="addonsSummary" style="margin-top:0.75rem;font-family:'DM Mono',monospace;font-size:0.72rem;color:var(--muted);"></div>
-          <button class="btn-use-price" onclick="sendPriceToBid()">→ Use This Price in Bid</button>
-        </div>
-      </div>
-
-    </div>
-  </div>
-
-  <!-- INVOICE TAB -->
+  
+  <!-- INVOICE TAB --><!-- INVOICE TAB -->
   <div class="tab-panel" id="tab-invoice">
     <div class="grid">
 
@@ -1476,11 +1373,129 @@ function syncJobInfo() {
 function addPiece() {
   const globalRate = parseFloat(document.getElementById('pricePerSqft').value) || 0;
   // w and h are now objects: { whole, frac }
-  pieces.push({ id: uid(), wWhole: '', wFrac: 0, hWhole: '', hFrac: 0, qty: '1', rate: globalRate ? String(globalRate) : '', thickness: '', glassType: '', edgeName: '', edgeCpf: '', fabrications: {} });
+  pieces.push({ id: uid(), wWhole: '', wFrac: 0, hWhole: '', hFrac: 0, qty: '1', rate: '', thickness: '', glassCategory: '', glassTreatment: '', glassTypeName: '', glassAddons: [], glassType: '', edgeName: '', edgeCpf: '', fabrications: {} });
   renderPieces();
 }
 
 function getPieceW(p) { return toDecimal(p.wWhole, p.wFrac); }
+
+// ─────────────────────────────────────────────────
+// INLINE GLASS SELECTION HELPERS
+// ─────────────────────────────────────────────────
+function getGlassThicknesses() {
+  return ['1/8"', '3/16"', '1/4"', '3/8"', '1/2"'];
+}
+
+function getGlassCategories(thickness) {
+  const hasFlat = !!FLAT_GLASS[thickness];
+  const hasIG   = !!INSULATED_GLASS[thickness];
+  const cats = [];
+  if (hasFlat) cats.push({ val: 'flat', label: 'Flat Glass' });
+  if (hasIG)   cats.push({ val: 'insulated', label: 'Insulated (IG)' });
+  return cats;
+}
+
+function getGlassTreatments(thickness, category) {
+  const data = category === 'flat' ? FLAT_GLASS[thickness] : (INSULATED_GLASS[thickness]?.types || []);
+  const treatments = [];
+  if (data.some(g => g.annealed != null)) treatments.push({ val: 'annealed', label: 'Annealed' });
+  if (data.some(g => g.tempered != null)) treatments.push({ val: 'tempered', label: 'Tempered' });
+  if (data.some(g => g.tempered50 != null)) treatments.push({ val: 'tempered50', label: 'Tempered >50 ft²' });
+  return treatments;
+}
+
+function getGlassTypes(thickness, category, treatment) {
+  const data = category === 'flat' ? FLAT_GLASS[thickness] : (INSULATED_GLASS[thickness]?.types || []);
+  return data.filter(g => g[treatment] != null);
+}
+
+function getGlassAddons(thickness, category) {
+  if (category !== 'insulated') return [];
+  return INSULATED_GLASS[thickness]?.addons || [];
+}
+
+function applyInlineGlassSelection(i) {
+  const p = pieces[i];
+  if (!p.thickness || !p.glassCategory || !p.glassTreatment || !p.glassTypeName) return;
+  const data = p.glassCategory === 'flat' ? FLAT_GLASS[p.thickness] : (INSULATED_GLASS[p.thickness]?.types || []);
+  const glassObj = data.find(g => g.name === p.glassTypeName);
+  if (!glassObj) return;
+  let baseRate = glassObj[p.glassTreatment];
+  if (baseRate == null) return;
+  // Apply Jessica multiplier for glass (same as getPrice())
+  if (activePerson === 'jessica') baseRate *= 2;
+  // Add selected addons
+  if (p.glassAddons && p.glassAddons.length && p.glassCategory === 'insulated') {
+    const addons = getGlassAddons(p.thickness, p.glassCategory);
+    p.glassAddons.forEach(aName => {
+      const addon = addons.find(a => a.name === aName);
+      if (addon && addon[p.glassTreatment] != null) {
+        let addonPrice = addon[p.glassTreatment];
+        if (activePerson === 'jessica') addonPrice *= 2;
+        baseRate += addonPrice;
+      }
+    });
+  }
+  pieces[i].rate = baseRate.toFixed(2);
+  // Update glass type display string
+  const treatLabel = { annealed: 'Annealed', tempered: 'Tempered', tempered50: 'Tempered >50ft²' }[p.glassTreatment] || '';
+  pieces[i].glassType = p.glassTypeName + (p.glassCategory === 'insulated' ? ' (IG)' : '') + ' · ' + treatLabel;
+  // Re-price edge for new thickness
+  if (p.edgeName) {
+    const col = edgeColForThickness(p.thickness);
+    const edgeEntry = EDGE_TYPES.find(e => e.name === p.edgeName);
+    if (edgeEntry) pieces[i].edgeCpf = edgeEntry[col] * personMultiplier();
+  }
+  calculate();
+  renderPieces();
+}
+
+function onInlineThicknessChange(i, val) {
+  pieces[i].thickness = val;
+  pieces[i].glassCategory = '';
+  pieces[i].glassTreatment = '';
+  pieces[i].glassTypeName = '';
+  pieces[i].glassAddons = [];
+  pieces[i].rate = '';
+  pieces[i].glassType = '';
+  renderPieces();
+  calculate();
+}
+
+function onInlineCategoryChange(i, val) {
+  pieces[i].glassCategory = val;
+  pieces[i].glassTreatment = '';
+  pieces[i].glassTypeName = '';
+  pieces[i].glassAddons = [];
+  pieces[i].rate = '';
+  pieces[i].glassType = '';
+  renderPieces();
+  calculate();
+}
+
+function onInlineTreatmentChange(i, val) {
+  pieces[i].glassTreatment = val;
+  pieces[i].glassTypeName = '';
+  pieces[i].glassAddons = [];
+  pieces[i].rate = '';
+  pieces[i].glassType = '';
+  renderPieces();
+  calculate();
+}
+
+function onInlineGlassTypeChange(i, val) {
+  pieces[i].glassTypeName = val;
+  pieces[i].glassAddons = [];
+  applyInlineGlassSelection(i);
+}
+
+function toggleInlineAddon(i, addonName) {
+  if (!pieces[i].glassAddons) pieces[i].glassAddons = [];
+  const idx = pieces[i].glassAddons.indexOf(addonName);
+  if (idx >= 0) pieces[i].glassAddons.splice(idx, 1);
+  else pieces[i].glassAddons.push(addonName);
+  applyInlineGlassSelection(i);
+}
 function getPieceH(p) { return toDecimal(p.hWhole, p.hFrac); }
 
 // ─────────────────────────────────────────────────
@@ -1668,17 +1683,48 @@ function renderPieces() {
         ${showDecimal ? `<div class="dim-decimal-badge">${wDec} × ${hDec}</div>` : ''}
         <button class="btn-remove" onclick="removePiece('${p.id}')">✕</button>
       </div>
-      <div class="piece-row-mid">
+      <div class="piece-row-mid" style="flex-wrap:wrap;gap:0.4rem;">
         <span class="edge-label">GLASS:</span>
-        <input type="text" placeholder='Thickness (e.g. 3/8")' value="${p.thickness}"
-          oninput="pieces[${i}].thickness=this.value;renderPieces();calculate()" style="flex:1 1 100px;min-width:80px;">
-        <input type="text" placeholder='Type (e.g. Clear)' value="${p.glassType}"
-          oninput="pieces[${i}].glassType=this.value;calculate()" style="flex:1 1 100px;min-width:80px;">
-        <span class="edge-label">$/FT²:</span>
-        <input type="number" class="piece-rate-input" placeholder="0.00" min="0" step="0.01" value="${p.rate}"
-          oninput="pieces[${i}].rate=this.value;calculate()">
+        <select class="dim-frac" style="flex:1;min-width:90px;border-radius:8px;border:1px solid var(--border);height:38px;"
+          onchange="onInlineThicknessChange(${i}, this.value)">
+          <option value="">Thickness</option>
+          ${getGlassThicknesses().map(t => `<option value="${t}" ${p.thickness===t?'selected':''}>${t}</option>`).join('')}
+        </select>
+        ${p.thickness ? `
+        <select class="dim-frac" style="flex:1;min-width:100px;border-radius:8px;border:1px solid var(--border);height:38px;"
+          onchange="onInlineCategoryChange(${i}, this.value)">
+          <option value="">Category</option>
+          ${getGlassCategories(p.thickness).map(c => `<option value="${c.val}" ${p.glassCategory===c.val?'selected':''}>${c.label}</option>`).join('')}
+        </select>` : ''}
+        ${p.thickness && p.glassCategory ? `
+        <select class="dim-frac" style="flex:1;min-width:110px;border-radius:8px;border:1px solid var(--border);height:38px;"
+          onchange="onInlineTreatmentChange(${i}, this.value)">
+          <option value="">Treatment</option>
+          ${getGlassTreatments(p.thickness, p.glassCategory).map(t => `<option value="${t.val}" ${p.glassTreatment===t.val?'selected':''}>${t.label}</option>`).join('')}
+        </select>` : ''}
+        ${p.thickness && p.glassCategory && p.glassTreatment ? `
+        <select class="dim-frac" style="flex:2;min-width:160px;border-radius:8px;border:1px solid var(--border);height:38px;"
+          onchange="onInlineGlassTypeChange(${i}, this.value)">
+          <option value="">Glass Type</option>
+          ${getGlassTypes(p.thickness, p.glassCategory, p.glassTreatment).map(g => `<option value="${g.name}" ${p.glassTypeName===g.name?'selected':''}>${g.name}</option>`).join('')}
+        </select>` : ''}
+        ${p.rate ? `<div class="piece-glass-total" style="background:rgba(126,212,160,0.12);border-color:rgba(126,212,160,0.3);color:#7ed4a0;">$${parseFloat(p.rate).toFixed(2)}/ft²</div>` : ''}
         ${showGlass ? `<div class="piece-glass-total">${fmt(glassTotal)}</div>` : ''}
       </div>
+      ${p.thickness && p.glassCategory === 'insulated' && p.glassTypeName ? `
+      <div style="display:flex;flex-wrap:wrap;gap:0.35rem;padding:0.4rem 0 0.2rem;">
+        <span class="edge-label" style="width:100%;margin-bottom:0.15rem;">ADD-ONS:</span>
+        ${getGlassAddons(p.thickness, p.glassCategory).map(a => {
+          const price = a[p.glassTreatment];
+          if (price == null) return '';
+          const finalPrice = activePerson === 'jessica' ? price * 2 : price;
+          const active = p.glassAddons && p.glassAddons.includes(a.name);
+          return `<div class="fab-chip ${active?'active':''}" onclick="toggleInlineAddon(${i}, '${a.name.replace(/'/g,"\'")}')">
+            ${a.name.replace('Add - ','').replace('Add for ','')}
+            <span class="fab-chip-price">+$${finalPrice.toFixed(2)}</span>
+          </div>`;
+        }).join('')}
+      </div>` : ''}
       <div class="piece-row-bottom">
         <span class="edge-label">EDGE:</span>
         <select class="dim-frac" style="flex:1;min-width:180px;max-width:100%;border-radius:8px;border:1px solid var(--border);height:38px;"
@@ -3006,6 +3052,8 @@ function setActivePerson(p) {
   // If pricing tab is mid-flow, re-render glass types with new prices
   if (pricingState.glassType) renderGlassTypeStep();
   else if (pricingState.treatment) renderGlassTypeStep();
+  // Re-apply glass rates for all pieces when person changes
+  pieces.forEach((p, i) => { if (p.glassTypeName) applyInlineGlassSelection(i); });
   renderPieces(); calculate(); // re-render so edging/fab prices update
   // Sync pricing tab person buttons
   const pc = document.getElementById('personChris');
@@ -3222,6 +3270,8 @@ function openJob(id) {
     if (job.date) document.getElementById('bidDate').value = job.date;
     if (job.margin)    document.getElementById('bidMargin').value    = job.margin;
     if (job.surcharge) document.getElementById('bidSurcharge').value = job.surcharge;
+    // Re-apply inline glass selections after loading
+    pieces.forEach((p, i) => { if (!p.glassCategory) p.glassCategory = ''; if (!p.glassTreatment) p.glassTreatment = ''; if (!p.glassTypeName) p.glassTypeName = ''; if (!p.glassAddons) p.glassAddons = []; });
     renderPieces(); renderHardware(); renderLabor(); renderExtras(); calculate();
     document.getElementById('bidSaveStatus').textContent = '✓ Loaded — click to update';
     switchTab('bid');
