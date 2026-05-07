@@ -914,14 +914,6 @@ onAuthStateChanged(auth, user => {
       <h1>American Legacy <span>Glass</span></h1>
     </div>
     <div style="margin-left:auto;display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;">
-      <div class="person-selector">
-        <button class="person-chip" id="chipChris" onclick="setActivePerson('chris')">
-          <div class="person-dot"></div>Chris
-        </button>
-        <button class="person-chip" id="chipJessica" onclick="setActivePerson('jessica')">
-          <div class="person-dot"></div>Jessica
-        </button>
-      </div>
       <button onclick="resetBid()" style="background:none;border:1px solid var(--border);border-radius:8px;color:var(--muted);cursor:pointer;font-family:'DM Mono',monospace;font-size:0.72rem;letter-spacing:0.08em;padding:0.45rem 0.9rem;transition:all 0.15s;white-space:nowrap;" onmouseover="this.style.borderColor='var(--danger)';this.style.color='var(--danger)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">↺ NEW BID</button>
       <button onclick="doLogout()" style="background:none;border:1px solid var(--border);border-radius:8px;color:var(--muted);cursor:pointer;font-family:'DM Mono',monospace;font-size:0.72rem;letter-spacing:0.08em;padding:0.45rem 0.9rem;transition:all 0.15s;white-space:nowrap;" onmouseover="this.style.borderColor='var(--danger)';this.style.color='var(--danger)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">⎋ Logout</button>
     </div>
@@ -2121,9 +2113,13 @@ function saveInvoicePDF() {
     const doc = new jsPDF({ unit:'pt', format:'letter' });
     const pageW=doc.internal.pageSize.getWidth(), M=50, R=pageW-M;
 
-    const subtotal=invItems.reduce((s,item)=>s+(parseFloat(item.qty)||0)*(parseFloat(item.price)||0),0);
+    const taxableItems   = invItems.filter(i => !i.taxFree);
+    const taxFreeItems   = invItems.filter(i => i.taxFree);
+    const taxableSubtotal= taxableItems.reduce((s,item)=>s+(parseFloat(item.qty)||0)*(parseFloat(item.price)||0),0);
+    const taxFreeSubtotal= taxFreeItems.reduce((s,item)=>s+(parseFloat(item.qty)||0)*(parseFloat(item.price)||0),0);
+    const subtotal       = taxableSubtotal + taxFreeSubtotal;
     const taxRate=invTaxExemptActive?0:9.1;
-    const taxAmt=subtotal*(taxRate/100), grand=subtotal+taxAmt, paid=totalPayments(), balance=Math.max(0,grand-paid);
+    const taxAmt=taxableSubtotal*(taxRate/100), grand=subtotal+taxAmt, paid=totalPayments(), balance=Math.max(0,grand-paid);
 
     const invNum   = document.getElementById('invNumber').value||'INV-0001';
     const invDateV = document.getElementById('invDate').value;
@@ -2214,8 +2210,14 @@ function saveInvoicePDF() {
       gray(20);doc.text(value,R,y,{align:'right'});
       y+=16;
     }
-    totRow('Subtotal',fmt(subtotal));
+    totRow('Taxable Subtotal', fmt(taxableSubtotal));
     totRow(invTaxExemptActive?'Tax Exempt':'Tax (9.10%)',invTaxExemptActive?'—':fmt(taxAmt));
+    if(taxFreeSubtotal > 0){
+      doc.setFontSize(9);doc.setFont('helvetica','normal');doc.setTextColor(122,184,232);
+      doc.text('Labor (tax-free)',totX,y);
+      doc.text(fmt(taxFreeSubtotal),R,y,{align:'right'});
+      y+=16;
+    }
     if(paid>0){
       doc.setTextColor(50,160,120);
       doc.setFontSize(9);doc.setFont('helvetica','normal');
@@ -2791,10 +2793,13 @@ function getBidSnapshot() {
 }
 
 function getInvoiceSnapshot() {
-  const subtotal = invItems.reduce((s,i)=>s+(parseFloat(i.qty)||0)*(parseFloat(i.price)||0),0);
+  const taxableItems    = invItems.filter(i => !i.taxFree);
+  const taxFreeItems    = invItems.filter(i => i.taxFree);
+  const taxableSubtotal = taxableItems.reduce((s,i)=>s+(parseFloat(i.qty)||0)*(parseFloat(i.price)||0),0);
+  const taxFreeSubtotal = taxFreeItems.reduce((s,i)=>s+(parseFloat(i.qty)||0)*(parseFloat(i.price)||0),0);
   const taxRate  = invTaxExemptActive ? 0 : 9.1;
-  const tax      = subtotal*(taxRate/100);
-  const grand    = subtotal + tax;
+  const tax      = taxableSubtotal*(taxRate/100);
+  const grand    = taxableSubtotal + taxFreeSubtotal + tax;
   const paid     = totalPayments();
   return {
     type: 'invoice',
