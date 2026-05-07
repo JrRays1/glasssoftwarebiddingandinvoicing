@@ -872,6 +872,61 @@ onAuthStateChanged(auth, user => {
   .btn-login:disabled { opacity: 0.5; cursor: default; transform: none; }
   .login-error { color: #e06060; font-family: 'DM Mono', monospace; font-size: 0.75rem; margin-top: 0.75rem; min-height: 1.2em; }
 
+  /* ── FABRICATION CHIPS ── */
+  .fab-section { margin-top: 0.5rem; }
+  .fab-section-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding: 0.3rem 0;
+    user-select: none;
+  }
+  .fab-section-toggle:hover { color: var(--accent2); }
+  .fab-section-toggle .fab-toggle-arrow { transition: transform 0.2s; font-size: 0.7rem; }
+  .fab-section-toggle.open .fab-toggle-arrow { transform: rotate(90deg); }
+  .fab-panel {
+    display: none;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    padding-top: 0.5rem;
+  }
+  .fab-panel.open { display: flex; }
+  .fab-group-label {
+    width: 100%;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.6rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-top: 0.4rem;
+    margin-bottom: 0.1rem;
+  }
+  .fab-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    cursor: pointer;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.75rem;
+    padding: 0.3rem 0.6rem;
+    transition: all 0.15s;
+  }
+  .fab-chip:hover { border-color: rgba(255,255,255,0.25); background: rgba(255,255,255,0.05); }
+  .fab-chip.active { background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.4); color: var(--accent); }
+  .fab-chip-price { font-family: 'DM Mono', monospace; font-size: 0.68rem; color: var(--accent2); }
+  .fab-chip.active .fab-chip-price { color: var(--accent); }
+  .fab-total-badge { font-family: 'DM Mono', monospace; font-size: 0.72rem; color: var(--accent); background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.15); border-radius: 5px; padding: 0.25rem 0.5rem; white-space: nowrap; }
+
   .terms-select {
     width: 100%;
     background: var(--surface2);
@@ -1403,7 +1458,7 @@ function syncJobInfo() {
 function addPiece() {
   const globalRate = parseFloat(document.getElementById('pricePerSqft').value) || 0;
   // w and h are now objects: { whole, frac }
-  pieces.push({ id: uid(), wWhole: '', wFrac: 0, hWhole: '', hFrac: 0, qty: '1', rate: globalRate ? String(globalRate) : '', thickness: '', glassType: '', edgeName: '', edgeCpf: '' });
+  pieces.push({ id: uid(), wWhole: '', wFrac: 0, hWhole: '', hFrac: 0, qty: '1', rate: globalRate ? String(globalRate) : '', thickness: '', glassType: '', edgeName: '', edgeCpf: '', fabrications: [] });
   renderPieces();
 }
 
@@ -1450,8 +1505,84 @@ function onEdgeSelect(i, selectEl) {
   pieces[i].edgeName = opt.value;
   pieces[i].edgeCpf  = opt.value ? parseFloat(opt.dataset.price) : 0;
   calculate();
-  // Re-render just this piece's edge total display without full re-render
   renderPieces();
+}
+
+// ─────────────────────────────────────────────────
+// FABRICATION DATA (price per each)
+// thin = 1/8"–1/4", mid = 3/8", thick = 1/2"
+// ─────────────────────────────────────────────────
+const FABRICATION_TYPES = [
+  { group: 'Fabrication',
+    items: [
+      { name: 'Triangles, Octagons, Parallelograms (PMC 7–40)', thin: 7.72,  mid: 11.88, thick: 16.04 },
+      { name: 'Radius Corners, Arch Tops, Circles (PMC 51–75)', thin: 7.72,  mid: 11.88, thick: 16.04 },
+      { name: 'Freeform Cut to Customers Pattern',               thin: 75.00, mid: 75.00, thick: 75.00 },
+      { name: 'Digitized Shape Charge',                          thin: 27.50, mid: 38.50, thick: 44.00 },
+      { name: 'Customer Supplied CAD File',                      thin: 17.82, mid: 23.76, thick: 29.70 },
+    ]
+  },
+  { group: 'Special Fabrication',
+    items: [
+      { name: 'Nipped/Dubbed Corners (per corner)',              thin: 1.78,  mid: 2.97,  thick: 3.56  },
+      { name: 'Radius/Crop Corners - No Polish (per corner)',    thin: 7.72,  mid: 11.88, thick: 16.04 },
+      { name: 'Mailslot',                                        thin: 17.82, mid: null,  thick: null  },
+      { name: '4" Polished Speak Hole',                          thin: 65.34, mid: 83.16, thick: 100.98},
+      { name: 'Internal Cut-Out (up to 20"×20")',                thin: 53.46, mid: 71.28, thick: 89.10 },
+      { name: 'Pass Thru (edge cut)',                            thin: 41.58, mid: 59.40, thick: 77.22 },
+      { name: 'Corner Notch',                                    thin: 11.88, mid: 14.26, thick: 16.63 },
+      { name: 'Edge Notch / Shower Door Hinge',                  thin: 10.69, mid: 13.07, thick: 15.44 },
+      { name: 'Finger Notch',                                    thin: 7.13,  mid: 8.32,  thick: 9.50  },
+      { name: 'Invisible Shield (per sf)',                       thin: 1.42,  mid: 1.42,  thick: 1.42  },
+    ]
+  },
+];
+
+function fabColForThickness(thicknessStr) {
+  const t = (thicknessStr || '').trim();
+  if (t === '3/8"' || t === '3/8') return 'mid';
+  if (t === '1/2"' || t === '1/2') return 'thick';
+  return 'thin';
+}
+
+function getPieceFabTotal(p) {
+  if (!p.fabrications || !p.fabrications.length) return 0;
+  const col = fabColForThickness(p.thickness);
+  const qty = parseFloat(p.qty) || 1;
+  return p.fabrications.reduce((s, fabName) => {
+    for (const g of FABRICATION_TYPES) {
+      const item = g.items.find(it => it.name === fabName);
+      if (item) return s + (item[col] || 0) * qty;
+    }
+    return s;
+  }, 0);
+}
+
+function toggleFabrication(i, fabName) {
+  if (!pieces[i].fabrications) pieces[i].fabrications = [];
+  const idx = pieces[i].fabrications.indexOf(fabName);
+  if (idx >= 0) pieces[i].fabrications.splice(idx, 1);
+  else pieces[i].fabrications.push(fabName);
+  calculate();
+  renderPieces();
+}
+
+function fabOptionsHTML(selectedFabs, thicknessStr) {
+  const col = fabColForThickness(thicknessStr);
+  const sel = selectedFabs || [];
+  let html = '';
+  FABRICATION_TYPES.forEach(g => {
+    html += `<div class="fab-group-label">${g.group}</div>`;
+    g.items.forEach(item => {
+      const price = item[col];
+      const active = sel.includes(item.name);
+      const naStyle = price == null ? 'opacity:0.4;cursor:default;' : '';
+      html += `<div class="fab-chip ${active ? 'active' : ''}" ${price != null ? `onclick="toggleFabrication(${-1}, '${item.name.replace(/'/g, "\\'")}')"` : ''} style="${naStyle}" data-fab="${item.name.replace(/"/g, '&quot;')}">
+        ${item.name}${price != null ? `<span class="fab-chip-price">$${price.toFixed(2)}</span>` : '<span class="fab-chip-price">N/A</span>'}
+      </div>`;
+    });
+  });
+  return html;
 }
 
 
@@ -1553,6 +1684,28 @@ function renderPieces() {
         ` : ''}
         ${perim > 0 && p.edgeName ? `<span class="edge-label">${perim.toFixed(3)} in</span>` : ''}
         ${showEdge ? `<div class="piece-edge-total">${fmt(edgeTotal)}</div>` : ''}
+      </div>
+      <div class="fab-section">
+        <div class="fab-section-toggle ${(p.fabrications&&p.fabrications.length)?'open':''}" onclick="this.classList.toggle('open');this.nextElementSibling.classList.toggle('open');">
+          <span class="fab-toggle-arrow">▶</span>
+          <span>FABRICATION</span>
+          ${p.fabrications && p.fabrications.length ? `<span class="fab-total-badge">${p.fabrications.length} selected · ${fmt(getPieceFabTotal(p))}</span>` : ''}
+        </div>
+        <div class="fab-panel ${(p.fabrications&&p.fabrications.length)?'open':''}">
+          ${FABRICATION_TYPES.map(g => `
+            <div class="fab-group-label">${g.group}</div>
+            ${g.items.map(item => {
+              const col = fabColForThickness(p.thickness);
+              const price = item[col];
+              const active = p.fabrications && p.fabrications.includes(item.name);
+              const naStyle = price == null ? 'opacity:0.4;pointer-events:none;' : '';
+              return `<div class="fab-chip ${active?'active':''}" style="${naStyle}" onclick="toggleFabrication(${i},'${item.name.replace(/'/g,"\\'").replace(/"/g,'\\"')}')">
+                ${item.name}
+                <span class="fab-chip-price">${price != null ? '$'+price.toFixed(2) : 'N/A'}</span>
+              </div>`;
+            }).join('')}
+          `).join('')}
+        </div>
       </div>`;
     list.appendChild(row);
   });
@@ -1568,6 +1721,7 @@ function totalGlass() {
   return pieces.reduce((s,p) => s + getPieceGlassTotal(p), 0);
 }
 function totalEdging() { return pieces.reduce((s,p) => s + getPieceEdgeTotal(p), 0); }
+function totalFabrication() { return pieces.reduce((s,p) => s + getPieceFabTotal(p), 0); }
 
 // ─────────────────────────────────────────────────
 // BID — LABOR
@@ -1651,8 +1805,9 @@ function calculate() {
   const glassTotal = totalGlass();
   const hwTotal    = totalHardware();
   const edgeTotal  = totalEdging();
+  const fabTotal   = totalFabrication();
   const laborTotal = totalLabor();
-  const taxableBase  = glassTotal + hwTotal + edgeTotal;
+  const taxableBase  = glassTotal + hwTotal + edgeTotal + fabTotal;
   const extTotal     = totalExtras(taxableBase);
   const taxableTotal = taxableBase + extTotal;
   const taxAmt       = taxableTotal * (taxRate/100);
@@ -1695,6 +1850,7 @@ function calculate() {
     </div>
     ${edgeLines}
     <div class="line-item"><span>Hardware</span><span>${fmt(hwTotal)}</span></div>
+    ${fabTotal > 0 ? `<div class="line-item"><span>Fabrication</span><span>${fmt(fabTotal)}</span></div>` : ''}
     ${extraLines}
     <div class="divider"></div>
     <div class="line-item"><span>Taxable Subtotal</span><span>${fmt(taxableTotal)}</span></div>
@@ -1967,8 +2123,8 @@ function saveBidPDF() {
     const doc = new jsPDF({ unit:'pt', format:'letter' });
     const taxExempt=window.taxExemptActive||false, taxRate=taxExempt?0:9.1;
     const glassTotal=totalGlass();
-    const hwTotal=totalHardware(), edgeTotal=totalEdging(), laborTotal=totalLabor();
-    const taxableBase=glassTotal+hwTotal+edgeTotal;
+    const hwTotal=totalHardware(), edgeTotal=totalEdging(), laborTotal=totalLabor(), fabTotal=totalFabrication();
+    const taxableBase=glassTotal+hwTotal+edgeTotal+fabTotal;
     const extTotal=totalExtras(taxableBase), taxableTotal=taxableBase+extTotal;
     const taxAmt=taxableTotal*(taxRate/100), grand=taxableTotal+taxAmt+laborTotal;
     const pageW=doc.internal.pageSize.getWidth(), M=50, R=pageW-M;
@@ -2027,6 +2183,26 @@ function saveBidPDF() {
     if(hardware.length===0)row('No hardware items',fmt(0));
     else hardware.forEach(h=>row(h.name||'Hardware item',fmt(parseFloat(h.cost)||0)));
     y+=6;
+    // Fabrication per piece
+    const fabPieces = pieces.filter(p => p.fabrications && p.fabrications.length > 0);
+    if(fabPieces.length > 0){
+      sectionLabel('Fabrication');
+      fabPieces.forEach(p => {
+        const col = fabColForThickness(p.thickness);
+        p.fabrications.forEach(fabName => {
+          for(const g of FABRICATION_TYPES){
+            const item = g.items.find(it => it.name === fabName);
+            if(item){
+              const price = (item[col]||0) * (parseFloat(p.qty)||1);
+              row(fabName + ' – ' + getPieceDisplay(p), fmt(price));
+            }
+          }
+        });
+      });
+      doc.setFontSize(9);doc.setFont('helvetica','bold');gray(40);
+      doc.text('Fabrication Total',M,y);doc.text(fmt(fabTotal),R,y,{align:'right'});y+=9*1.8;
+      y+=6;
+    }
     if(extras.length>0){
       sectionLabel('Additional Costs');
       extras.forEach(e=>{
@@ -2771,8 +2947,8 @@ let currentJobId = null; // track if we're editing an existing job
 function getBidSnapshot() {
   const taxExempt = window.taxExemptActive || false;
   const taxRate   = taxExempt ? 0 : 9.1;
-  const glassT    = totalGlass(), hwT = totalHardware(), edgeT = totalEdging(), laborT = totalLabor();
-  const taxBase   = glassT + hwT + edgeT;
+  const glassT    = totalGlass(), hwT = totalHardware(), edgeT = totalEdging(), laborT = totalLabor(), fabT = totalFabrication();
+  const taxBase   = glassT + hwT + edgeT + fabT;
   const extT      = totalExtras(taxBase);
   const taxable   = taxBase + extT;
   const tax       = taxable * (taxRate/100);
