@@ -1100,6 +1100,28 @@ onAuthStateChanged(auth, user => {
       <div class="card total-card">
         <div class="card-label">Bid Summary</div>
         <div class="breakdown" id="breakdown"></div>
+
+        <!-- Chris pricing controls — only visible when Chris is selected -->
+        <div id="chrisMarginBidRow" style="display:none;">
+          <div style="display:flex;gap:0.75rem;align-items:center;flex-wrap:wrap;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:0.75rem 1rem;">
+            <!-- Surcharge toggle -->
+            <button id="chrisSurchargeBtn" onclick="toggleSurcharge()"
+              style="background:rgba(255,255,255,0.06);border:1px solid var(--border);border-radius:7px;color:var(--muted);cursor:pointer;font-family:'DM Mono',monospace;font-size:0.72rem;letter-spacing:0.06em;padding:0.45rem 0.85rem;transition:all 0.2s;white-space:nowrap;flex-shrink:0;">
+              + 15% Surcharge
+            </button>
+            <!-- Divider -->
+            <div style="width:1px;height:24px;background:var(--border);flex-shrink:0;"></div>
+            <!-- Margin -->
+            <div style="font-family:'DM Mono',monospace;font-size:0.68rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);flex-shrink:0;">Margin</div>
+            <input type="number" id="chrisMarginBid" min="0" max="500" step="1" value="0" placeholder="0"
+              oninput="calculate()"
+              style="width:68px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'DM Mono',monospace;font-size:1rem;padding:0.4rem 0.55rem;outline:none;text-align:center;-moz-appearance:textfield;flex-shrink:0;">
+            <span style="font-family:'DM Mono',monospace;font-size:0.8rem;color:var(--muted);">%</span>
+            <!-- Running total breakdown -->
+            <div id="chrisPricingBreakdown" style="font-family:'DM Mono',monospace;font-size:0.7rem;color:var(--muted);margin-left:auto;text-align:right;line-height:1.6;"></div>
+          </div>
+        </div>
+
         <div class="grand-total">
           <div class="grand-label">Total Bid</div>
           <div class="grand-value" id="grandTotal">$0.00</div>
@@ -1208,19 +1230,6 @@ onAuthStateChanged(auth, user => {
           <div class="price-result-label">Price Per Square Foot</div>
           <div class="price-result-name" id="priceResultName">—</div>
           <div class="price-result-specs" id="priceResultSpecs">—</div>
-
-          <!-- Chris margin input — only shown for Chris -->
-          <div id="chrisMarginRow" style="display:none;margin:0.75rem auto 0.5rem;max-width:260px;">
-            <div style="font-family:'DM Mono',monospace;font-size:0.65rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);margin-bottom:0.4rem;">Profit Margin %</div>
-            <div style="display:flex;align-items:center;gap:0.5rem;">
-              <input type="number" id="chrisMargin" min="0" max="200" step="1" value="0" placeholder="0"
-                oninput="renderPriceResult()"
-                style="width:90px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'DM Mono',monospace;font-size:1.1rem;padding:0.5rem 0.75rem;outline:none;text-align:center;-moz-appearance:textfield;">
-              <span style="font-family:'DM Mono',monospace;font-size:0.8rem;color:var(--muted);">%</span>
-              <div id="chrisMarginBreakdown" style="font-family:'DM Mono',monospace;font-size:0.68rem;color:var(--muted);text-align:left;line-height:1.5;"></div>
-            </div>
-          </div>
-
           <div class="price-result-value" id="priceResultValue">—</div>
           <div class="price-result-unit">per sq ft</div>
           <div id="addonsSummary" style="margin-top:0.75rem;font-family:'DM Mono',monospace;font-size:0.72rem;color:var(--muted);"></div>
@@ -1386,7 +1395,6 @@ onAuthStateChanged(auth, user => {
 // ─────────────────────────────────────────────────
 // FRACTION HELPERS
 // ─────────────────────────────────────────────────
-// Fractional inch options (numerator/denominator, stored as decimal offset)
 const FRACTIONS = [
   { label: '—',    val: 0 },
   { label: '1/16', val: 1/16 },
@@ -1412,12 +1420,10 @@ function fracOptionsHTML(selected) {
   ).join('');
 }
 
-// Convert whole + frac to decimal inches
 function toDecimal(whole, frac) {
   return (parseFloat(whole) || 0) + (parseFloat(frac) || 0);
 }
 
-// Display string like "23 3/8"" or "24"""
 function dimDisplay(whole, frac) {
   const w = parseFloat(whole) || 0;
   const f = parseFloat(frac) || 0;
@@ -1470,7 +1476,6 @@ function syncJobInfo() {
 // ─────────────────────────────────────────────────
 function addPiece() {
   const globalRate = parseFloat(document.getElementById('pricePerSqft').value) || 0;
-  // w and h are now objects: { whole, frac }
   pieces.push({ id: uid(), wWhole: '', wFrac: 0, hWhole: '', hFrac: 0, qty: '1', rate: globalRate ? String(globalRate) : '', thickness: '', glassType: '', edgeName: '', edgeCpf: '', fabrications: {} });
   renderPieces();
 }
@@ -1479,8 +1484,7 @@ function getPieceW(p) { return toDecimal(p.wWhole, p.wFrac); }
 function getPieceH(p) { return toDecimal(p.hWhole, p.hFrac); }
 
 // ─────────────────────────────────────────────────
-// EDGEWORK DATA  (price per lineal inch)
-// col: 'thin' = 1/8"–1/4", 'mid' = 3/8", 'thick' = 1/2"
+// EDGEWORK DATA
 // ─────────────────────────────────────────────────
 const EDGE_TYPES = [
   { name: 'Seamed Edge on Annealed Glass', thin: 0.05, mid: 0.06, thick: 0.07 },
@@ -1494,15 +1498,13 @@ const EDGE_TYPES = [
   { name: 'Hand Polish',                   thin: 1.19, mid: 1.49, thick: 1.61 },
 ];
 
-// Map a thickness string to edge price column
 function edgeColForThickness(thicknessStr) {
   const t = (thicknessStr || '').trim();
   if (t === '3/8"' || t === '3/8') return 'mid';
   if (t === '1/2"' || t === '1/2') return 'thick';
-  return 'thin'; // 1/8", 3/16", 1/4" all use thin column
+  return 'thin';
 }
 
-// Apply person-based pricing to edging & fabrication base prices
 function getPersonPrice(basePrice) {
   if (basePrice == null) return null;
   const person = pricingState.person || 'chris';
@@ -1532,8 +1534,7 @@ function onEdgeSelect(i, selectEl) {
 }
 
 // ─────────────────────────────────────────────────
-// FABRICATION DATA (price per each)
-// thin = 1/8"–1/4", mid = 3/8", thick = 1/2"
+// FABRICATION DATA
 // ─────────────────────────────────────────────────
 const FABRICATION_TYPES = [
   { group: 'Fabrication',
@@ -1568,7 +1569,6 @@ function fabColForThickness(thicknessStr) {
   return 'thin';
 }
 
-// fabrications is now an object: { 'Corner Notch': 2, 'Finger Notch': 1, ... }
 function getPieceFabTotal(p) {
   if (!p.fabrications || !Object.keys(p.fabrications).length) return 0;
   const col = fabColForThickness(p.thickness);
@@ -1600,8 +1600,6 @@ function setFabQty(i, fabName, qty) {
   calculate();
   renderPieces();
 }
-
-
 
 function getPieceGlassTotal(p) {
   const w = getPieceW(p), h = getPieceH(p), qty = parseFloat(p.qty)||1;
@@ -1644,7 +1642,6 @@ function renderPieces() {
     const showGlass = glassTotal > 0;
     const w = getPieceW(p), h = getPieceH(p);
 
-    // Decimal display for reference
     const wDec = w ? w.toFixed(4).replace(/\.?0+$/, '') + '"' : '';
     const hDec = h ? h.toFixed(4).replace(/\.?0+$/, '') + '"' : '';
     const showDecimal = (p.wFrac > 0 || p.hFrac > 0) && w && h;
@@ -1653,7 +1650,6 @@ function renderPieces() {
     row.className = 'piece-row';
     row.innerHTML = `
       <div class="piece-row-top">
-        <!-- Width: whole + fraction -->
         <div class="dim-input-group">
           <input type="number" class="dim-whole" placeholder='W"' min="0" step="1" value="${p.wWhole}"
             oninput="pieces[${i}].wWhole=this.value;updatePieceSqft('${p.id}');calculate()">
@@ -1662,7 +1658,6 @@ function renderPieces() {
           </select>
         </div>
         <span class="dim-sep">×</span>
-        <!-- Height: whole + fraction -->
         <div class="dim-input-group">
           <input type="number" class="dim-whole" placeholder='H"' min="0" step="1" value="${p.hWhole}"
             oninput="pieces[${i}].hWhole=this.value;updatePieceSqft('${p.id}');calculate()">
@@ -1833,6 +1828,7 @@ function totalExtras(base) {
 // BID — CALCULATE
 // ─────────────────────────────────────────────────
 function calculate() {
+  const isChris    = pricingState.person === 'chris';
   const taxExempt  = window.taxExemptActive || false;
   const taxRate    = taxExempt ? 0 : 9.1;
   const glassTotal = totalGlass();
@@ -1843,8 +1839,24 @@ function calculate() {
   const taxableBase  = glassTotal + hwTotal + edgeTotal + fabTotal;
   const extTotal     = totalExtras(taxableBase);
   const taxableTotal = taxableBase + extTotal;
-  const taxAmt       = taxableTotal * (taxRate/100);
-  const grand        = taxableTotal + taxAmt + laborTotal;
+
+  const surchargeMulti = (isChris && chrisSurchargeActive) ? 1.15 : 1;
+  const marginPct      = isChris ? (parseFloat(document.getElementById('chrisMarginBid')?.value)||0)/100 : 0;
+  const afterSurcharge = taxableTotal * surchargeMulti;
+  const afterMargin    = afterSurcharge * (1 + marginPct);
+  const taxAmt         = afterMargin * (taxRate/100);
+  const grand          = afterMargin + taxAmt + laborTotal;
+
+  const marginRow = document.getElementById('chrisMarginBidRow');
+  if (marginRow) marginRow.style.display = isChris ? '' : 'none';
+
+  const breakdownEl = document.getElementById('chrisPricingBreakdown');
+  if (breakdownEl && isChris) {
+    let lines = `Base: ${fmt(taxableTotal)}`;
+    if (chrisSurchargeActive) lines += `<br>+15%: ${fmt(afterSurcharge)}`;
+    if (marginPct > 0) lines += `<br>+${Math.round(marginPct*100)}%: ${fmt(afterMargin)}`;
+    breakdownEl.innerHTML = lines;
+  }
 
   const extraLines = extras.map(e => {
     const v = parseFloat(e.value)||0;
@@ -1861,7 +1873,6 @@ function calculate() {
     `<div class="line-item" style="color:#7ab8e8;"><span>${l.name||'Labor'} <span style="font-size:0.7rem;opacity:0.6;">tax-free</span></span><span>${fmt(parseFloat(l.cost)||0)}</span></div>`
   ).join('');
 
-  // Per-piece glass lines
   const pieceLines = pieces.filter(p => getPieceW(p) && getPieceH(p)).map(p => {
     const w = getPieceW(p), h = getPieceH(p);
     const sqft = (w * h / 144 * (parseFloat(p.qty)||1));
@@ -1886,7 +1897,7 @@ function calculate() {
     ${fabTotal > 0 ? `<div class="line-item"><span>Fabrication</span><span>${fmt(fabTotal)}</span></div>` : ''}
     ${extraLines}
     <div class="divider"></div>
-    <div class="line-item"><span>Taxable Subtotal</span><span>${fmt(taxableTotal)}</span></div>
+    <div class="line-item"><span>Subtotal</span><span>${fmt(taxableTotal)}</span></div>
     <div class="line-item"><span>${taxExempt?'Tax Exempt':'Tax (9.10%)'}</span><span>${taxExempt?'—':fmt(taxAmt)}</span></div>
     ${laborTotal > 0 ? `<div class="divider"></div>${laborLines}<div class="line-item" style="color:#7ab8e8;font-size:0.8rem;"><span>Labor Total (not taxed)</span><span>${fmt(laborTotal)}</span></div>` : ''}`;
 
@@ -1897,6 +1908,26 @@ function calculate() {
   gv.classList.add('updated');
 }
 
+let chrisSurchargeActive = false;
+
+function toggleSurcharge() {
+  chrisSurchargeActive = !chrisSurchargeActive;
+  const btn = document.getElementById('chrisSurchargeBtn');
+  if (chrisSurchargeActive) {
+    btn.style.background = 'rgba(255,255,255,0.12)';
+    btn.style.borderColor = 'rgba(255,255,255,0.4)';
+    btn.style.color = 'var(--accent)';
+  } else {
+    btn.style.background = 'rgba(255,255,255,0.06)';
+    btn.style.borderColor = 'var(--border)';
+    btn.style.color = 'var(--muted)';
+  }
+  calculate();
+}
+
+// ─────────────────────────────────────────────────
+// BID — TAX EXEMPT  ← THIS WAS THE MISSING FUNCTION DECLARATION
+// ─────────────────────────────────────────────────
 function toggleTaxExempt() {
   window.taxExemptActive = !window.taxExemptActive;
   const btn = document.getElementById('taxExemptBtn');
@@ -2021,7 +2052,6 @@ function importFromBid() {
     const v=parseFloat(e.value)||0, amt=e.type==='%'?base*(v/100):v;
     if (amt>0) invItems.push({ id: uid(), desc: e.name||'Additional Cost', qty: 1, price: amt });
   });
-  // Fabrication items — flagged as isFab
   pieces.filter(p=>p.fabrications&&Object.keys(p.fabrications).length>0).forEach(p=>{
     const col=fabColForThickness(p.thickness);
     Object.entries(p.fabrications).forEach(([fabName,fabQty])=>{
@@ -2059,7 +2089,6 @@ function importFromBid() {
 function calcInvoice() {
   const taxRate  = invTaxExemptActive ? 0 : 9.1;
 
-  // Split items into taxable and tax-free (labor)
   const taxableItems  = invItems.filter(i => !i.taxFree);
   const taxFreeItems  = invItems.filter(i => i.taxFree);
 
@@ -2134,6 +2163,11 @@ function resetBid() {
   document.getElementById('invTaxExemptBtn').textContent = '○ Not Exempt';
   document.getElementById('bidSaveStatus').textContent = '💾 Save this bid to the dashboard';
   document.getElementById('invSaveStatus').textContent  = '💾 Save this invoice to the dashboard';
+  const marginEl = document.getElementById('chrisMarginBid');
+  if (marginEl) marginEl.value = '0';
+  chrisSurchargeActive = false;
+  const surBtn = document.getElementById('chrisSurchargeBtn');
+  if (surBtn) { surBtn.style.background='rgba(255,255,255,0.06)'; surBtn.style.borderColor='var(--border)'; surBtn.style.color='var(--muted)'; }
   setInvStatus('draft');
   renderHardware(); renderLabor(); renderExtras(); renderInvItems(); renderPayments();
   addPiece(); calculate(); calcInvoice();
@@ -2171,7 +2205,10 @@ function saveBidPDF() {
     const hwTotal=totalHardware(), edgeTotal=totalEdging(), laborTotal=totalLabor(), fabTotal=totalFabrication();
     const taxableBase=glassTotal+hwTotal+edgeTotal+fabTotal;
     const extTotal=totalExtras(taxableBase), taxableTotal=taxableBase+extTotal;
-    const taxAmt=taxableTotal*(taxRate/100), grand=taxableTotal+taxAmt+laborTotal;
+    const surchargeMultiPDF = (pricingState.person==='chris' && chrisSurchargeActive) ? 1.15 : 1;
+    const marginPctPDF      = pricingState.person==='chris' ? (parseFloat(document.getElementById('chrisMarginBid')?.value)||0)/100 : 0;
+    const adjustedTotal     = taxableTotal * surchargeMultiPDF * (1 + marginPctPDF);
+    const taxAmt=adjustedTotal*(taxRate/100), grand=adjustedTotal+taxAmt+laborTotal;
     const pageW=doc.internal.pageSize.getWidth(), M=50, R=pageW-M;
     const bidDateVal=document.getElementById('bidDate').value;
     const displayDate=bidDateVal?new Date(bidDateVal+'T00:00:00').toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'}):new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'});
@@ -2209,18 +2246,15 @@ function saveBidPDF() {
     sectionLabel('Glass & Fabrication');
     pieces.filter(p=>getPieceW(p)&&getPieceH(p)).forEach(p=>{
       const rate=parseFloat(p.rate)||0;
-      const gparts=[p.thickness?p.thickness:''  ,p.glassType].filter(Boolean).join(' · ');
+      const gparts=[p.thickness?p.thickness+'"':''  ,p.glassType].filter(Boolean).join(' · ');
       const desc=getPieceDisplay(p)+(gparts?' · '+gparts:'');
-      // Glass line
       row(desc, rate?fmt(getPieceGlassTotal(p)):'(no rate)');
-      // Edging sub-line (indented)
       if(getPieceEdgeTotal(p)>0){
         doc.setFontSize(8.5);doc.setFont('helvetica','normal');gray(120);
         doc.text('   + '+(p.edgeName||'Edging'),M+8,y);
         gray(60);doc.text(fmt(getPieceEdgeTotal(p)),R,y,{align:'right'});
         y+=8.5*1.8;
       }
-      // Fabrication sub-lines (indented)
       if(p.fabrications && Object.keys(p.fabrications).length>0){
         const col=fabColForThickness(p.thickness);
         Object.entries(p.fabrications).forEach(([fabName,fabQty])=>{
@@ -2238,7 +2272,6 @@ function saveBidPDF() {
       }
     });
     if(pieces.filter(p=>getPieceW(p)&&getPieceH(p)).length===0) row('No dimensions',fmt(0));
-    // Glass section total (glass + edge + fab)
     const glassSectionTotal = glassTotal + edgeTotal + fabTotal;
     doc.setFontSize(9);doc.setFont('helvetica','bold');gray(40);
     doc.text('Glass & Fabrication Total',M,y);doc.text(fmt(glassSectionTotal),R,y,{align:'right'});y+=9*1.8;
@@ -2255,7 +2288,7 @@ function saveBidPDF() {
       });y+=6;
     }
     divider();
-    row('Taxable Subtotal',fmt(taxableTotal));
+    row('Subtotal',fmt(taxableTotal));
     row(taxExempt?'Tax Exempt':'Tax (9.10%)',taxExempt?'—':fmt(taxAmt));
     if(labor.length>0){
       y+=4;
@@ -2415,7 +2448,6 @@ function saveInvoicePDF() {
     invItems.forEach((item,idx)=>{
       const isSubItem = item.desc && (item.desc.startsWith('  ↳') || item.taxFree);
       if(idx%2===0){doc.setFillColor(245,245,240);}else{doc.setFillColor(255,255,255);}
-      // Sub-items (edging, fab imported) get a slightly different background
       if(item.isEdge||item.isFab){doc.setFillColor(240,240,235);}
       doc.rect(M-8,y-10,R-M+16,18,'F');
       doc.setFontSize(item.isEdge||item.isFab?8:8.5);
@@ -2423,7 +2455,6 @@ function saveInvoicePDF() {
       gray(item.isEdge||item.isFab?100:30);
       const indent = (item.isEdge||item.isFab) ? M+10 : M;
       const prefix = (item.isEdge||item.isFab) ? '+ ' : '';
-      // Strip " – WxH" dimension suffix from edge/fab sub-items
       let displayDesc = item.desc || '—';
       if (item.isEdge||item.isFab) displayDesc = displayDesc.replace(/\s*–\s*[\d\s/x"×]+.*$/, '').trim();
       const descLines=doc.splitTextToSize((prefix)+displayDesc, 250);
@@ -2561,7 +2592,6 @@ function saveInvoicePDF() {
     });
 
     y=pmBoxY+pmBoxH;
-
     y+=14;
     doc.setFontSize(7.5);doc.setFont('helvetica','normal');doc.setTextColor(170,170,170);
     doc.text('American Legacy Glass  •  americanlegacyglass.com  •  Serving Arizona Since 1988',pageW/2,y,{align:'center'});
@@ -2702,15 +2732,14 @@ const INSULATED_GLASS = {
 // PRICING TAB — STATE
 // ─────────────────────────────────────────────────
 let pricingState = {
-  person: null,      // 'chris' | 'jessica'
-  category: null,    // 'flat' | 'insulated'
+  person: null,
+  category: null,
   thickness: null,
-  treatment: null,   // 'annealed' | 'tempered' | 'tempered50'
+  treatment: null,
   glassType: null,
   selectedAddons: [],
 };
 
-// Jessica's prices are 2× Chris's — applied at lookup time via getPrice()
 function getPrice(g, key) {
   const base = g[key];
   if (base == null) return null;
@@ -2722,10 +2751,8 @@ function selectPerson(person) {
   document.getElementById('personChris').classList.toggle('selected', person === 'chris');
   document.getElementById('personJessica').classList.toggle('selected', person === 'jessica');
   document.getElementById('step0num').classList.add('done');
-  // Show category step
   document.getElementById('step1card').style.display = '';
   document.getElementById('step1card').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-  // Reset downstream
   document.getElementById('catFlat').classList.remove('selected');
   document.getElementById('catInsulated').classList.remove('selected');
   document.getElementById('step2card').style.display = 'none';
@@ -2785,7 +2812,6 @@ function renderTreatmentStep() {
   const thickness = pricingState.thickness;
   const data = cat === 'flat' ? FLAT_GLASS[thickness] : INSULATED_GLASS[thickness].types;
 
-  // Determine which treatments are available for this thickness
   const hasAnnealed  = data.some(g => g.annealed != null);
   const hasTempered  = data.some(g => g.tempered != null);
   const hasTem50     = data.some(g => g.tempered50 != null);
@@ -2853,7 +2879,6 @@ function selectGlassType(g) {
   });
   document.getElementById('step4num').classList.add('done');
 
-  // Show add-ons for insulated
   if (pricingState.category === 'insulated') {
     renderAddons();
   } else {
@@ -2904,13 +2929,12 @@ function toggleAddon(a, row) {
 }
 
 function getChrisMargin() {
-  return (parseFloat(document.getElementById('chrisMargin').value) || 0) / 100;
+  const el = document.getElementById('chrisMarginBid');
+  return (parseFloat(el ? el.value : 0) || 0) / 100;
 }
 
 function applyChrisPricing(baseTotal) {
-  const surcharge = 1.15;
-  const margin = 1 + getChrisMargin();
-  return baseTotal * surcharge * margin;
+  return baseTotal * 1.15;
 }
 
 function renderPriceResult() {
@@ -2921,21 +2945,7 @@ function renderPriceResult() {
   const addonTotal = selectedAddons.reduce((s, a) => s + (getPrice(a, treatment) || 0), 0);
   const rawTotal   = basePrice + addonTotal;
 
-  // Show/hide Chris margin row
-  const marginRow = document.getElementById('chrisMarginRow');
-  marginRow.style.display = person === 'chris' ? '' : 'none';
-
-  let finalTotal = rawTotal;
-  if (person === 'chris') {
-    finalTotal = applyChrisPricing(rawTotal);
-    // Show breakdown
-    const margin = getChrisMargin() * 100;
-    const afterSurcharge = rawTotal * 1.15;
-    document.getElementById('chrisMarginBreakdown').innerHTML =
-      `Base: $${rawTotal.toFixed(2)}<br>` +
-      `+15% surcharge: $${afterSurcharge.toFixed(2)}<br>` +
-      (margin > 0 ? `+${margin.toFixed(0)}% margin: $${finalTotal.toFixed(2)}` : '');
-  }
+  const finalTotal = person === 'chris' ? applyChrisPricing(rawTotal) : rawTotal;
 
   document.getElementById('priceResultName').textContent = glassType.name;
   document.getElementById('priceResultSpecs').textContent =
@@ -2959,7 +2969,6 @@ function sendPriceToBid() {
   const addonTotal = selectedAddons.reduce((s, a) => s + (getPrice(a, treatment) || 0), 0);
   const rawTotal   = basePrice + addonTotal;
 
-  // Apply Chris's surcharge + margin silently
   const finalTotal = person === 'chris' ? applyChrisPricing(rawTotal) : rawTotal;
 
   if (pieces.length === 0) { addPiece(); }
@@ -2991,20 +3000,17 @@ function sendPriceToBid() {
 }
 
 // ─────────────────────────────────────────────────
-// ACTIVE PERSON (pricing tab only)
+// ACTIVE PERSON
 // ─────────────────────────────────────────────────
 let activePerson = 'chris';
 
 function setActivePerson(p) {
   activePerson = p;
-  // Also sync the pricing tab person selector
   pricingState.person = p;
   document.getElementById('chipChris').className   = 'person-chip' + (p==='chris'?' active-chris':'');
   document.getElementById('chipJessica').className = 'person-chip' + (p==='jessica'?' active-jessica':'');
-  // If pricing tab is mid-flow, re-render glass types with new prices
   if (pricingState.glassType) renderGlassTypeStep();
   else if (pricingState.treatment) renderGlassTypeStep();
-  // Sync pricing tab person buttons
   const pc = document.getElementById('personChris');
   const pj = document.getElementById('personJessica');
   if (pc) pc.classList.toggle('selected', p === 'chris');
@@ -3025,7 +3031,7 @@ function showToast(msg, type='success') {
 // ─────────────────────────────────────────────────
 // FIREBASE — SAVE JOB
 // ─────────────────────────────────────────────────
-let currentJobId = null; // track if we're editing an existing job
+let currentJobId = null;
 
 function getBidSnapshot() {
   const taxExempt = window.taxExemptActive || false;
@@ -3034,8 +3040,11 @@ function getBidSnapshot() {
   const taxBase   = glassT + hwT + edgeT + fabT;
   const extT      = totalExtras(taxBase);
   const taxable   = taxBase + extT;
-  const tax       = taxable * (taxRate/100);
-  const grand     = taxable + tax + laborT;
+  const surchargeMulti = (pricingState.person==='chris' && chrisSurchargeActive) ? 1.15 : 1;
+  const marginPct = pricingState.person==='chris' ? (parseFloat(document.getElementById('chrisMarginBid')?.value)||0)/100 : 0;
+  const adjusted  = taxable * surchargeMulti * (1 + marginPct);
+  const tax       = adjusted * (taxRate/100);
+  const grand     = adjusted + tax + laborT;
   return {
     type: 'bid',
     customer: document.getElementById('customerName').value.trim() || 'Unnamed',
@@ -3095,11 +3104,9 @@ async function saveJobToFirebase(type) {
   try {
     const data = type === 'bid' ? getBidSnapshot() : getInvoiceSnapshot();
     if (currentJobId && window._currentJobType === type) {
-      // Update existing
       await window._updateDoc(window._doc(db, 'jobs', currentJobId), data);
       showToast('✓ Job updated!');
     } else {
-      // New record
       const ref = await window._addDoc(window._collection(db, 'jobs'), data);
       currentJobId = ref.id;
       window._currentJobType = type;
@@ -3198,7 +3205,6 @@ function openJob(id) {
   window._currentJobType = job.type;
 
   if (job.type === 'bid') {
-    // Restore bid state
     pieces   = job.pieces   || [];
     hardware = job.hardware || [];
     labor    = job.labor    || [];
@@ -3219,7 +3225,6 @@ function openJob(id) {
     document.getElementById('bidSaveStatus').textContent = '✓ Loaded — click to update';
     switchTab('bid');
   } else {
-    // Restore invoice state
     invItems  = job.invItems  || [];
     payments  = job.payments  || [];
     invStatus = job.status    || 'draft';
@@ -3271,7 +3276,6 @@ async function doLogin() {
   inputEl.classList.remove('error');
   try {
     await window._signInWithEmailAndPassword(window._auth, 'alg@login.com', pin);
-    // onAuthStateChanged will handle showing the app
   } catch(e) {
     inputEl.classList.add('error');
     errEl.textContent = 'Incorrect PIN. Please try again.';
@@ -3288,11 +3292,10 @@ async function doLogout() {
 }
 
 // ─────────────────────────────────────────────────
-// INIT — load jobs after Firebase module ready
+// INIT
 // ─────────────────────────────────────────────────
 setTimeout(() => { if (window.loadJobs && window._db) window.loadJobs(); }, 1000);
 
-// ─────────────────────────────────────────────────
 calculate();
 calcInvoice();
 document.getElementById('bidDate').valueAsDate  = new Date();
@@ -3303,9 +3306,8 @@ document.getElementById('invDate').valueAsDate  = new Date();
 })();
 document.getElementById('invNumber').value = 'INV-' + String(Math.floor(Math.random()*9000)+1000);
 
-// Event delegation for fabrication buttons (avoids string escaping issues)
+// Event delegation for fabrication buttons
 document.getElementById('piecesList').addEventListener('click', function(e) {
-  // Qty stepper buttons
   const qtyBtn = e.target.closest('.fab-qty-btn');
   if (qtyBtn) {
     e.stopPropagation();
@@ -3317,7 +3319,6 @@ document.getElementById('piecesList').addEventListener('click', function(e) {
     setFabQty(pi, name, current + delta);
     return;
   }
-  // Toggle chips (regular fabrication)
   const chip = e.target.closest('.fab-toggle-chip');
   if (chip) {
     const pi   = parseInt(chip.dataset.pi);
