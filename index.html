@@ -1833,31 +1833,31 @@ function calculate() {
   const laborTotal = totalLabor();
   const marginPct    = parseFloat(document.getElementById('bidMargin')?.value) || 0;
   const surchargePct = parseFloat(document.getElementById('bidSurcharge')?.value) || 0;
+  // Multiplier spreads markup proportionally across all line items
+  const mkup         = 1 + (marginPct + surchargePct) / 100;
   const taxableBase  = glassTotal + hwTotal + edgeTotal + fabTotal;
   const extTotal     = totalExtras(taxableBase);
-  const markupBase   = taxableBase + extTotal;
-  const marginAmt    = markupBase * (marginPct / 100);
-  const surchargeAmt = markupBase * (surchargePct / 100);
-  const taxableTotal = markupBase + marginAmt + surchargeAmt;
-  const taxAmt       = taxableTotal * (taxRate/100);
-  const grand        = taxableTotal + taxAmt + laborTotal;
+  const baseSubtotal = taxableBase + extTotal;
+  const taxAmt       = baseSubtotal * (taxRate/100);
+  const markupAmt    = baseSubtotal * (mkup - 1);
+  const grand        = baseSubtotal + taxAmt + markupAmt + laborTotal;
 
   const extraLines = extras.map(e => {
     const v = parseFloat(e.value)||0;
-    const amt = e.type === '%' ? taxableBase*(v/100) : v;
+    const amt = (e.type === '%' ? taxableBase*(v/100) : v) * mkup;
     return `<div class="line-item"><span>${e.name||'Additional Cost'}${e.type==='%'?' ('+v+'%)':''}</span><span>${fmt(amt)}</span></div>`;
   }).join('');
 
   const edgeLines = pieces.filter(p => getPieceEdgeTotal(p) > 0).map(p => {
     const perim = getPiecePerimFt(p), cpf = parseFloat(p.edgeCpf)||0;
-    return `<div class="line-item"><span>${p.edgeName||'Edging'} – ${getPieceDisplay(p)} (${perim.toFixed(3)} in × ${fmt(cpf)}/in)</span><span>${fmt(getPieceEdgeTotal(p))}</span></div>`;
+    return `<div class="line-item"><span>${p.edgeName||'Edging'} – ${getPieceDisplay(p)} (${perim.toFixed(3)} in × ${fmt(cpf)}/in)</span><span>${fmt(getPieceEdgeTotal(p) * mkup)}</span></div>`;
   }).join('');
 
   const laborLines = labor.map(l =>
     `<div class="line-item" style="color:#7ab8e8;"><span>${l.name||'Labor'} <span style="font-size:0.7rem;opacity:0.6;">tax-free</span></span><span>${fmt(parseFloat(l.cost)||0)}</span></div>`
   ).join('');
 
-  // Per-piece glass lines
+  // Per-piece glass lines — show base rate for Chris to see, marked-up total
   const pieceLines = pieces.filter(p => getPieceW(p) && getPieceH(p)).map(p => {
     const w = getPieceW(p), h = getPieceH(p);
     const sqft = (w * h / 144 * (parseFloat(p.qty)||1));
@@ -1867,7 +1867,7 @@ function calculate() {
     const rateStr = rate ? ` @ ${fmt(rate)}/ft²` : ' (no rate set)';
     return `<div class="line-item total-glass" style="padding-left:0.75rem;font-size:0.8rem;">
       <span>${getPieceDisplay(p)}${gparts?' · '+gparts:''} — ${sqft.toFixed(3)} ft²${rateStr}</span>
-      <span>${rate ? fmt(pieceTotal) : '—'}</span>
+      <span>${rate ? fmt(pieceTotal * mkup) : '—'}</span>
     </div>`;
   }).join('');
 
@@ -1875,16 +1875,14 @@ function calculate() {
     <div class="line-item" style="font-family:'DM Mono',monospace;font-size:0.65rem;letter-spacing:0.12em;color:var(--muted);text-transform:uppercase;margin-bottom:0.15rem;">Glass Pieces</div>
     ${pieceLines || '<div class="line-item"><span style="color:var(--muted)">No pieces added</span><span>—</span></div>'}
     <div class="line-item total-glass" style="margin-top:0.25rem;border-top:1px solid rgba(255,255,255,0.08);padding-top:0.4rem;">
-      <span>Glass Total</span><span>${fmt(glassTotal)}</span>
+      <span>Glass Total</span><span>${fmt(glassTotal * mkup)}</span>
     </div>
     ${edgeLines}
-    <div class="line-item"><span>Hardware</span><span>${fmt(hwTotal)}</span></div>
-    ${fabTotal > 0 ? `<div class="line-item"><span>Fabrication</span><span>${fmt(fabTotal)}</span></div>` : ''}
+    <div class="line-item"><span>Hardware</span><span>${fmt(hwTotal * mkup)}</span></div>
+    ${fabTotal > 0 ? `<div class="line-item"><span>Fabrication</span><span>${fmt(fabTotal * mkup)}</span></div>` : ''}
     ${extraLines}
     <div class="divider"></div>
-    <div class="line-item"><span>Base Subtotal</span><span>${fmt(markupBase)}</span></div>
-    ${marginAmt > 0 ? `<div class="line-item" style="color:var(--muted);font-size:0.78rem;"><span>Margin (${marginPct}%) <span style="font-size:0.65rem;opacity:0.6;">internal</span></span><span>${fmt(marginAmt)}</span></div>` : ''}
-    ${surchargeAmt > 0 ? `<div class="line-item" style="color:var(--muted);font-size:0.78rem;"><span>Surcharge (${surchargePct}%) <span style="font-size:0.65rem;opacity:0.6;">internal</span></span><span>${fmt(surchargeAmt)}</span></div>` : ''}
+    <div class="line-item"><span>Taxable Subtotal</span><span>${fmt(baseSubtotal)}</span></div>
     <div class="line-item"><span>${taxExempt?'Tax Exempt':'Tax (9.10%)'}</span><span>${taxExempt?'—':fmt(taxAmt)}</span></div>
     ${laborTotal > 0 ? `<div class="divider"></div>${laborLines}<div class="line-item" style="color:#7ab8e8;font-size:0.8rem;"><span>Labor Total (not taxed)</span><span>${fmt(laborTotal)}</span></div>` : ''}`;
 
@@ -2171,9 +2169,12 @@ function saveBidPDF() {
     const extTotal=totalExtras(taxableBase);
     const marginPct=parseFloat(document.getElementById('bidMargin')?.value)||0;
     const surchargePct=parseFloat(document.getElementById('bidSurcharge')?.value)||0;
-    const markupBase=taxableBase+extTotal;
-    const taxableTotal=markupBase*(1+(marginPct+surchargePct)/100);
-    const taxAmt=taxableTotal*(taxRate/100), grand=taxableTotal+taxAmt+laborTotal;
+    const mkup=1+(marginPct+surchargePct)/100;
+    const baseSubtotal=(taxableBase+extTotal);
+    const taxAmt=baseSubtotal*(taxRate/100);
+    const markupAmt=baseSubtotal*(mkup-1);
+    const taxableTotal=baseSubtotal;
+    const grand=baseSubtotal+taxAmt+markupAmt+laborTotal;
     const pageW=doc.internal.pageSize.getWidth(), M=50, R=pageW-M;
     const bidDateVal=document.getElementById('bidDate').value;
     const displayDate=bidDateVal?new Date(bidDateVal+'T00:00:00').toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'}):new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'});
@@ -2213,23 +2214,23 @@ function saveBidPDF() {
       const rate=parseFloat(p.rate)||0;
       const gparts=[p.thickness?p.thickness:''  ,p.glassType].filter(Boolean).join(' · ');
       const desc=getPieceDisplay(p)+(gparts?' · '+gparts:'');
-      // Glass line
-      row(desc, rate?fmt(getPieceGlassTotal(p)):'(no rate)');
-      // Edging sub-line (indented)
+      // Glass line — apply markup
+      row(desc, rate?fmt(getPieceGlassTotal(p)*mkup):'(no rate)');
+      // Edging sub-line (indented) — apply markup
       if(getPieceEdgeTotal(p)>0){
         doc.setFontSize(8.5);doc.setFont('helvetica','normal');gray(120);
         doc.text('   + '+(p.edgeName||'Edging'),M+8,y);
-        gray(60);doc.text(fmt(getPieceEdgeTotal(p)),R,y,{align:'right'});
+        gray(60);doc.text(fmt(getPieceEdgeTotal(p)*mkup),R,y,{align:'right'});
         y+=8.5*1.8;
       }
-      // Fabrication sub-lines (indented)
+      // Fabrication sub-lines (indented) — apply markup
       if(p.fabrications && Object.keys(p.fabrications).length>0){
         const col=fabColForThickness(p.thickness);
         Object.entries(p.fabrications).forEach(([fabName,fabQty])=>{
           for(const g of FABRICATION_TYPES){
             const item=g.items.find(it=>it.name===fabName);
             if(item){
-              const price=(item[col]||0)*fabQty;
+              const price=(item[col]||0)*fabQty*mkup;
               doc.setFontSize(8.5);doc.setFont('helvetica','normal');gray(120);
               doc.text('   + '+fabName+(fabQty>1?' x'+fabQty:''),M+8,y);
               gray(60);doc.text(fmt(price),R,y,{align:'right'});
@@ -2240,19 +2241,19 @@ function saveBidPDF() {
       }
     });
     if(pieces.filter(p=>getPieceW(p)&&getPieceH(p)).length===0) row('No dimensions',fmt(0));
-    // Glass section total (glass + edge + fab)
-    const glassSectionTotal = glassTotal + edgeTotal + fabTotal;
+    // Glass section total (glass + edge + fab) — apply markup
+    const glassSectionTotal = (glassTotal + edgeTotal + fabTotal) * mkup;
     doc.setFontSize(9);doc.setFont('helvetica','bold');gray(40);
     doc.text('Glass & Fabrication Total',M,y);doc.text(fmt(glassSectionTotal),R,y,{align:'right'});y+=9*1.8;
     y+=6;
     sectionLabel('Hardware');
     if(hardware.length===0)row('No hardware items',fmt(0));
-    else hardware.forEach(h=>row(h.name||'Hardware item',fmt(parseFloat(h.cost)||0)));
+    else hardware.forEach(h=>row(h.name||'Hardware item',fmt((parseFloat(h.cost)||0)*mkup)));
     y+=6;
     if(extras.length>0){
       sectionLabel('Additional Costs');
       extras.forEach(e=>{
-        const v=parseFloat(e.value)||0,amt=e.type==='%'?taxableBase*(v/100):v;
+        const v=parseFloat(e.value)||0,amt=(e.type==='%'?taxableBase*(v/100):v)*mkup;
         row((e.name||'Additional Cost')+(e.type==='%'?' ('+v+'%)':''),fmt(amt));
       });y+=6;
     }
