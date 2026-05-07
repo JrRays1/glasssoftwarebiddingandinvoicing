@@ -1730,12 +1730,17 @@ function toggleTaxExempt() {
 // ─────────────────────────────────────────────────
 // INVOICE — LINE ITEMS
 // ─────────────────────────────────────────────────
-function addInvItem(desc='', qty=1, price=0) {
-  invItems.push({ id: uid(), desc, qty, price });
+function addInvItem(desc='', qty=1, price=0, taxFree=false) {
+  invItems.push({ id: uid(), desc, qty, price, taxFree });
   renderInvItems();
   calcInvoice();
 }
 function removeInvItem(id) { invItems = invItems.filter(x => x.id !== id); renderInvItems(); calcInvoice(); }
+function toggleInvItemTaxFree(i) {
+  invItems[i].taxFree = !invItems[i].taxFree;
+  renderInvItems();
+  calcInvoice();
+}
 function renderInvItems() {
   const list = document.getElementById('invItemsList');
   list.innerHTML = '';
@@ -1743,6 +1748,7 @@ function renderInvItems() {
     const total = (parseFloat(item.qty)||0) * (parseFloat(item.price)||0);
     const row = document.createElement('div');
     row.className = 'inv-item-row';
+    row.style.gridTemplateColumns = '2fr 70px 90px auto 90px auto';
     row.innerHTML = `
       <input type="text" placeholder="Description" value="${item.desc}"
         oninput="invItems[${i}].desc=this.value">
@@ -1750,6 +1756,7 @@ function renderInvItems() {
         oninput="invItems[${i}].qty=this.value;calcInvoice();renderInvItems()">
       <input type="number" placeholder="0.00" min="0" step="0.01" value="${item.price}"
         oninput="invItems[${i}].price=this.value;calcInvoice();renderInvItems()">
+      <button onclick="toggleInvItemTaxFree(${i})" title="Toggle tax-free" style="background:${item.taxFree?'rgba(122,184,232,0.15)':'none'};border:1px solid ${item.taxFree?'#7ab8e8':'var(--border)'};border-radius:6px;color:${item.taxFree?'#7ab8e8':'var(--muted)'};cursor:pointer;font-family:'DM Mono',monospace;font-size:0.6rem;padding:0.3rem 0.4rem;white-space:nowrap;transition:all 0.15s;">${item.taxFree?'TAX FREE':'TAXABLE'}</button>
       <div class="inv-line-total">${fmt(total)}</div>
       <button class="btn-remove" onclick="removeInvItem('${item.id}')">✕</button>`;
     list.appendChild(row);
@@ -1832,7 +1839,7 @@ function importFromBid() {
     if (amt>0) invItems.push({ id: uid(), desc: e.name||'Additional Cost', qty: 1, price: amt });
   });
   labor.forEach(l => {
-    if (parseFloat(l.cost)>0) invItems.push({ id: uid(), desc: (l.name||'Labor')+' (tax-free)', qty: 1, price: parseFloat(l.cost)||0 });
+    if (parseFloat(l.cost)>0) invItems.push({ id: uid(), desc: (l.name||'Labor')+' (tax-free)', qty: 1, price: parseFloat(l.cost)||0, taxFree: true });
   });
   const cname = document.getElementById('customerName').value;
   const jdesc = document.getElementById('jobDesc').value;
@@ -1855,24 +1862,33 @@ function importFromBid() {
 // INVOICE — CALCULATE
 // ─────────────────────────────────────────────────
 function calcInvoice() {
-  const subtotal = invItems.reduce((s,item) => s+(parseFloat(item.qty)||0)*(parseFloat(item.price)||0), 0);
   const taxRate  = invTaxExemptActive ? 0 : 9.1;
-  const taxAmt   = subtotal * (taxRate/100);
+
+  // Split items into taxable and tax-free (labor)
+  const taxableItems  = invItems.filter(i => !i.taxFree);
+  const taxFreeItems  = invItems.filter(i => i.taxFree);
+
+  const taxableSubtotal = taxableItems.reduce((s,item) => s+(parseFloat(item.qty)||0)*(parseFloat(item.price)||0), 0);
+  const taxFreeSubtotal = taxFreeItems.reduce((s,item) => s+(parseFloat(item.qty)||0)*(parseFloat(item.price)||0), 0);
+  const subtotal = taxableSubtotal + taxFreeSubtotal;
+  const taxAmt   = taxableSubtotal * (taxRate/100);
   const grand    = subtotal + taxAmt;
   const paid     = totalPayments();
   const balance  = grand - paid;
 
   const itemLines = invItems.map(item => {
     const total = (parseFloat(item.qty)||0)*(parseFloat(item.price)||0);
-    return `<div class="line-item"><span>${item.desc||'Line Item'}</span><span>${fmt(total)}</span></div>`;
+    const taxFreeTag = item.taxFree ? `<span style="font-size:0.65rem;color:#7ab8e8;margin-left:0.35rem;">tax-free</span>` : '';
+    return `<div class="line-item"><span>${item.desc||'Line Item'}${taxFreeTag}</span><span>${fmt(total)}</span></div>`;
   }).join('');
 
   const deposit = grand * 0.5;
   document.getElementById('invBreakdown').innerHTML = `
     ${itemLines}
     <div class="divider"></div>
-    <div class="line-item"><span>Subtotal</span><span>${fmt(subtotal)}</span></div>
+    <div class="line-item"><span>Taxable Subtotal</span><span>${fmt(taxableSubtotal)}</span></div>
     <div class="line-item"><span>${invTaxExemptActive?'Tax Exempt':'Tax (9.10%)'}</span><span>${invTaxExemptActive?'—':fmt(taxAmt)}</span></div>
+    ${taxFreeSubtotal > 0 ? `<div class="line-item" style="color:#7ab8e8;"><span>Labor (tax-free)</span><span>${fmt(taxFreeSubtotal)}</span></div>` : ''}
     <div class="divider"></div>
     <div class="line-item" style="color:var(--invoice-accent);"><span>50% Deposit Required</span><span>${fmt(deposit)}</span></div>
     ${paid > 0 ? `<div class="line-item" style="color:var(--green)"><span>Payments Received</span><span>− ${fmt(paid)}</span></div>` : ''}`;
