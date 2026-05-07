@@ -942,6 +942,30 @@ onAuthStateChanged(auth, user => {
     cursor: pointer;
   }
   .terms-select:focus { border-color: var(--invoice-accent); }
+
+  .glass-sel {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    font-size: 0.78rem;
+    padding: 0.6rem 1.5rem 0.6rem 0.75rem;
+    outline: none;
+    cursor: pointer;
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23777'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 6px center;
+    height: 38px;
+    flex: 1;
+    min-width: 90px;
+    transition: border-color 0.2s;
+  }
+  .glass-sel:focus { border-color: var(--accent); }
+  .glass-sel option { background: #242424; color: var(--text); }
+  .glass-sel-type { flex: 2; min-width: 160px; }
 </style>
 </head>
 <body>
@@ -1526,22 +1550,20 @@ function updatePieceSqft(id) {
 }
 
 function buildGlassDropdowns(p, i) {
-  const sel = "background:var(--surface2);border:1px solid var(--border);color:var(--text);font-family:'DM Mono',monospace;font-size:0.78rem;padding:0.6rem 0.3rem 0.6rem 0.75rem;outline:none;cursor:pointer;appearance:none;-webkit-appearance:none;background-image:url('data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'10\' height=\'6\'%3E%3Cpath d=\'M0 0l5 6 5-6z\' fill=\'%23777\'/%3E%3C/svg%3E');background-repeat:no-repeat;background-position:right 6px center;padding-right:20px;height:38px;border-radius:8px;flex:1;min-width:90px;";
-
   // Thickness
   let thickOpts = '<option value="">Thickness</option>';
   getGlassThicknesses().forEach(function(t) {
     thickOpts += '<option value="' + t + '"' + (p.thickness === t ? ' selected' : '') + '>' + t + '</option>';
   });
-  let html = '<select style="' + sel + 'min-width:90px;" onchange="onInlineThicknessChange(' + i + ', this.value)">' + thickOpts + '</select>';
+  let html = '<select class="glass-sel" data-action="thickness" data-pi="' + i + '">' + thickOpts + '</select>';
 
-  // Category
+  // Category — only show if thickness selected
   if (p.thickness) {
     let catOpts = '<option value="">Category</option>';
     getGlassCategories(p.thickness).forEach(function(c) {
       catOpts += '<option value="' + c.val + '"' + (p.glassCategory === c.val ? ' selected' : '') + '>' + c.label + '</option>';
     });
-    html += '<select style="' + sel + 'min-width:100px;" onchange="onInlineCategoryChange(' + i + ', this.value)">' + catOpts + '</select>';
+    html += '<select class="glass-sel" data-action="category" data-pi="' + i + '">' + catOpts + '</select>';
   }
 
   // Treatment
@@ -1550,7 +1572,7 @@ function buildGlassDropdowns(p, i) {
     getGlassTreatments(p.thickness, p.glassCategory).forEach(function(t) {
       treatOpts += '<option value="' + t.val + '"' + (p.glassTreatment === t.val ? ' selected' : '') + '>' + t.label + '</option>';
     });
-    html += '<select style="' + sel + 'min-width:110px;" onchange="onInlineTreatmentChange(' + i + ', this.value)">' + treatOpts + '</select>';
+    html += '<select class="glass-sel" data-action="treatment" data-pi="' + i + '">' + treatOpts + '</select>';
   }
 
   // Glass Type
@@ -1559,7 +1581,7 @@ function buildGlassDropdowns(p, i) {
     getGlassTypes(p.thickness, p.glassCategory, p.glassTreatment).forEach(function(g) {
       typeOpts += '<option value="' + g.name + '"' + (p.glassTypeName === g.name ? ' selected' : '') + '>' + g.name + '</option>';
     });
-    html += '<select style="' + sel + 'min-width:160px;flex:2;" onchange="onInlineGlassTypeChange(' + i + ', this.value)">' + typeOpts + '</select>';
+    html += '<select class="glass-sel glass-sel-type" data-action="glasstype" data-pi="' + i + '">' + typeOpts + '</select>';
   }
 
   return html;
@@ -3414,6 +3436,19 @@ document.getElementById('piecesList').addEventListener('click', function(e) {
     const name = decodeURIComponent(addonChip.dataset.addon);
     toggleInlineAddon(pi, name);
   }
+});
+
+// Event delegation for glass selection dropdowns
+document.getElementById('piecesList').addEventListener('change', function(e) {
+  const sel = e.target.closest('.glass-sel');
+  if (!sel) return;
+  const pi  = parseInt(sel.dataset.pi);
+  const val = sel.value;
+  const action = sel.dataset.action;
+  if (action === 'thickness') onInlineThicknessChange(pi, val);
+  else if (action === 'category')  onInlineCategoryChange(pi, val);
+  else if (action === 'treatment') onInlineTreatmentChange(pi, val);
+  else if (action === 'glasstype') onInlineGlassTypeChange(pi, val);
 });
 </script>
 </div><!-- end appContainer -->
