@@ -44,6 +44,7 @@ onAuthStateChanged(auth, user => {
     document.getElementById('loginScreen').style.display = 'none';
     document.getElementById('appContainer').style.display = '';
     if (window.loadJobs) window.loadJobs();
+    if (window.switchTab) window.switchTab('dashboard');
   } else {
     document.getElementById('loginScreen').style.display = 'flex';
     document.getElementById('appContainer').style.display = 'none';
@@ -1381,6 +1382,7 @@ function switchTab(tab) {
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === 'tab-' + tab));
   if (tab === 'invoice') calcInvoice();
 }
+window.switchTab = switchTab;
 
 // ─────────────────────────────────────────────────
 // SYNC JOB INFO → INVOICE
@@ -2716,6 +2718,7 @@ function sendPriceToBid() {
   renderPieces();
   calculate();
   switchTab('bid');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
 
   setTimeout(() => {
     const rows = document.querySelectorAll('.piece-row');
