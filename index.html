@@ -2189,7 +2189,7 @@ function saveBidPDF() {
       // Edging sub-line (indented)
       if(getPieceEdgeTotal(p)>0){
         doc.setFontSize(8.5);doc.setFont('helvetica','normal');gray(120);
-        doc.text('  ↳ '+(p.edgeName||'Edging')+' ('+getPiecePerimFt(p).toFixed(2)+' in)',M+8,y);
+        doc.text('   + '+(p.edgeName||'Edging')+' ('+getPiecePerimFt(p).toFixed(2)+' in)',M+8,y);
         gray(60);doc.text(fmt(getPieceEdgeTotal(p)),R,y,{align:'right'});
         y+=8.5*1.8;
       }
@@ -2202,7 +2202,7 @@ function saveBidPDF() {
             if(item){
               const price=(item[col]||0)*fabQty;
               doc.setFontSize(8.5);doc.setFont('helvetica','normal');gray(120);
-              doc.text('  ↳ '+fabName+(fabQty>1?' ×'+fabQty:''),M+8,y);
+              doc.text('   + '+fabName+(fabQty>1?' x'+fabQty:''),M+8,y);
               gray(60);doc.text(fmt(price),R,y,{align:'right'});
               y+=8.5*1.8;
             }
@@ -2395,7 +2395,7 @@ function saveInvoicePDF() {
       doc.setFont('helvetica',item.isEdge||item.isFab?'normal':'normal');
       gray(item.isEdge||item.isFab?100:30);
       const indent = (item.isEdge||item.isFab) ? M+10 : M;
-      const prefix = (item.isEdge||item.isFab) ? '↳ ' : '';
+      const prefix = (item.isEdge||item.isFab) ? '+ ' : '';
       const descLines=doc.splitTextToSize((prefix)+(item.desc||'—'), 250);
       doc.text(descLines[0]||'—',indent,y+2);
       const qty=parseFloat(item.qty)||0, price=parseFloat(item.price)||0;
