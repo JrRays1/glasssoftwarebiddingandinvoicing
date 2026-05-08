@@ -1078,6 +1078,9 @@ onAuthStateChanged(auth, user => {
       <button class="filter-btn" onclick="setDashFilter('sent', this)">Sent</button>
       <button class="filter-btn" onclick="setDashFilter('paid', this)">Paid</button>
       <button class="filter-btn" onclick="setDashFilter('overdue', this)">Overdue</button>
+      <input type="text" id="dashSearch" placeholder="Search customer or job…" oninput="renderDashboard()"
+        style="margin-left:auto;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:0.82rem;padding:0.32rem 0.75rem;outline:none;transition:border-color 0.2s;width:200px;"
+        onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'">
     </div>
 
     <!-- Job list -->
@@ -3594,9 +3597,19 @@ function renderDashboard() {
   else if (['draft','sent','paid','overdue'].includes(dashFilter))
     filtered = allJobs.filter(j => j.status === dashFilter);
 
+  const q = (document.getElementById('dashSearch')?.value || '').toLowerCase().trim();
+  if (q) {
+    filtered = filtered.filter(j =>
+      (j.customer  || '').toLowerCase().includes(q) ||
+      (j.jobDesc   || '').toLowerCase().includes(q) ||
+      (j.location  || '').toLowerCase().includes(q) ||
+      (j.invNumber || '').toLowerCase().includes(q)
+    );
+  }
+
   const list = document.getElementById('jobList');
   if (!filtered.length) {
-    list.innerHTML = '<div class="dash-empty"><div class="dash-empty-icon">📋</div>No jobs match this filter.</div>';
+    list.innerHTML = '<div class="dash-empty"><div class="dash-empty-icon">📋</div>' + (q ? 'No jobs match "' + q + '".' : 'No jobs match this filter.') + '</div>';
     return;
   }
 
@@ -3629,6 +3642,8 @@ function setDashFilter(f, btn) {
   dashFilter = f;
   document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
+  const s = document.getElementById('dashSearch');
+  if (s) s.value = '';
   renderDashboard();
 }
 
