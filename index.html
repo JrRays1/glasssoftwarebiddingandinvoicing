@@ -1586,6 +1586,21 @@ const FABRICATION_TYPES = [
       { name: 'Invisible Shield (per sf)',                       thin: 1.42,  mid: 1.42,  thick: 1.42  },
     ]
   },
+  { group: 'Insulated Fabrication',
+    insulated: true,
+    items: [
+      { name: 'IG – Rakes, Right Triangles, PMC Shapes 1–6',          under50: 19.76, over50: 24.70 },
+      { name: 'IG – Triangles, Octagons, Parallelograms (PMC 7–40)',   under50: 26.25, over50: 32.81 },
+      { name: 'IG – Radius Corners, Arch Tops, Circles (PMC 51–75)',   under50: 33.00, over50: 41.25 },
+      { name: 'IG – Freeform Cut to Customers Pattern',                under50: 150.00,over50: 150.00 },
+      { name: 'IG – Digitized Shape Charge',                           under50: 55.00, over50: 68.75 },
+      { name: 'IG – Argon Gas Fill Upgrade (per sq ft)',               under50: 3.65,  over50: 3.65  },
+      { name: 'IG – Silicone Seal (standard)',                         under50: 0,     over50: 0     },
+      { name: 'IG – Off-set Units up to 1-1/2" (per sq ft)',           under50: 2.97,  over50: 2.97  },
+      { name: 'IG – Muntin Bars Rectangles, Equal Openings (per sqft)',under50: 2.50,  over50: 3.13  },
+      { name: 'IG – Muntin Bars 3-Spoke Grid, Unequal (per sketch)',   under50: 5.50,  over50: 6.88  },
+    ]
+  },
 ];
 
 function fabColForThickness(thicknessStr) {
@@ -1599,10 +1614,17 @@ function fabColForThickness(thicknessStr) {
 function getPieceFabTotal(p) {
   if (!p.fabrications || !Object.keys(p.fabrications).length) return 0;
   const col = fabColForThickness(p.thickness);
+  const sqft = (getPieceW(p) * getPieceH(p)) / 144 * (p.qty || 1);
   return Object.entries(p.fabrications).reduce((s, [fabName, fabQty]) => {
     for (const g of FABRICATION_TYPES) {
       const item = g.items.find(it => it.name === fabName);
-      if (item) return s + (item[col] || 0) * (fabQty || 1) * personMultiplier();
+      if (item) {
+        if (g.insulated) {
+          const price = sqft <= 50 ? item.under50 : item.over50;
+          return s + (price || 0) * (fabQty || 1) * personMultiplier();
+        }
+        return s + (item[col] || 0) * (fabQty || 1) * personMultiplier();
+      }
     }
     return s;
   }, 0);
@@ -2047,15 +2069,19 @@ function renderPieces() {
         <div class="fab-panel ${(p.fabrications&&Object.keys(p.fabrications).length)?'open':''}">
           ${FABRICATION_TYPES.map(g => {
             const isSpecial = g.group === 'Special Fabrication';
+            const isInsulated = g.insulated;
+            const sqft = (getPieceW(p) * getPieceH(p)) / 144 * (p.qty || 1);
             return `<div class="fab-group-label">${g.group}</div>
             ${g.items.map(item => {
               const col = fabColForThickness(p.thickness);
-              const price = item[col] != null ? item[col] * personMultiplier() : null;
+              const price = isInsulated
+                ? (sqft <= 50 ? item.under50 : item.over50) * personMultiplier()
+                : (item[col] != null ? item[col] * personMultiplier() : null);
               const fabQty = (p.fabrications && p.fabrications[item.name]) || 0;
               const active = fabQty > 0;
               const naStyle = price == null ? 'opacity:0.4;pointer-events:none;' : '';
               const encodedName = encodeURIComponent(item.name);
-              if (isSpecial) {
+              if (isSpecial || isInsulated) {
                 return `<div class="fab-chip ${active?'active':''}" style="${naStyle};padding:0.25rem 0.4rem 0.25rem 0.6rem;display:flex;align-items:center;gap:0.4rem;">
                   <span style="flex:1;font-size:0.75rem;">${item.name}</span>
                   <span class="fab-chip-price">${price != null ? '$'+price.toFixed(2)+' ea' : 'N/A'}</span>
@@ -2369,7 +2395,10 @@ function importFromBid() {
       for(const g of FABRICATION_TYPES){
         const item=g.items.find(it=>it.name===fabName);
         if(item){
-          const basePrice = (item[col]||0) * pm;
+          const sqft = (getPieceW(p) * getPieceH(p)) / 144 * (parseFloat(p.qty)||1);
+          const basePrice = g.insulated
+            ? (sqft <= 50 ? item.under50 : item.over50) * pm
+            : (item[col]||0) * pm;
           invItems.push({ id: uid(), desc: fabName+' – '+getPieceDisplay(p), qty: fabQty, price: basePrice * mkup, basePrice, isFab: true });
         }
       }
@@ -2617,7 +2646,9 @@ function saveBidPDF() {
           for(const g of FABRICATION_TYPES){
             const item=g.items.find(it=>it.name===fabName);
             if(item){
-              const price=(item[col]||0)*fabQty*mkup;
+              const sqft=(getPieceW(p)*getPieceH(p))/144*(parseFloat(p.qty)||1);
+              const unitPrice=g.insulated?(sqft<=50?item.under50:item.over50):(item[col]||0);
+              const price=unitPrice*fabQty*mkup;
               doc.setFontSize(8.5);doc.setFont('helvetica','normal');gray(120);
               doc.text('   + '+fabName+(fabQty>1?' x'+fabQty:''),M+8,y);
               gray(60);doc.text(fmt(price),R,y,{align:'right'});
