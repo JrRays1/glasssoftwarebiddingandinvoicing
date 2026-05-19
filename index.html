@@ -1146,7 +1146,10 @@ onAuthStateChanged(auth, user => {
 
       <!-- Glass Pieces -->
       <div class="card full">
-        <div class="card-label">Glass Pieces — Dimensions</div>
+        <div class="card-label" style="justify-content:space-between;">
+          <span>Glass Pieces — Dimensions</span>
+          <button id="roundSqftBtn" onclick="toggleRoundSqft()" style="background:none;border:1px solid var(--border);border-radius:6px;color:var(--muted);cursor:pointer;font-family:'DM Mono',monospace;font-size:0.65rem;letter-spacing:0.1em;padding:0.2rem 0.55rem;transition:color 0.2s,border-color 0.2s;" title="Toggle rounding sq ft to nearest whole number">≈ Round ft²</button>
+        </div>
         <div class="pieces-scroll">
           <div class="pieces-list" id="piecesList"></div>
         </div>
@@ -1669,10 +1672,28 @@ function getPiecePerimFt(p) {
 }
 function getPieceEdgeTotal(p) { return getPiecePerimFt(p) * (parseFloat(p.edgeCpf)||0); }
 
+let roundSqft = false;
+
 function getSqft(p) {
   const w = getPieceW(p), h = getPieceH(p), qty = parseFloat(p.qty)||1;
   if (!w || !h) return '—';
-  return (w*h/144*qty).toFixed(3) + ' ft²';
+  const val = w*h/144*qty;
+  return (roundSqft ? Math.round(val) : val.toFixed(3)) + ' ft²';
+}
+
+function toggleRoundSqft() {
+  roundSqft = !roundSqft;
+  const btn = document.getElementById('roundSqftBtn');
+  if (btn) {
+    btn.textContent = roundSqft ? '≈ Rounded' : '≈ Round ft²';
+    btn.style.color = roundSqft ? 'var(--accent)' : 'var(--muted)';
+    btn.style.borderColor = roundSqft ? 'var(--accent)' : 'var(--border)';
+  }
+  document.querySelectorAll('[id^="sqft_"]').forEach(el => {
+    const id = el.id.replace('sqft_', '');
+    const p = pieces.find(x => x.id === id);
+    if (p) el.textContent = getSqft(p);
+  });
 }
 function updatePieceSqft(id) {
   const p = pieces.find(x => x.id === id);
