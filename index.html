@@ -1154,7 +1154,6 @@ onAuthStateChanged(auth, user => {
           <div class="pieces-list" id="piecesList"></div>
         </div>
         <button class="btn-add" onclick="addPiece()">+ Add Piece</button>
-      </div>
 
       <!-- Hardware -->
       <div class="card">
@@ -1655,7 +1654,9 @@ function setFabQty(i, fabName, qty) {
 function getPieceGlassTotal(p) {
   const w = getPieceW(p), h = getPieceH(p), qty = parseFloat(p.qty)||1;
   const rate = parseFloat(p.rate)||0;
-  return (w * h / 144 * qty) * rate;
+  const rawSqft = w * h / 144 * qty;
+  const sqft = roundSqft ? Math.ceil(rawSqft) : rawSqft;
+  return sqft * rate;
 }
 function removePiece(id) { pieces = pieces.filter(p => p.id !== id); renderPieces(); calculate(); }
 
@@ -1678,7 +1679,7 @@ function getSqft(p) {
   const w = getPieceW(p), h = getPieceH(p), qty = parseFloat(p.qty)||1;
   if (!w || !h) return '—';
   const val = w*h/144*qty;
-  return (roundSqft ? Math.round(val) : val.toFixed(3)) + ' ft²';
+  return (roundSqft ? Math.ceil(val) : val.toFixed(3)) + ' ft²';
 }
 
 function toggleRoundSqft() {
@@ -1694,6 +1695,7 @@ function toggleRoundSqft() {
     const p = pieces.find(x => x.id === id);
     if (p) el.textContent = getSqft(p);
   });
+  calculate();
 }
 function updatePieceSqft(id) {
   const p = pieces.find(x => x.id === id);
@@ -2063,7 +2065,14 @@ function renderPieces() {
       <div class="piece-row-mid" style="flex-wrap:wrap;gap:0.4rem;">
         <span class="edge-label">GLASS:</span>
         ${buildGlassDropdowns(p, i)}
-        ${p.rate ? '<div class="piece-glass-total" style="background:rgba(126,212,160,0.12);border-color:rgba(126,212,160,0.3);color:#7ed4a0;">$' + parseFloat(p.rate).toFixed(2) + '/ft²</div>' : ''}
+        <div style="display:flex;align-items:center;gap:0;flex-shrink:0;background:rgba(126,212,160,0.10);border:1px solid rgba(126,212,160,0.3);border-radius:6px;overflow:hidden;" title="$/ft² — edit to override">
+          <span style="font-family:'DM Mono',monospace;font-size:0.72rem;color:#7ed4a0;padding:0 0.3rem 0 0.5rem;white-space:nowrap;">$</span>
+          <input type="number" min="0" step="0.01" placeholder="0.00"
+            value="${p.rate ? parseFloat(p.rate).toFixed(2) : ''}"
+            oninput="pieces[${i}].rate=this.value;calculate()"
+            style="width:62px;background:transparent;border:none;outline:none;font-family:'DM Mono',monospace;font-size:0.72rem;color:#7ed4a0;padding:0.28rem 0;text-align:right;">
+          <span style="font-family:'DM Mono',monospace;font-size:0.72rem;color:#7ed4a0;padding:0 0.5rem 0 0.2rem;white-space:nowrap;">/ft²</span>
+        </div>
         ${showGlass ? '<div class="piece-glass-total">' + fmt(glassTotal) + '</div>' : ''}
       </div>
       ${buildAddonRow(p, i)}
@@ -2130,7 +2139,8 @@ function renderPieces() {
 function totalSqft() {
   return pieces.reduce((s,p) => {
     const w = getPieceW(p), h = getPieceH(p), qty = parseFloat(p.qty)||1;
-    return s + (w*h/144*qty);
+    const raw = w*h/144*qty;
+    return s + (roundSqft ? Math.ceil(raw) : raw);
   }, 0);
 }
 function totalGlass() {
@@ -2253,12 +2263,13 @@ function calculate() {
   const pieceLines = pieces.filter(p => getPieceW(p) && getPieceH(p)).map(p => {
     const w = getPieceW(p), h = getPieceH(p);
     const sqft = (w * h / 144 * (parseFloat(p.qty)||1));
+    const displaySqft = roundSqft ? Math.ceil(sqft) : sqft;
     const rate = parseFloat(p.rate)||0;
     const pieceTotal = getPieceGlassTotal(p);
     const gparts = [p.thickness?p.thickness+'"':'', p.glassType].filter(Boolean).join(' · ');
     const rateStr = rate ? ` @ ${fmt(rate)}/ft²` : ' (no rate set)';
     return `<div class="line-item total-glass" style="padding-left:0.75rem;font-size:0.8rem;">
-      <span>${getPieceDisplay(p)}${gparts?' · '+gparts:''} — ${sqft.toFixed(3)} ft²${rateStr}</span>
+      <span>${getPieceDisplay(p)}${gparts?' · '+gparts:''} — ${roundSqft ? displaySqft : sqft.toFixed(3)} ft²${rateStr}</span>
       <span>${rate ? fmt(pieceTotal * mkup) : '—'}</span>
     </div>`;
   }).join('');
