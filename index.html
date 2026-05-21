@@ -1616,16 +1616,17 @@ function fabColForThickness(thicknessStr) {
 function getPieceFabTotal(p) {
   if (!p.fabrications || !Object.keys(p.fabrications).length) return 0;
   const col = fabColForThickness(p.thickness);
-  const sqft = (getPieceW(p) * getPieceH(p)) / 144 * (p.qty || 1);
+  const pieceQty = parseFloat(p.qty) || 1;
+  const sqft = (getPieceW(p) * getPieceH(p)) / 144 * pieceQty;
   return Object.entries(p.fabrications).reduce((s, [fabName, fabQty]) => {
     for (const g of FABRICATION_TYPES) {
       const item = g.items.find(it => it.name === fabName);
       if (item) {
         if (g.insulated) {
           const price = sqft <= 50 ? item.under50 : item.over50;
-          return s + (price || 0) * (fabQty || 1) * personMultiplier();
+          return s + (price || 0) * (fabQty || 1) * pieceQty * personMultiplier();
         }
-        return s + (item[col] || 0) * (fabQty || 1) * personMultiplier();
+        return s + (item[col] || 0) * (fabQty || 1) * pieceQty * personMultiplier();
       }
     }
     return s;
@@ -2423,15 +2424,16 @@ function importFromBid() {
   // Fabrication — apply both pm (for Jessica) and mkup (for Chris)
   pieces.filter(p=>p.fabrications&&Object.keys(p.fabrications).length>0).forEach(p=>{
     const col=fabColForThickness(p.thickness);
+    const pieceQty = parseFloat(p.qty)||1;
     Object.entries(p.fabrications).forEach(([fabName,fabQty])=>{
       for(const g of FABRICATION_TYPES){
         const item=g.items.find(it=>it.name===fabName);
         if(item){
-          const sqft = (getPieceW(p) * getPieceH(p)) / 144 * (parseFloat(p.qty)||1);
+          const sqft = (getPieceW(p) * getPieceH(p)) / 144 * pieceQty;
           const basePrice = g.insulated
             ? (sqft <= 50 ? item.under50 : item.over50) * pm
             : (item[col]||0) * pm;
-          invItems.push({ id: uid(), desc: fabName+' – '+getPieceDisplay(p), qty: fabQty, price: basePrice * mkup, basePrice, isFab: true });
+          invItems.push({ id: uid(), desc: fabName+' – '+getPieceDisplay(p), qty: fabQty * pieceQty, price: basePrice * mkup, basePrice, isFab: true });
         }
       }
     });
@@ -2674,15 +2676,17 @@ function saveBidPDF() {
       // Fabrication sub-lines (indented) — apply markup
       if(p.fabrications && Object.keys(p.fabrications).length>0){
         const col=fabColForThickness(p.thickness);
+        const pieceQty=parseFloat(p.qty)||1;
         Object.entries(p.fabrications).forEach(([fabName,fabQty])=>{
           for(const g of FABRICATION_TYPES){
             const item=g.items.find(it=>it.name===fabName);
             if(item){
-              const sqft=(getPieceW(p)*getPieceH(p))/144*(parseFloat(p.qty)||1);
+              const sqft=(getPieceW(p)*getPieceH(p))/144*pieceQty;
               const unitPrice=g.insulated?(sqft<=50?item.under50:item.over50):(item[col]||0);
-              const price=unitPrice*fabQty*mkup;
+              const totalFabQty=fabQty*pieceQty;
+              const price=unitPrice*totalFabQty*mkup;
               doc.setFontSize(8.5);doc.setFont('helvetica','normal');gray(120);
-              doc.text('   + '+fabName+(fabQty>1?' x'+fabQty:''),M+8,y);
+              doc.text('   + '+fabName+(totalFabQty>1?' x'+totalFabQty:''),M+8,y);
               gray(60);doc.text(fmt(price),R,y,{align:'right'});
               y+=8.5*1.8;
             }
