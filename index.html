@@ -3876,6 +3876,377 @@ document.getElementById('piecesList').addEventListener('change', function(e) {
   else if (action === 'treatment') onInlineTreatmentChange(pi, val);
   else if (action === 'glasstype') onInlineGlassTypeChange(pi, val);
 });
+
+// ─────────────────────────────────────────────────
+// BULK CONTACT IMPORT (runs once, skips if already done)
+// ─────────────────────────────────────────────────
+async function bulkImportContacts() {
+  const db = window._db;
+  if (!db) return;
+  if (localStorage.getItem('alg_contacts_imported_v1')) return;
+  const contacts = [
+  {
+    "name": "Amazing Tint",
+    "company": "Amazing Tint",
+    "email": "amazingtintquotes@gmail.com",
+    "phone": "602.721.9349",
+    "address": ""
+  },
+  {
+    "name": "Anthony Ante",
+    "company": "Contractors Wardrobe",
+    "email": "AAnte@cwdoors.com",
+    "phone": "602.481.3699",
+    "address": ""
+  },
+  {
+    "name": "Arista Dawson",
+    "company": "Oldcastle",
+    "email": "adawson@obe.com",
+    "phone": "602.362.5513",
+    "address": ""
+  },
+  {
+    "name": "Ashley Benoit",
+    "company": "Hartung Glass",
+    "email": "ABenoit@hartung-glass.com",
+    "phone": "602.309.9638",
+    "address": ""
+  },
+  {
+    "name": "Bill Waibel",
+    "company": "Waibel Masonry",
+    "email": "bill@waibelmasonry.com",
+    "phone": "480.620.1663",
+    "address": ""
+  },
+  {
+    "name": "Cameron Farner",
+    "company": "GEF Development",
+    "email": "cameron@gefdevelopment.com",
+    "phone": "602.781.2954",
+    "address": ""
+  },
+  {
+    "name": "Cameron Nelson",
+    "company": "Saguaro Glass Inc.",
+    "email": "orders@saguaroglass.com",
+    "phone": "623.872.2777",
+    "address": ""
+  },
+  {
+    "name": "Christopher Quirk",
+    "company": "Trulite Glass",
+    "email": "cquirk@trulite.com",
+    "phone": "602.281.5714",
+    "address": ""
+  },
+  {
+    "name": "Chuck Clarke",
+    "company": "",
+    "email": "chuck@clarkecpa.cc",
+    "phone": "602.769.7479",
+    "address": "10687 E Cinder Cone Trail, Scottsdale, AZ 85262"
+  },
+  {
+    "name": "Colton from Oldcastle",
+    "company": "Oldcastle",
+    "email": "",
+    "phone": "+16239995021",
+    "address": ""
+  },
+  {
+    "name": "Curt Lenhardt",
+    "company": "Oldcastle Building",
+    "email": "clenhardt@obe.com",
+    "phone": "602.477.1025",
+    "address": ""
+  },
+  {
+    "name": "Dan Bouet",
+    "company": "",
+    "email": "dan.d.day@gmail.com",
+    "phone": "858.380.8592",
+    "address": ""
+  },
+  {
+    "name": "Couto Dan",
+    "company": "",
+    "email": "dcouto@timesunion.com",
+    "phone": "",
+    "address": ""
+  },
+  {
+    "name": "Debbie & Vern Sumnicht",
+    "company": "",
+    "email": "DSumnicht@gmail.com",
+    "phone": "920.277.9439",
+    "address": "7647 E Pasaro Dr, Scottsdale, AZ 85266"
+  },
+  {
+    "name": "Diana Carmona",
+    "company": "Glaztech",
+    "email": "diana@glaztech.com",
+    "phone": "602.272.1544 EXT. 1208",
+    "address": ""
+  },
+  {
+    "name": "Elizabeth Sims",
+    "company": "",
+    "email": "4sims96@gmail.com",
+    "phone": "623.363.5748",
+    "address": "38326 N 31st Ave, Phoenix, AZ 85086"
+  },
+  {
+    "name": "Erika Darby",
+    "company": "",
+    "email": "eadarby@gmail.com",
+    "phone": "919.671.8199",
+    "address": "8516 S 40th Glen, Laveen Village, AZ 85339"
+  },
+  {
+    "name": "Fleming Wong",
+    "company": "",
+    "email": "liparus.1@shaw.ca",
+    "phone": "403.861.9007",
+    "address": ""
+  },
+  {
+    "name": "Francisca Montoya",
+    "company": "",
+    "email": "fcamontoya@aol.com",
+    "phone": "602.384.3692",
+    "address": "2004 S 82nd Ln, Phoenix, AZ 85043"
+  },
+  {
+    "name": "Grace Mininberg",
+    "company": "",
+    "email": "jjminz13@gmail.com",
+    "phone": "602.722.0922",
+    "address": "5123 N 34th Way, Phoenix, AZ 85018"
+  },
+  {
+    "name": "Greg Schursky",
+    "company": "",
+    "email": "zoom89@aol.com",
+    "phone": "602.579.0311",
+    "address": ""
+  },
+  {
+    "name": "Jeremy Harris",
+    "company": "Fairmont",
+    "email": "Jeremy.harris@fairmont.com",
+    "phone": "",
+    "address": ""
+  },
+  {
+    "name": "Henry Garza",
+    "company": "Wright Brothers Glassworks",
+    "email": "henry@wbglassworks.com",
+    "phone": "623.780.4000",
+    "address": "1547 W Parkside Ln, Phoenix, AZ 85027"
+  },
+  {
+    "name": "Irene Gonzalez",
+    "company": "Oldcastle Building",
+    "email": "igonzalez@obe.com",
+    "phone": "",
+    "address": ""
+  },
+  {
+    "name": "Jacki Cohen",
+    "company": "",
+    "email": "jackihcohen@gmail.com",
+    "phone": "480.217.2595",
+    "address": "22025 N 79th Pl, Scottsdale, AZ 85255"
+  },
+  {
+    "name": "Jason Coleman",
+    "company": "",
+    "email": "jasoncoleman3340@gmail.com",
+    "phone": "480.433.0445",
+    "address": "N 68th St, Scottsdale, AZ 85254"
+  },
+  {
+    "name": "Jeff Shelton",
+    "company": "Clovis Glass",
+    "email": "jeff@clovisglass.com",
+    "phone": "602.317.5288",
+    "address": ""
+  },
+  {
+    "name": "John Eygabroad",
+    "company": "",
+    "email": "johney.gabroad@gmail.com",
+    "phone": "+16027686912",
+    "address": ""
+  },
+  {
+    "name": "Josh Couto",
+    "company": "",
+    "email": "",
+    "phone": "+16236068322",
+    "address": ""
+  },
+  {
+    "name": "Karen Hull",
+    "company": "",
+    "email": "karen.hull@cox.net",
+    "phone": "",
+    "address": ""
+  },
+  {
+    "name": "Ari Felix",
+    "company": "Luxury Home Concierge",
+    "email": "azlhcinfo@gmail.com",
+    "phone": "602.320.0614",
+    "address": "4340 E Indian School Rd, Phoenix, AZ 85018"
+  },
+  {
+    "name": "Marc Zegar",
+    "company": "",
+    "email": "marczegar@ilj.com",
+    "phone": "253.606.5093",
+    "address": ""
+  },
+  {
+    "name": "Michael McGlothlin",
+    "company": "Glaztech",
+    "email": "MMcGlothlin@glaztech.com",
+    "phone": "480.688.3388",
+    "address": ""
+  },
+  {
+    "name": "Mike Biers",
+    "company": "Biers Management",
+    "email": "mike@biersmgmt.com",
+    "phone": "",
+    "address": ""
+  },
+  {
+    "name": "Oldcastle Orders",
+    "company": "Oldcastle (OBE)",
+    "email": "PHOOrders@obe.com",
+    "phone": "602.253.6980",
+    "address": ""
+  },
+  {
+    "name": "Oldcastle Quotes",
+    "company": "Oldcastle (OBE)",
+    "email": "PHOQuotes@obe.com",
+    "phone": "602.253.6980",
+    "address": ""
+  },
+  {
+    "name": "Oldcastle Shower Orders",
+    "company": "Oldcastle (OBE)",
+    "email": "phoglassdoors@obe.com",
+    "phone": "602.253.6980",
+    "address": ""
+  },
+  {
+    "name": "Rob Maldonado",
+    "company": "",
+    "email": "",
+    "phone": "+14803925629",
+    "address": ""
+  },
+  {
+    "name": "Rob Meyer",
+    "company": "Factory Direct",
+    "email": "factorydirectrep@gmail.com",
+    "phone": "602.232.2345",
+    "address": ""
+  },
+  {
+    "name": "Ryan Abril",
+    "company": "Senior Resource Center",
+    "email": "ryan.abril@srg-llc.com",
+    "phone": "480.538.5605",
+    "address": ""
+  },
+  {
+    "name": "Shad Parker",
+    "company": "Facelift Construction LLC",
+    "email": "faceliftconstruction@me.com",
+    "phone": "602.919.4002",
+    "address": ""
+  },
+  {
+    "name": "Jeff Smith",
+    "company": "Fairmont",
+    "email": "Jeff.Smith@fairmont.com",
+    "phone": "602.488.9970",
+    "address": "7575 E Princess Dr, Scottsdale, AZ 85255"
+  },
+  {
+    "name": "Tara Young",
+    "company": "Biers Management",
+    "email": "Tara@biersmgmt.com",
+    "phone": "480.513.1777",
+    "address": ""
+  },
+  {
+    "name": "Tim Biers",
+    "company": "Biers Management",
+    "email": "tim@biersmgmt.com",
+    "phone": "602.677.0194",
+    "address": ""
+  },
+  {
+    "name": "Christi Torrella",
+    "company": "Fairmont Princess",
+    "email": "Christi.Torrella@fairmont.com",
+    "phone": "480.585.2651",
+    "address": ""
+  },
+  {
+    "name": "Trulite Glass",
+    "company": "Trulite Glass",
+    "email": "customerservicephoenix@trulite.com",
+    "phone": "602.484.9778",
+    "address": ""
+  },
+  {
+    "name": "Wright Brothers Orders/Quotes",
+    "company": "Wright Brothers Glassworks",
+    "email": "frontdesk@wbglassworks.com",
+    "phone": "",
+    "address": ""
+  },
+  {
+    "name": "Zachary Lafferty",
+    "company": "Senior Resource Center",
+    "email": "zachary.lafferty@srg-llc.com",
+    "phone": "480.538.5608",
+    "address": ""
+  },
+  {
+    "name": "Zulema Ortega",
+    "company": "Glaztech",
+    "email": "zulema@glaztech.com",
+    "phone": "602.272.1544 EXT. 1206",
+    "address": ""
+  }
+];
+  let count = 0;
+  for (const c of contacts) {
+    try {
+      await window._addDoc(window._collection(db, 'customers'), {
+        ...c,
+        savedAt: new Date().toISOString()
+      });
+      count++;
+    } catch(e) { console.error('Failed to import', c.name, e); }
+  }
+  localStorage.setItem('alg_contacts_imported_v1', '1');
+  showToast('✓ Imported ' + count + ' contacts!');
+  if (window.loadCustomers) await window.loadCustomers();
+}
+
+// Run after Firebase is ready
+setTimeout(() => { if (window._db) bulkImportContacts(); }, 1500);
+
 </script>
 </div><!-- end appContainer -->
 </body>
