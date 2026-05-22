@@ -2302,14 +2302,17 @@ function calculate() {
   const laborTotal = totalLabor();
   const marginPct    = parseFloat(document.getElementById('bidMargin')?.value) || 0;
   const surchargePct = parseFloat(document.getElementById('bidSurcharge')?.value) || 0;
-  // Multiplier spreads markup proportionally across all line items
-  const mkup         = 1 + (marginPct + surchargePct) / 100;
+  const glassMkup    = 1 + (marginPct + surchargePct) / 100; // margin + surcharge on glass/fab/edge
+  const hwMkup       = 1 + marginPct / 100;                  // margin only on hardware
   const taxableBase  = glassTotal + hwTotal + edgeTotal + fabTotal;
   const extTotal     = totalExtras(taxableBase);
   const baseSubtotal = taxableBase + extTotal;
+  // Markup amount: glass/fab/edge get surcharge too, hardware gets margin only
+  const glassBase    = glassTotal + edgeTotal + fabTotal + extTotal;
+  const markupAmt    = glassBase * (glassMkup - 1) + hwTotal * (hwMkup - 1);
   const taxAmt       = Math.round(Math.round(baseSubtotal*100)/100 * (taxRate/100) * 100) / 100;
-  const markupAmt    = baseSubtotal * (mkup - 1);
   const grand        = baseSubtotal + taxAmt + markupAmt + laborTotal;
+  const mkup         = glassMkup; // keep mkup alias for display lines below
 
   const extraLines = extras.map(e => {
     const v = parseFloat(e.value)||0;
@@ -2352,7 +2355,7 @@ function calculate() {
       <span>Glass Total</span><span>${fmt(glassTotal * mkup)}</span>
     </div>
     ${edgeLines}
-    <div class="line-item"><span>Hardware</span><span>${fmt(hwTotal * mkup)}</span></div>
+    <div class="line-item"><span>Hardware</span><span>${fmt(hwTotal * hwMkup)}</span></div>
     ${fabTotal > 0 ? `<div class="line-item"><span>Fabrication</span><span>${fmt(fabTotal * mkup)}</span></div>` : ''}
     ${extraLines}
     <div class="divider"></div>
@@ -2478,7 +2481,9 @@ function importFromBid() {
   const pm   = personMultiplier();
   const marginPct    = parseFloat(document.getElementById('bidMargin')?.value) || 0;
   const surchargePct = parseFloat(document.getElementById('bidSurcharge')?.value) || 0;
-  const mkup = 1 + (marginPct + surchargePct) / 100;
+  const glassMkup = 1 + (marginPct + surchargePct) / 100;
+  const hwMkup    = 1 + marginPct / 100;
+  const mkup      = glassMkup; // alias for glass/fab/edge/extras
 
   pieces.filter(p=>getPieceW(p)&&getPieceH(p)).forEach(p => {
     const desc='Glass — '+getPieceDisplay(p)+([p.thickness?p.thickness+'"':'',p.glassType].filter(Boolean).join(' · ')?(' · '+[p.thickness?p.thickness+'"':'',p.glassType].filter(Boolean).join(' · ')):'');
@@ -2513,7 +2518,7 @@ function importFromBid() {
   hardware.forEach(h => {
     if (parseFloat(h.cost)>0) {
       const basePrice = parseFloat(h.cost)||0;
-      invItems.push({ id: uid(), desc: h.name||'Hardware', qty: 1, price: basePrice * mkup, basePrice });
+      invItems.push({ id: uid(), desc: h.name||'Hardware', qty: 1, price: basePrice * hwMkup, basePrice });
     }
   });
   const base = totalGlass() + totalHardware() + totalEdging();
@@ -2703,10 +2708,13 @@ function saveBidPDF() {
     const extTotal=totalExtras(taxableBase);
     const marginPct=parseFloat(document.getElementById('bidMargin')?.value)||0;
     const surchargePct=parseFloat(document.getElementById('bidSurcharge')?.value)||0;
-    const mkup=1+(marginPct+surchargePct)/100;
+    const glassMkup=1+(marginPct+surchargePct)/100;
+    const hwMkup=1+marginPct/100;
+    const mkup=glassMkup;
     const baseSubtotal=(taxableBase+extTotal);
     const taxAmt=Math.round(Math.round(baseSubtotal*100)/100*(taxRate/100)*100)/100;
-    const markupAmt=baseSubtotal*(mkup-1);
+    const glassBase=glassTotal+edgeTotal+fabTotal+extTotal;
+    const markupAmt=glassBase*(glassMkup-1)+hwTotal*(hwMkup-1);
     const taxableTotal=baseSubtotal;
     const grand=baseSubtotal+taxAmt+markupAmt+laborTotal;
     const pageW=doc.internal.pageSize.getWidth(), M=50, R=pageW-M;
@@ -2799,7 +2807,7 @@ function saveBidPDF() {
     y+=6;
     sectionLabel('Hardware');
     if(hardware.length===0)row('No hardware items',fmt(0));
-    else hardware.forEach(h=>row(h.name||'Hardware item',fmt((parseFloat(h.cost)||0)*mkup)));
+    else hardware.forEach(h=>row(h.name||'Hardware item',fmt((parseFloat(h.cost)||0)*hwMkup)));
     y+=6;
     if(extras.length>0){
       sectionLabel('Additional Costs');
