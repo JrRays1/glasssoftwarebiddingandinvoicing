@@ -3949,8 +3949,63 @@ async function pushToZoho() {
 
     if (!lineItems.length) throw new Error('No line items on this invoice. Add items before pushing to Zoho.');
 
+    // 4. Find or create the customer in Zoho
+    setStatus('Looking up customer in Zoho…', 'info');
+    const searchRes = await fetch(workerUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        targetUrl: `https://www.zohoapis.com/books/v3/contacts?organization_id=${orgId}&contact_name=${encodeURIComponent(customerName)}&contact_type=customer`,
+        method: 'GET',
+        headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` },
+      }),
+    });
+    const searchData = await searchRes.json();
+    let customerId = null;
+
+    if (searchData.contacts && searchData.contacts.length > 0) {
+      // Found existing customer
+      customerId = searchData.contacts[0].contact_id;
+      setStatus('Customer found — creating invoice…', 'info');
+    } else {
+      // Create the customer
+      setStatus('Creating new customer in Zoho…', 'info');
+      const company = document.getElementById('invCompany').value.trim();
+      const phone   = document.getElementById('invContact').value.trim();
+      const address = document.getElementById('invAddress').value.trim();
+      const cityState = document.getElementById('invCityState').value.trim();
+
+      const createCustRes = await fetch(workerUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          targetUrl: `https://www.zohoapis.com/books/v3/contacts?organization_id=${orgId}`,
+          method: 'POST',
+          headers: {
+            'Authorization': `Zoho-oauthtoken ${accessToken}`,
+            'Content-Type': 'application/json',
+          },
+          payload: {
+            contact_name: customerName,
+            contact_type: 'customer',
+            company_name: company || undefined,
+            billing_address: (address || cityState) ? {
+              address: address || undefined,
+              city: cityState ? cityState.split(',')[0].trim() : undefined,
+              state: cityState ? (cityState.split(',')[1] || '').trim().split(' ')[0] : undefined,
+              zip: cityState ? (cityState.split(',')[1] || '').trim().split(' ')[1] : undefined,
+            } : undefined,
+          },
+        }),
+      });
+      const custData = await createCustRes.json();
+      if (custData.code !== 0) throw new Error('Could not create customer: ' + (custData.message || JSON.stringify(custData)));
+      customerId = custData.contact.contact_id;
+    }
+
+    // 5. Push invoice to Zoho Books
     const zohoInvoice = {
-      customer_name: customerName,
+      customer_id: customerId,
       invoice_number: invNum || undefined,
       date: invDate,
       due_date: dueDate || undefined,
@@ -3958,8 +4013,7 @@ async function pushToZoho() {
       line_items: lineItems,
     };
 
-    // 4. Push to Zoho Books via the worker
-    setStatus('Sending to Zoho Books…', 'info');
+    setStatus('Sending invoice to Zoho Books…', 'info');
     const invoiceRes = await fetch(workerUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
