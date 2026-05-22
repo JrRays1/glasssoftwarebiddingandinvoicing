@@ -2524,13 +2524,17 @@ function importFromBid() {
   labor.forEach(l => {
     if (parseFloat(l.cost)>0) invItems.push({ id: uid(), desc: (l.name||'Labor')+' (tax-free)', qty: 1, price: parseFloat(l.cost)||0, taxFree: true });
   });
-  const cname = document.getElementById('customerName').value;
-  const jdesc = document.getElementById('jobDesc').value;
-  const jloc  = document.getElementById('jobLocation').value;
-  if (cname) document.getElementById('invCustomer').value   = cname;
-  if (jdesc) document.getElementById('invJobDesc').value    = jdesc;
-  if (jloc)  document.getElementById('invJobAddress').value = jloc;
-  if (jloc)  document.getElementById('invAddress').value    = jloc;
+  const cname   = document.getElementById('customerName').value;
+  const jdesc   = document.getElementById('jobDesc').value;
+  const jloc    = document.getElementById('jobLocation').value;
+  const cphone  = document.getElementById('customerPhone').value;
+  const cemail  = document.getElementById('customerEmail').value;
+  if (cname)  document.getElementById('invCustomer').value   = cname;
+  if (jdesc)  document.getElementById('invJobDesc').value    = jdesc;
+  if (jloc)   document.getElementById('invJobAddress').value = jloc;
+  if (jloc)   document.getElementById('invAddress').value    = jloc;
+  if (cphone) document.getElementById('invContact').value    = cphone;
+  if (cemail) document.getElementById('invEmail').value      = cemail;
   invTaxExemptActive = window.taxExemptActive || false;
   const btn = document.getElementById('invTaxExemptBtn');
   if (invTaxExemptActive) {
@@ -2578,7 +2582,7 @@ function calcInvoice() {
   const subtotal = taxableSubtotal + taxFreeSubtotal;
 
   // Tax applies to the marked-up price (what customer pays)
-  const taxAmt = taxableSubtotal * (taxRate/100);
+  const taxAmt = Math.round(taxableSubtotal * (taxRate/100) * 100) / 100;
 
   // Card processing fee — 3% of entire subtotal + tax, not taxed itself
   const cardFeeAmt = cardFeeActive ? (subtotal + taxAmt) * 0.03 : 0;
@@ -2886,7 +2890,7 @@ function saveInvoicePDF() {
     const subtotal       = taxableSubtotal + taxFreeSubtotal;
     const taxRate=invTaxExemptActive?0:9.1;
     // Tax applies to the marked-up taxable subtotal (what customer pays)
-    const taxAmt=taxableSubtotal*(taxRate/100);
+    const taxAmt=Math.round(taxableSubtotal*(taxRate/100)*100)/100;
     const cardFeeAmtPDF = cardFeeActive ? (subtotal + taxAmt) * 0.03 : 0;
     const grand=subtotal+taxAmt+cardFeeAmtPDF, paid=totalPayments(), balance=Math.max(0,grand-paid);
 
