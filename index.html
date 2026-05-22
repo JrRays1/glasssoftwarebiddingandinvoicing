@@ -3945,7 +3945,6 @@ async function pushToZoho() {
       name: (item.desc || 'Glass Service').substring(0, 100),
       quantity: parseFloat(item.qty) || 1,
       rate: parseFloat(item.price) || 0,
-      tax_exemption_code: item.taxFree ? 'OUT_OF_SCOPE' : undefined,
     })).filter(item => item.rate > 0);
 
     if (!lineItems.length) throw new Error('No line items on this invoice. Add items before pushing to Zoho.');
