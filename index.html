@@ -2477,58 +2477,83 @@ function toggleInvTaxExempt() {
 // ─────────────────────────────────────────────────
 function importFromBid() {
   invItems = [];
-  // Apply both Jessica's person multiplier and Chris's margin/surcharge markup
-  const pm   = personMultiplier();
+  const pm           = personMultiplier();
   const marginPct    = parseFloat(document.getElementById('bidMargin')?.value) || 0;
   const surchargePct = parseFloat(document.getElementById('bidSurcharge')?.value) || 0;
-  const glassMkup = 1 + (marginPct + surchargePct) / 100;
-  const hwMkup    = 1 + marginPct / 100;
-  const mkup      = glassMkup; // alias for glass/fab/edge/extras
+  const glassMkup    = 1 + (marginPct + surchargePct) / 100;
+  const hwMkup       = 1 + marginPct / 100;
+
+  // ── Compute bid grand total exactly as calculate() does ──────────────
+  const glassTotal = totalGlass();
+  const hwTotal    = totalHardware();
+  const edgeTotal  = totalEdging();
+  const fabTotal   = totalFabrication();
+  const laborTotal = totalLabor();
+  const taxRate    = (window.taxExemptActive||false) ? 0 : 9.1;
+  const taxableBase  = glassTotal + hwTotal + edgeTotal + fabTotal;
+  const extTotal     = totalExtras(taxableBase);
+  const baseSubtotal = taxableBase + extTotal;
+  const glassBase    = glassTotal + edgeTotal + fabTotal + extTotal;
+  const markupAmt    = glassBase * (glassMkup - 1) + hwTotal * (hwMkup - 1);
+  const taxAmt       = Math.round(Math.round(baseSubtotal*100)/100 * (taxRate/100) * 100) / 100;
+  const bidGrand     = baseSubtotal + taxAmt + markupAmt + laborTotal;
+
+  // ── Build line items using exact bid prices ───────────────────────────
+  // Each item's price = base * appropriate markup, no rounding until the end.
+  // We then apply a correction to the last taxable line so the sum = bidGrand exactly.
 
   pieces.filter(p=>getPieceW(p)&&getPieceH(p)).forEach(p => {
     const desc='Glass — '+getPieceDisplay(p)+([p.thickness?p.thickness+'"':'',p.glassType].filter(Boolean).join(' · ')?(' · '+[p.thickness?p.thickness+'"':'',p.glassType].filter(Boolean).join(' · ')):'');
-    const basePrice = parseFloat(getPieceGlassTotal(p).toFixed(2));
-    const markedPrice = parseFloat((getPieceGlassTotal(p) * mkup).toFixed(2));
-    invItems.push({ id: uid(), desc, qty: 1, price: markedPrice, basePrice });
+    const base = getPieceGlassTotal(p);
+    invItems.push({ id: uid(), desc, qty: 1, price: base * glassMkup, basePrice: base });
   });
   pieces.filter(p=>getPieceEdgeTotal(p)>0).forEach(p => {
-    const basePrice = getPieceEdgeTotal(p);
-    invItems.push({ id: uid(), desc: (p.edgeName||'Edging')+' – '+getPieceDisplay(p), qty: 1, price: basePrice * mkup, basePrice, isEdge: true });
+    const base = getPieceEdgeTotal(p);
+    invItems.push({ id: uid(), desc: (p.edgeName||'Edging')+' – '+getPieceDisplay(p), qty: 1, price: base * glassMkup, basePrice: base, isEdge: true });
   });
-  // Fabrication — flat-fee items only (per-sqft items already rolled into glass total via getPieceGlassTotal)
+  // Flat-fee fabrication only — per-sqft already baked into glass total
   pieces.filter(p=>p.fabrications&&Object.keys(p.fabrications).length>0).forEach(p=>{
     const col=fabColForThickness(p.thickness);
-    const pieceQty = parseFloat(p.qty)||1;
-    const rawSqft = (getPieceW(p) * getPieceH(p)) / 144 * pieceQty;
-    const sqft = roundSqft ? Math.ceil(rawSqft) : rawSqft;
+    const pieceQty=parseFloat(p.qty)||1;
+    const rawSqft=(getPieceW(p)*getPieceH(p))/144*pieceQty;
+    const sqft=roundSqft?Math.ceil(rawSqft):rawSqft;
     Object.entries(p.fabrications).forEach(([fabName,fabQty])=>{
       for(const g of FABRICATION_TYPES){
         const item=g.items.find(it=>it.name===fabName);
-        if(item && !item.perSqft){
-          // Flat fee only — per-sqft items are already baked into getPieceGlassTotal
-          const unitPrice = g.insulated
-            ? (sqft <= 50 ? item.under50 : item.over50)
-            : (item[col]||0);
-          const basePrice = unitPrice * pm;
-          invItems.push({ id: uid(), desc: fabName+' – '+getPieceDisplay(p), qty: fabQty * pieceQty, price: basePrice * mkup, basePrice, isFab: true });
+        if(item&&!item.perSqft){
+          const unitPrice=g.insulated?(sqft<=50?item.under50:item.over50):(item[col]||0);
+          const base=unitPrice*pm*fabQty*pieceQty;
+          invItems.push({ id: uid(), desc: fabName+' – '+getPieceDisplay(p), qty: 1, price: base * glassMkup, basePrice: base, isFab: true });
         }
       }
     });
   });
   hardware.forEach(h => {
     if (parseFloat(h.cost)>0) {
-      const basePrice = parseFloat(h.cost)||0;
-      invItems.push({ id: uid(), desc: h.name||'Hardware', qty: 1, price: basePrice * hwMkup, basePrice });
+      const base = parseFloat(h.cost)||0;
+      invItems.push({ id: uid(), desc: h.name||'Hardware', qty: 1, price: base * hwMkup, basePrice: base });
     }
   });
-  const base = totalGlass() + totalHardware() + totalEdging();
   extras.forEach(e => {
-    const v=parseFloat(e.value)||0, baseAmt=e.type==='%'?base*(v/100):v;
-    if (baseAmt>0) invItems.push({ id: uid(), desc: e.name||'Additional Cost', qty: 1, price: baseAmt * mkup, basePrice: baseAmt });
+    const v=parseFloat(e.value)||0;
+    const base=e.type==='%'?taxableBase*(v/100):v;
+    if (base>0) invItems.push({ id: uid(), desc: e.name||'Additional Cost', qty: 1, price: base * glassMkup, basePrice: base });
   });
   labor.forEach(l => {
     if (parseFloat(l.cost)>0) invItems.push({ id: uid(), desc: (l.name||'Labor')+' (tax-free)', qty: 1, price: parseFloat(l.cost)||0, taxFree: true });
   });
+
+  // ── Penny correction: adjust last taxable item so invoice total = bid total exactly ──
+  const taxableItems = invItems.filter(i=>!i.taxFree);
+  const taxFreeItems = invItems.filter(i=>i.taxFree);
+  const taxableSum   = taxableItems.reduce((s,i)=>s+i.price,0);
+  const taxFreeSum   = taxFreeItems.reduce((s,i)=>s+i.price,0);
+  const invTaxAmt    = Math.round(Math.round(taxableSum*100)/100*(taxRate/100)*100)/100;
+  const invGrand     = taxableSum + invTaxAmt + taxFreeSum;
+  const diff         = Math.round((bidGrand - invGrand)*100)/100;
+  if (diff !== 0 && taxableItems.length > 0) {
+    taxableItems[taxableItems.length-1].price = Math.round((taxableItems[taxableItems.length-1].price + diff)*100)/100;
+  }
   const cname   = document.getElementById('customerName').value;
   const jdesc   = document.getElementById('jobDesc').value;
   const jloc    = document.getElementById('jobLocation').value;
