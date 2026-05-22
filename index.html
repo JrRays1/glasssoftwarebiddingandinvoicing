@@ -1357,6 +1357,10 @@ onAuthStateChanged(auth, user => {
           <div class="save-bar-text" style="color:var(--invoice-accent);" id="invSaveStatus">💾 Save this invoice to the dashboard</div>
           <button class="btn-save-job" id="btnSaveInv" onclick="saveJobToFirebase('invoice')" style="background:var(--invoice-accent);color:#1a1000;">Save Invoice</button>
         </div>
+        <button id="btnPushZoho" onclick="pushToZoho()" style="margin-top:0.75rem;width:100%;background:rgba(232,194,122,0.12);border:1px solid rgba(232,194,122,0.4);border-radius:8px;color:var(--invoice-accent);cursor:pointer;font-family:'Bebas Neue',sans-serif;font-size:1.05rem;letter-spacing:0.1em;padding:0.7rem;transition:all 0.2s;display:flex;align-items:center;justify-content:center;gap:0.5rem;">
+          <span>⬆</span><span id="zohoBtn Text">Push to Zoho Books</span>
+        </button>
+        <div id="zohoStatus" style="display:none;margin-top:0.5rem;font-family:'DM Mono',monospace;font-size:0.72rem;text-align:center;padding:0.5rem;border-radius:6px;"></div>
       </div>
 
     </div>
@@ -3876,6 +3880,118 @@ document.getElementById('piecesList').addEventListener('change', function(e) {
   else if (action === 'treatment') onInlineTreatmentChange(pi, val);
   else if (action === 'glasstype') onInlineGlassTypeChange(pi, val);
 });
+
+
+// ─────────────────────────────────────────────────
+// PUSH TO ZOHO BOOKS
+// ─────────────────────────────────────────────────
+async function pushToZoho() {
+  const btn = document.getElementById('btnPushZoho');
+  const statusEl = document.getElementById('zohoStatus');
+
+  function setStatus(msg, color) {
+    statusEl.style.display = '';
+    statusEl.textContent = msg;
+    statusEl.style.background = color === 'error' ? 'rgba(204,51,51,0.12)' : color === 'ok' ? 'rgba(42,184,154,0.12)' : 'rgba(255,255,255,0.05)';
+    statusEl.style.color = color === 'error' ? '#e06060' : color === 'ok' ? 'var(--green)' : 'var(--muted)';
+    statusEl.style.border = '1px solid ' + (color === 'error' ? 'rgba(204,51,51,0.3)' : color === 'ok' ? 'rgba(42,184,154,0.3)' : 'var(--border)');
+  }
+
+  btn.disabled = true;
+  btn.style.opacity = '0.6';
+  setStatus('Connecting to Zoho…', 'info');
+
+  try {
+    // 1. Load config from Firestore
+    const db = window._db;
+    if (!db) throw new Error('Firebase not ready');
+    const snap = await window._getDocs(window._collection(db, 'config'));
+    let cfg = null;
+    snap.forEach(d => { if (d.id === 'zoho') cfg = d.data(); });
+    if (!cfg) throw new Error('Zoho config not found in Firestore. Check your config/zoho document.');
+
+    const { clientId, clientSecret, refreshToken, orgId, workerUrl } = cfg;
+    if (!clientId || !clientSecret || !refreshToken || !orgId || !workerUrl) {
+      throw new Error('Missing fields in Firestore config/zoho document.');
+    }
+
+    // 2. Get a fresh access token via the Cloudflare worker
+    setStatus('Getting access token…', 'info');
+    const tokenRes = await fetch(workerUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        targetUrl: 'https://accounts.zoho.com/oauth/v2/token',
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        payload: `grant_type=refresh_token&client_id=${encodeURIComponent(clientId)}&client_secret=${encodeURIComponent(clientSecret)}&refresh_token=${encodeURIComponent(refreshToken)}`,
+      }),
+    });
+    const tokenData = await tokenRes.json();
+    if (!tokenData.access_token) throw new Error('Failed to get access token: ' + (tokenData.error || JSON.stringify(tokenData)));
+    const accessToken = tokenData.access_token;
+
+    // 3. Build the Zoho invoice payload from current invoice state
+    setStatus('Building invoice…', 'info');
+    const customerName = document.getElementById('invCustomer').value.trim() || 'Unknown Customer';
+    const invNum       = document.getElementById('invNumber').value.trim();
+    const invDate      = document.getElementById('invDate').value || new Date().toISOString().split('T')[0];
+    const dueDate      = document.getElementById('invDueDate').value;
+    const notes        = document.getElementById('invNotes').value.trim();
+    const payInstr     = document.getElementById('invPayInstructions').value.trim();
+
+    // Build line items
+    const lineItems = invItems.map(item => ({
+      name: (item.desc || 'Glass Service').substring(0, 100),
+      quantity: parseFloat(item.qty) || 1,
+      rate: parseFloat(item.price) || 0,
+      tax_exemption_code: item.taxFree ? 'OUT_OF_SCOPE' : undefined,
+    })).filter(item => item.rate > 0);
+
+    if (!lineItems.length) throw new Error('No line items on this invoice. Add items before pushing to Zoho.');
+
+    const zohoInvoice = {
+      customer_name: customerName,
+      invoice_number: invNum || undefined,
+      date: invDate,
+      due_date: dueDate || undefined,
+      notes: [notes, payInstr].filter(Boolean).join('\n\n') || undefined,
+      line_items: lineItems,
+    };
+
+    // 4. Push to Zoho Books via the worker
+    setStatus('Sending to Zoho Books…', 'info');
+    const invoiceRes = await fetch(workerUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        targetUrl: `https://www.zohoapis.com/books/v3/invoices?organization_id=${orgId}`,
+        method: 'POST',
+        headers: {
+          'Authorization': `Zoho-oauthtoken ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        payload: zohoInvoice,
+      }),
+    });
+
+    const invoiceData = await invoiceRes.json();
+    if (invoiceData.code !== 0) {
+      throw new Error('Zoho error: ' + (invoiceData.message || JSON.stringify(invoiceData)));
+    }
+
+    const zohoInvNum = invoiceData.invoice?.invoice_number || invNum;
+    setStatus('✓ Invoice ' + zohoInvNum + ' created in Zoho Books!', 'ok');
+    showToast('✓ Pushed to Zoho Books!');
+
+  } catch (err) {
+    setStatus('✗ ' + err.message, 'error');
+    console.error('Zoho push error:', err);
+  }
+
+  btn.disabled = false;
+  btn.style.opacity = '1';
+}
 
 // ─────────────────────────────────────────────────
 // BULK CONTACT IMPORT (runs once, skips if already done)
