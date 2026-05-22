@@ -2505,7 +2505,7 @@ function importFromBid() {
   pieces.filter(p=>getPieceW(p)&&getPieceH(p)).forEach(p => {
     const desc='Glass — '+getPieceDisplay(p)+([p.thickness?p.thickness+'"':'',p.glassType].filter(Boolean).join(' · ')?(' · '+[p.thickness?p.thickness+'"':'',p.glassType].filter(Boolean).join(' · ')):'');
     const base = getPieceGlassTotal(p);
-    invItems.push({ id: uid(), desc, qty: 1, price: base * glassMkup, basePrice: base });
+    invItems.push({ id: uid(), desc, qty: 1, price: base * glassMkup, basePrice: base, pieceId: p.id });
   });
   pieces.filter(p=>getPieceEdgeTotal(p)>0).forEach(p => {
     const base = getPieceEdgeTotal(p);
@@ -3009,17 +3009,25 @@ function saveInvoicePDF() {
     doc.text('TOTAL',R,y+4,{align:'right'});
     y+=22;
 
-    // Group fab items under their glass parent for no-price display
-    // Build a map: pieceDisplay -> [fabNames]
-    const fabByPiece = {};
-    invItems.filter(i=>i.isFab).forEach(item=>{
-      // desc format: "FabName – pieceDisplay"
-      const dashIdx = item.desc ? item.desc.indexOf(' – ') : -1;
-      const piecePart = dashIdx>=0 ? item.desc.substring(dashIdx+3) : '';
-      const fabPart   = dashIdx>=0 ? item.desc.substring(0, dashIdx) : item.desc;
-      if(!fabByPiece[piecePart]) fabByPiece[piecePart]=[];
-      const qty = parseFloat(item.qty)||1;
-      fabByPiece[piecePart].push(fabPart+(qty>1?' ×'+qty:''));
+    // Build fab map keyed by pieceId so lookup is reliable
+    const fabByPieceId = {};
+    pieces.forEach(p=>{
+      if(!p.fabrications||!Object.keys(p.fabrications).length) return;
+      const col=fabColForThickness(p.thickness);
+      const pieceQty=parseFloat(p.qty)||1;
+      const rawSqft=(getPieceW(p)*getPieceH(p))/144*pieceQty;
+      const sqft=roundSqft?Math.ceil(rawSqft):rawSqft;
+      const labels=[];
+      Object.entries(p.fabrications).forEach(([fabName,fabQty])=>{
+        for(const g of FABRICATION_TYPES){
+          const item=g.items.find(it=>it.name===fabName);
+          if(item&&!item.perSqft){
+            const totalQty=(fabQty||1)*pieceQty;
+            labels.push(fabName+(totalQty>1?' ×'+totalQty:''));
+          }
+        }
+      });
+      if(labels.length) fabByPieceId[p.id]=labels;
     });
 
     let rowIdx=0;
@@ -3043,14 +3051,14 @@ function saveInvoicePDF() {
       y+=18;
       rowIdx++;
 
-      // Print any fab items for this glass piece — name only, no price
-      const pieceKey = displayDesc.replace(/^Glass — /,'');
-      const fabs = fabByPiece[pieceKey] || [];
-      fabs.forEach(fabLabel=>{
-        doc.setFontSize(7.5);doc.setFont('helvetica','normal');gray(140);
-        doc.text('   · '+fabLabel, M+10, y+2);
-        y+=14;
-      });
+      // Print fab labels under the matching glass piece — name only, no price
+      if(item.pieceId && fabByPieceId[item.pieceId]){
+        fabByPieceId[item.pieceId].forEach(fabLabel=>{
+          doc.setFontSize(7.5);doc.setFont('helvetica','normal');gray(140);
+          doc.text('   · '+fabLabel, M+10, y+2);
+          y+=14;
+        });
+      }
     });
     y+=12;
 
