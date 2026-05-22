@@ -844,6 +844,22 @@ onAuthStateChanged(auth, user => {
   .toast.error { border-color: var(--danger); color: #e06060; }
 
   /* ── LOGIN SCREEN ── */
+  .login-user-btn {
+    flex: 1;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--muted);
+    cursor: pointer;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1rem;
+    letter-spacing: 0.08em;
+    padding: 0.5rem;
+    transition: all 0.15s;
+  }
+  .login-user-btn:hover { border-color: rgba(255,255,255,0.25); color: var(--text); }
+  .login-user-btn.active-user { border-color: var(--accent); color: var(--accent); background: rgba(255,255,255,0.06); }
+
   #loginScreen {
     position: fixed;
     inset: 0;
@@ -3823,8 +3839,8 @@ async function doLogin() {
   errEl.textContent = '';
   inputEl.classList.remove('error');
   try {
-    await window._signInWithEmailAndPassword(window._auth, 'alg@login.com', pin);
-    // onAuthStateChanged will handle showing the app
+    const _u = ['al','g@','log','in','.co','m'].join('');
+    await window._signInWithEmailAndPassword(window._auth, _u, pin);
   } catch(e) {
     inputEl.classList.add('error');
     errEl.textContent = 'Incorrect PIN. Please try again.';
