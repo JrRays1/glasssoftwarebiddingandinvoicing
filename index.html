@@ -3009,19 +3009,16 @@ function saveInvoicePDF() {
     doc.text('TOTAL',R,y+4,{align:'right'});
     y+=22;
 
-    // Build fab map keyed by pieceId so lookup is reliable
+    // Build fab map keyed by pieceId — includes ALL fab items (perSqft and flat-fee)
     const fabByPieceId = {};
     pieces.forEach(p=>{
       if(!p.fabrications||!Object.keys(p.fabrications).length) return;
-      const col=fabColForThickness(p.thickness);
       const pieceQty=parseFloat(p.qty)||1;
-      const rawSqft=(getPieceW(p)*getPieceH(p))/144*pieceQty;
-      const sqft=roundSqft?Math.ceil(rawSqft):rawSqft;
       const labels=[];
       Object.entries(p.fabrications).forEach(([fabName,fabQty])=>{
         for(const g of FABRICATION_TYPES){
           const item=g.items.find(it=>it.name===fabName);
-          if(item&&!item.perSqft){
+          if(item){
             const totalQty=(fabQty||1)*pieceQty;
             labels.push(fabName+(totalQty>1?' ×'+totalQty:''));
           }
