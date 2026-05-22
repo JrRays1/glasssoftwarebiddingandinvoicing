@@ -1367,6 +1367,13 @@ onAuthStateChanged(auth, user => {
       <!-- Invoice Total -->
       <div class="card invoice-total-card" style="position:relative;">
         <div class="card-label" style="color:var(--invoice-accent);">Invoice Summary</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:8px;padding:0.6rem 0.85rem;">
+          <div>
+            <div style="font-family:'DM Mono',monospace;font-size:0.72rem;color:var(--muted);letter-spacing:0.08em;">PAYMENT METHOD</div>
+            <div id="cardFeeLabel" style="font-family:'DM Mono',monospace;font-size:0.75rem;color:var(--muted);margin-top:0.15rem;">No processing fee</div>
+          </div>
+          <button id="cardToggleBtn" onclick="toggleCardFee()" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--muted);cursor:pointer;font-family:'Bebas Neue',sans-serif;font-size:0.95rem;letter-spacing:0.1em;padding:0.45rem 0.9rem;transition:all 0.2s;white-space:nowrap;">💳 Card Payment</button>
+        </div>
         <div class="breakdown" id="invBreakdown"></div>
         <div class="grand-total">
           <div class="grand-label">Invoice Total</div>
@@ -1610,7 +1617,7 @@ const FABRICATION_TYPES = [
       { name: 'Corner Notch',                                    thin: 11.88, mid: 14.26, thick: 16.63 },
       { name: 'Edge Notch / Shower Door Hinge',                  thin: 10.69, mid: 13.07, thick: 15.44 },
       { name: 'Finger Notch',                                    thin: 7.13,  mid: 8.32,  thick: 9.50  },
-      { name: 'Invisible Shield (per sf)',                       thin: 1.42,  mid: 1.42,  thick: 1.42  },
+      { name: 'Invisible Shield (per sf)',                       thin: 1.42,  mid: 1.42,  thick: 1.42,  perSqft: true },
     ]
   },
   { group: 'Insulated Fabrication',
@@ -1621,10 +1628,10 @@ const FABRICATION_TYPES = [
       { name: 'IG – Radius Corners, Arch Tops, Circles (PMC 51–75)',   under50: 33.00, over50: 41.25 },
       { name: 'IG – Freeform Cut to Customers Pattern',                under50: 150.00,over50: 150.00 },
       { name: 'IG – Digitized Shape Charge',                           under50: 55.00, over50: 68.75 },
-      { name: 'IG – Argon Gas Fill Upgrade (per sq ft)',               under50: 3.65,  over50: 3.65  },
+      { name: 'IG – Argon Gas Fill Upgrade (per sq ft)',               under50: 3.65,  over50: 3.65,  perSqft: true },
       { name: 'IG – Silicone Seal (standard)',                         under50: 0,     over50: 0     },
-      { name: 'IG – Off-set Units up to 1-1/2" (per sq ft)',           under50: 2.97,  over50: 2.97  },
-      { name: 'IG – Muntin Bars Rectangles, Equal Openings (per sqft)',under50: 2.50,  over50: 3.13  },
+      { name: 'IG – Off-set Units up to 1-1/2" (per sq ft)',           under50: 2.97,  over50: 2.97,  perSqft: true },
+      { name: 'IG – Muntin Bars Rectangles, Equal Openings (per sqft)',under50: 2.50,  over50: 3.13,  perSqft: true },
       { name: 'IG – Muntin Bars 3-Spoke Grid, Unequal (per sketch)',   under50: 5.50,  over50: 6.88  },
     ]
   },
@@ -1637,16 +1644,38 @@ function fabColForThickness(thicknessStr) {
   return 'thin';
 }
 
+// Returns the extra $/ft² to add to the glass rate for per-sqft fab items
+function getPiecePerSqftFabRate(p) {
+  if (!p.fabrications || !Object.keys(p.fabrications).length) return 0;
+  const col = fabColForThickness(p.thickness);
+  const pieceQty = parseFloat(p.qty) || 1;
+  const rawSqft = (getPieceW(p) * getPieceH(p)) / 144 * pieceQty;
+  const sqft = roundSqft ? Math.ceil(rawSqft) : rawSqft;
+  return Object.entries(p.fabrications).reduce((s, [fabName, fabQty]) => {
+    for (const g of FABRICATION_TYPES) {
+      const item = g.items.find(it => it.name === fabName);
+      if (item && item.perSqft) {
+        const unitRate = g.insulated ? (sqft <= 50 ? item.under50 : item.over50) : (item[col] || 0);
+        return s + unitRate * (fabQty || 1) * personMultiplier();
+      }
+    }
+    return s;
+  }, 0);
+}
+
 // fabrications is now an object: { 'Corner Notch': 2, 'Finger Notch': 1, ... }
+// Per-sqft fab items are rolled into the glass rate via getPiecePerSqftFabRate
 function getPieceFabTotal(p) {
   if (!p.fabrications || !Object.keys(p.fabrications).length) return 0;
   const col = fabColForThickness(p.thickness);
   const pieceQty = parseFloat(p.qty) || 1;
-  const sqft = (getPieceW(p) * getPieceH(p)) / 144 * pieceQty;
+  const rawSqft = (getPieceW(p) * getPieceH(p)) / 144 * pieceQty;
+  const sqft = roundSqft ? Math.ceil(rawSqft) : rawSqft;
   return Object.entries(p.fabrications).reduce((s, [fabName, fabQty]) => {
     for (const g of FABRICATION_TYPES) {
       const item = g.items.find(it => it.name === fabName);
-      if (item) {
+      if (item && !item.perSqft) {
+        // Flat fee items — charged as before
         if (g.insulated) {
           const price = sqft <= 50 ? item.under50 : item.over50;
           return s + (price || 0) * (fabQty || 1) * pieceQty * personMultiplier();
@@ -1656,6 +1685,11 @@ function getPieceFabTotal(p) {
     }
     return s;
   }, 0);
+}
+
+// Returns the effective glass rate including any per-sqft fab items
+function getPieceEffectiveRate(p) {
+  return (parseFloat(p.rate) || 0) + getPiecePerSqftFabRate(p);
 }
 
 function toggleFabrication(i, fabName) {
@@ -1679,10 +1713,11 @@ function setFabQty(i, fabName, qty) {
 
 function getPieceGlassTotal(p) {
   const w = getPieceW(p), h = getPieceH(p), qty = parseFloat(p.qty)||1;
-  const rate = parseFloat(p.rate)||0;
   const rawSqft = w * h / 144 * qty;
   const sqft = roundSqft ? Math.ceil(rawSqft) : rawSqft;
-  return sqft * rate;
+  // effective rate = glass rate + any per-sqft fab items rolled in
+  const effectiveRate = getPieceEffectiveRate(p);
+  return sqft * effectiveRate;
 }
 function removePiece(id) { pieces = pieces.filter(p => p.id !== id); renderPieces(); calculate(); }
 
@@ -2097,7 +2132,7 @@ function renderPieces() {
             value="${p.rate ? parseFloat(p.rate).toFixed(2) : ''}"
             oninput="pieces[${i}].rate=this.value;calculate()"
             style="width:62px;background:transparent;border:none;outline:none;font-family:'DM Mono',monospace;font-size:0.72rem;color:#7ed4a0;padding:0.28rem 0;text-align:right;">
-          <span style="font-family:'DM Mono',monospace;font-size:0.72rem;color:#7ed4a0;padding:0 0.5rem 0 0.2rem;white-space:nowrap;">/ft²</span>
+          <span style="font-family:'DM Mono',monospace;font-size:0.72rem;color:#7ed4a0;padding:0 0.5rem 0 0.2rem;white-space:nowrap;">/ft²${getPiecePerSqftFabRate(p) > 0 ? ' <span title="Includes per-sqft fab" style="font-size:0.62rem;opacity:0.7;">(eff. $'+getPieceEffectiveRate(p).toFixed(2)+')</span>' : ''}</span>
         </div>
         ${showGlass ? '<div class="piece-glass-total">' + fmt(glassTotal) + '</div>' : ''}
       </div>
@@ -2297,9 +2332,13 @@ function calculate() {
     const sqft = (w * h / 144 * (parseFloat(p.qty)||1));
     const displaySqft = roundSqft ? Math.ceil(sqft) : sqft;
     const rate = parseFloat(p.rate)||0;
+    const effectiveRate = getPieceEffectiveRate(p);
+    const perSqftExtra = getPiecePerSqftFabRate(p);
     const pieceTotal = getPieceGlassTotal(p);
     const gparts = [p.thickness?p.thickness+'"':'', p.glassType].filter(Boolean).join(' · ');
-    const rateStr = rate ? ` @ ${fmt(rate)}/ft²` : ' (no rate set)';
+    const rateStr = effectiveRate
+      ? ` @ ${fmt(effectiveRate)}/ft²${perSqftExtra > 0 ? ' (incl. fab)' : ''}`
+      : ' (no rate set)';
     return `<div class="line-item total-glass" style="padding-left:0.75rem;font-size:0.8rem;">
       <span>${getPieceDisplay(p)}${gparts?' · '+gparts:''} — ${roundSqft ? displaySqft : sqft.toFixed(3)} ft²${rateStr}</span>
       <span>${rate ? fmt(pieceTotal * mkup) : '—'}</span>
@@ -2503,6 +2542,28 @@ function importFromBid() {
 // ─────────────────────────────────────────────────
 // INVOICE — CALCULATE
 // ─────────────────────────────────────────────────
+let cardFeeActive = false;
+
+function toggleCardFee() {
+  cardFeeActive = !cardFeeActive;
+  const btn = document.getElementById('cardToggleBtn');
+  const label = document.getElementById('cardFeeLabel');
+  if (cardFeeActive) {
+    btn.style.background = 'rgba(232,194,122,0.15)';
+    btn.style.borderColor = 'var(--invoice-accent)';
+    btn.style.color = 'var(--invoice-accent)';
+    label.textContent = '3% processing fee added';
+    label.style.color = 'var(--invoice-accent)';
+  } else {
+    btn.style.background = 'var(--surface2)';
+    btn.style.borderColor = 'var(--border)';
+    btn.style.color = 'var(--muted)';
+    label.textContent = 'No processing fee';
+    label.style.color = 'var(--muted)';
+  }
+  calcInvoice();
+}
+
 function calcInvoice() {
   const taxRate  = invTaxExemptActive ? 0 : 9.1;
 
@@ -2513,17 +2574,19 @@ function calcInvoice() {
   const taxableSubtotal = taxableItems.reduce((s,item) => s+(parseFloat(item.qty)||0)*(parseFloat(item.price)||0), 0);
   const taxFreeSubtotal = taxFreeItems.reduce((s,item) => s+(parseFloat(item.qty)||0)*(parseFloat(item.price)||0), 0);
   const subtotal = taxableSubtotal + taxFreeSubtotal;
-  // If items have basePrice stored, tax on the pre-markup base (Chris's rule)
-  // Otherwise tax on full price (Jessica, or manually entered items)
+
   const taxableBase = taxableItems.reduce((s,item) => {
     const qty = parseFloat(item.qty)||0;
     const base = item.basePrice != null ? item.basePrice : (parseFloat(item.price)||0);
     return s + qty * base;
   }, 0);
-  const taxAmt   = taxableBase * (taxRate/100);
-  const grand    = subtotal + taxAmt;
-  const paid     = totalPayments();
-  const balance  = grand - paid;
+  const taxAmt = taxableBase * (taxRate/100);
+
+  // Card processing fee — 3% of entire subtotal + tax, not taxed itself
+  const cardFeeAmt = cardFeeActive ? (subtotal + taxAmt) * 0.03 : 0;
+  const grand = subtotal + taxAmt + cardFeeAmt;
+  const paid  = totalPayments();
+  const balance = grand - paid;
 
   const itemLines = invItems.map(item => {
     const total = (parseFloat(item.qty)||0)*(parseFloat(item.price)||0);
@@ -2538,6 +2601,7 @@ function calcInvoice() {
     <div class="line-item"><span>Taxable Subtotal</span><span>${fmt(taxableBase)}</span></div>
     <div class="line-item"><span>${invTaxExemptActive?'Tax Exempt':'Tax (9.10%)'}</span><span>${invTaxExemptActive?'—':fmt(taxAmt)}</span></div>
     ${taxFreeSubtotal > 0 ? `<div class="line-item" style="color:#7ab8e8;"><span>Labor (tax-free)</span><span>${fmt(taxFreeSubtotal)}</span></div>` : ''}
+    ${cardFeeActive ? `<div class="line-item" style="color:var(--invoice-accent);"><span>Credit Card Processing Fee (3%)</span><span>${fmt(cardFeeAmt)}</span></div>` : ''}
     <div class="divider"></div>
     <div class="line-item" style="color:var(--invoice-accent);"><span>50% Deposit Required</span><span>${fmt(deposit)}</span></div>
     ${paid > 0 ? `<div class="line-item" style="color:var(--green)"><span>Payments Received</span><span>− ${fmt(paid)}</span></div>` : ''}`;
@@ -2573,7 +2637,7 @@ function updateDueFromTerms() {
 function resetBid() {
   if (!confirm('Start a new bid? This will clear everything.')) return;
   pieces=[]; hardware=[]; labor=[]; extras=[]; invItems=[]; payments=[];
-  invStatus='draft'; invTaxExemptActive=false;
+  invStatus='draft'; invTaxExemptActive=false; cardFeeActive=false;
   currentJobId = null; window._currentJobType = null;
   ['customerName','customerPhone','customerEmail','jobDesc','jobLocation','pricePerSqft','glassThickness','glassType','bidNotes','bidMargin','bidSurcharge',
    'invCustomer','invCompany','invAddress','invCityState','invContact','invEmail',
@@ -2586,6 +2650,10 @@ function resetBid() {
   document.getElementById('taxExemptBtn').textContent = '○ Not Exempt';
   document.getElementById('taxExemptBtn').style.cssText='background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--muted);cursor:pointer;font-family:DM Mono,monospace;font-size:0.8rem;padding:0.6rem 0.85rem;text-align:left;';
   document.getElementById('invTaxExemptBtn').textContent = '○ Not Exempt';
+  const _ctb = document.getElementById('cardToggleBtn');
+  const _cfl = document.getElementById('cardFeeLabel');
+  if (_ctb) { _ctb.style.background='var(--surface2)'; _ctb.style.borderColor='var(--border)'; _ctb.style.color='var(--muted)'; }
+  if (_cfl) { _cfl.textContent='No processing fee'; _cfl.style.color='var(--muted)'; }
   document.getElementById('bidSaveStatus').textContent = '💾 Save this bid to the dashboard';
   document.getElementById('invSaveStatus').textContent  = '💾 Save this invoice to the dashboard';
   setInvStatus('draft');
@@ -2834,7 +2902,9 @@ function saveInvoicePDF() {
       const base=item.basePrice!=null?item.basePrice:(parseFloat(item.price)||0);
       return s+qty*base;
     },0);
-    const taxAmt=taxableBase*(taxRate/100), grand=subtotal+taxAmt, paid=totalPayments(), balance=Math.max(0,grand-paid);
+    const taxAmt=taxableBase*(taxRate/100);
+    const cardFeeAmtPDF = cardFeeActive ? (subtotal + taxAmt) * 0.03 : 0;
+    const grand=subtotal+taxAmt+cardFeeAmtPDF, paid=totalPayments(), balance=Math.max(0,grand-paid);
 
     const invNum   = document.getElementById('invNumber').value||'INV-0001';
     const invDateV = document.getElementById('invDate').value;
@@ -2939,6 +3009,12 @@ function saveInvoicePDF() {
     }
     totRow('Taxable Subtotal', fmt(taxableSubtotal));
     totRow(invTaxExemptActive?'Tax Exempt':'Tax (9.10%)',invTaxExemptActive?'—':fmt(taxAmt));
+    if(cardFeeAmtPDF>0){
+      doc.setFontSize(9);doc.setFont('helvetica','normal');doc.setTextColor(160,120,40);
+      doc.text('Credit Card Processing Fee (3%)',totX,y);
+      doc.text(fmt(cardFeeAmtPDF),R,y,{align:'right'});
+      y+=16;
+    }
     if(taxFreeSubtotal > 0){
       doc.setFontSize(9);doc.setFont('helvetica','normal');doc.setTextColor(122,184,232);
       doc.text('Labor (tax-free)',totX,y);
