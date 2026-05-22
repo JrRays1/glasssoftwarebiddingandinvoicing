@@ -2356,7 +2356,7 @@ function calculate() {
     ${fabTotal > 0 ? `<div class="line-item"><span>Fabrication</span><span>${fmt(fabTotal * mkup)}</span></div>` : ''}
     ${extraLines}
     <div class="divider"></div>
-    <div class="line-item"><span>Taxable Subtotal</span><span>${fmt(baseSubtotal)}</span></div>
+    ${!taxExempt ? `<div class="line-item"><span>Taxable Subtotal</span><span>${fmt(baseSubtotal)}</span></div>` : ''}
     <div class="line-item"><span>${taxExempt?'Tax Exempt':'Tax (9.10%)'}</span><span>${taxExempt?'—':fmt(taxAmt)}</span></div>
     ${laborTotal > 0 ? `<div class="divider"></div>${laborLines}<div class="line-item" style="color:#7ab8e8;font-size:0.8rem;"><span>Labor Total (not taxed)</span><span>${fmt(laborTotal)}</span></div>` : ''}`;
 
@@ -2811,7 +2811,7 @@ function saveBidPDF() {
       });y+=6;
     }
     divider();
-    row('Taxable Subtotal',fmt(taxableTotal));
+    if(!taxExempt) row('Taxable Subtotal',fmt(taxableTotal));
     row(taxExempt?'Tax Exempt':'Tax (9.10%)',taxExempt?'—':fmt(taxAmt));
     if(labor.length>0){
       y+=4;
@@ -3007,7 +3007,7 @@ function saveInvoicePDF() {
       gray(20);doc.text(value,R,y,{align:'right'});
       y+=16;
     }
-    totRow('Taxable Subtotal', fmt(taxableSubtotal));
+    if(!invTaxExemptActive) totRow('Taxable Subtotal', fmt(taxableSubtotal));
     totRow(invTaxExemptActive?'Tax Exempt':'Tax (9.10%)',invTaxExemptActive?'—':fmt(taxAmt));
     if(cardFeeAmtPDF>0){
       doc.setFontSize(9);doc.setFont('helvetica','normal');doc.setTextColor(160,120,40);
