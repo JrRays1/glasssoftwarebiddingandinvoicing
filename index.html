@@ -2357,7 +2357,7 @@ function calculate() {
     ${extraLines}
     <div class="divider"></div>
     ${!taxExempt ? `<div class="line-item"><span>Taxable Subtotal</span><span>${fmt(baseSubtotal)}</span></div>` : ''}
-    <div class="line-item"><span>${taxExempt?'Tax Exempt':'Tax (9.10%)'}</span><span>${taxExempt?'—':fmt(taxAmt)}</span></div>
+    ${!taxExempt ? `<div class="line-item"><span>Tax (9.10%)</span><span>${fmt(taxAmt)}</span></div>` : ''}
     ${laborTotal > 0 ? `<div class="divider"></div>${laborLines}<div class="line-item" style="color:#7ab8e8;font-size:0.8rem;"><span>Labor Total (not taxed)</span><span>${fmt(laborTotal)}</span></div>` : ''}`;
 
   const gv = document.getElementById('grandTotal');
@@ -2763,34 +2763,24 @@ function saveBidPDF() {
       const rate=parseFloat(p.rate)||0;
       const gparts=[p.thickness?p.thickness:''  ,p.glassType].filter(Boolean).join(' · ');
       const desc=getPieceDisplay(p)+(gparts?' · '+gparts:'');
-      // Glass line — apply markup
-      row(desc, rate?fmt(getPieceGlassTotal(p)*mkup):'(no rate)');
+      // Combine glass + ALL fabrication costs into one unit price per piece
+      const combinedTotal = (getPieceGlassTotal(p) + getPieceFabTotal(p)) * mkup;
+      row(desc, rate?fmt(combinedTotal):'(no rate)');
+      // Fabrication names — no price, just show what's included
+      if(p.fabrications && Object.keys(p.fabrications).length>0){
+        Object.entries(p.fabrications).forEach(([fabName,fabQty])=>{
+          const totalFabQty=(fabQty||1)*(parseFloat(p.qty)||1);
+          doc.setFontSize(8);doc.setFont('helvetica','normal');gray(140);
+          doc.text('   · '+fabName+(totalFabQty>1?' ×'+totalFabQty:''),M+8,y);
+          y+=8*1.8;
+        });
+      }
       // Edging sub-line (indented) — apply markup
       if(getPieceEdgeTotal(p)>0){
         doc.setFontSize(8.5);doc.setFont('helvetica','normal');gray(120);
         doc.text('   + '+(p.edgeName||'Edging'),M+8,y);
         gray(60);doc.text(fmt(getPieceEdgeTotal(p)*mkup),R,y,{align:'right'});
         y+=8.5*1.8;
-      }
-      // Fabrication sub-lines (indented) — apply markup
-      if(p.fabrications && Object.keys(p.fabrications).length>0){
-        const col=fabColForThickness(p.thickness);
-        const pieceQty=parseFloat(p.qty)||1;
-        Object.entries(p.fabrications).forEach(([fabName,fabQty])=>{
-          for(const g of FABRICATION_TYPES){
-            const item=g.items.find(it=>it.name===fabName);
-            if(item){
-              const sqft=(getPieceW(p)*getPieceH(p))/144*pieceQty;
-              const unitPrice=g.insulated?(sqft<=50?item.under50:item.over50):(item[col]||0);
-              const totalFabQty=fabQty*pieceQty;
-              const price=unitPrice*totalFabQty*mkup;
-              doc.setFontSize(8.5);doc.setFont('helvetica','normal');gray(120);
-              doc.text('   + '+fabName+(totalFabQty>1?' x'+totalFabQty:''),M+8,y);
-              gray(60);doc.text(fmt(price),R,y,{align:'right'});
-              y+=8.5*1.8;
-            }
-          }
-        });
       }
     });
     if(pieces.filter(p=>getPieceW(p)&&getPieceH(p)).length===0) row('No dimensions',fmt(0));
@@ -2812,7 +2802,7 @@ function saveBidPDF() {
     }
     divider();
     if(!taxExempt) row('Taxable Subtotal',fmt(taxableTotal));
-    row(taxExempt?'Tax Exempt':'Tax (9.10%)',taxExempt?'—':fmt(taxAmt));
+    if(!taxExempt) row('Tax (9.10%)',fmt(taxAmt));
     if(labor.length>0){
       y+=4;
       doc.setFontSize(7);doc.setFont('helvetica','bold');doc.setTextColor(122,184,232);
@@ -3008,7 +2998,7 @@ function saveInvoicePDF() {
       y+=16;
     }
     if(!invTaxExemptActive) totRow('Taxable Subtotal', fmt(taxableSubtotal));
-    totRow(invTaxExemptActive?'Tax Exempt':'Tax (9.10%)',invTaxExemptActive?'—':fmt(taxAmt));
+    if(!invTaxExemptActive) totRow('Tax (9.10%)', fmt(taxAmt));
     if(cardFeeAmtPDF>0){
       doc.setFontSize(9);doc.setFont('helvetica','normal');doc.setTextColor(160,120,40);
       doc.text('Credit Card Processing Fee (3%)',totX,y);
