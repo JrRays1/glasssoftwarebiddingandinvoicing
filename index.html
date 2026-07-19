@@ -165,34 +165,7 @@ onAuthStateChanged(auth, user => {
   .tab-panel { display: none; }
   .tab-panel.active { display: block; }
 
-  /* ── STICKY TOTAL BAR ── */
-  .sticky-total {
-    position: fixed;
-    bottom: 0; left: 0; right: 0;
-    background: rgba(15,15,15,0.95);
-    backdrop-filter: blur(12px);
-    border-top: 1px solid var(--border);
-    padding: 0.6rem 1.25rem;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 1rem;
-    z-index: 100;
-    transform: translateY(100%);
-    transition: transform 0.3s ease;
-  }
-  .sticky-total.visible { transform: translateY(0); }
-  .sticky-total-label { font-family:'DM Mono',monospace;font-size:0.65rem;letter-spacing:0.1em;color:var(--muted);text-transform:uppercase; }
-  .sticky-total-amount { font-family:'Bebas Neue',sans-serif;font-size:1.8rem;color:var(--accent);transition:color 0.2s; }
-  .sticky-total-amount.invoice { color:var(--invoice-accent); }
-  .sticky-total-actions { display:flex;gap:0.5rem;flex-shrink:0; }
-  .sticky-btn { background:var(--accent);border:none;border-radius:7px;color:#0f0f0f;cursor:pointer;font-family:'Bebas Neue',sans-serif;font-size:1rem;letter-spacing:0.08em;padding:0.45rem 1.1rem;white-space:nowrap;transition:all 0.15s; }
-  .sticky-btn:hover { background:#ddd; }
-  .sticky-btn.inv { background:var(--invoice-accent);color:#0f0f0f; }
-  .sticky-btn.inv:hover { background:#f0d28e; }
-  .sticky-btn.ghost { background:transparent;border:1px solid var(--border);color:var(--muted);font-family:'DM Mono',monospace;font-size:0.72rem;letter-spacing:0.05em; }
-  .sticky-btn.ghost:hover { border-color:var(--accent);color:var(--accent); }
-  body { padding-bottom: 8rem; }
+  body { padding-bottom: 2rem; }
 
   /* ── COLLAPSIBLE SECTIONS ── */
   .collapsible-header {
@@ -1525,18 +1498,6 @@ onAuthStateChanged(auth, user => {
     </div>
   </div>
 
-  <!-- STICKY TOTAL BAR -->
-  <div class="sticky-total" id="stickyTotal">
-    <div>
-      <div class="sticky-total-label" id="stickyLabel">Total Bid</div>
-      <div class="sticky-total-amount" id="stickyAmount">$0.00</div>
-    </div>
-    <div class="sticky-total-actions" id="stickyActions">
-      <button class="sticky-btn ghost" onclick="resetBid()">↺ New Bid</button>
-      <button class="sticky-btn" onclick="saveBidPDF()">⬇ PDF</button>
-      <button class="sticky-btn" onclick="saveJobToFirebase('bid')" style="background:rgba(255,255,255,0.12);color:var(--text);border:1px solid rgba(255,255,255,0.2);">💾 Save</button>
-    </div>
-  </div>
 </div><!-- end appContainer -->
 
 <script>
@@ -1607,7 +1568,6 @@ function switchTab(tab) {
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === 'tab-' + tab));
   if (tab === 'invoice') calcInvoice();
   if (tab === 'bid') calculate();
-  setTimeout(updateStickyBar, 50);
 }
 window.switchTab = switchTab;
 
@@ -4727,47 +4687,6 @@ setTimeout(async () => {
 }, 1500);
 
 
-// ─────────────────────────────────────────────────
-// STICKY TOTAL BAR
-// ─────────────────────────────────────────────────
-function updateStickyBar() {
-  const activeTab = document.querySelector('.tab-btn.active')?.dataset?.tab;
-  const bar = document.getElementById('stickyTotal');
-  const label = document.getElementById('stickyLabel');
-  const amount = document.getElementById('stickyAmount');
-  const actions = document.getElementById('stickyActions');
-  if (!bar) return;
-
-  if (activeTab === 'bid') {
-    const total = document.getElementById('grandTotal')?.textContent || '$0.00';
-    label.textContent = 'Total Bid';
-    amount.textContent = total;
-    amount.className = 'sticky-total-amount';
-    actions.innerHTML = `
-      <button class="sticky-btn ghost" onclick="resetBid()">↺ New</button>
-      <button class="sticky-btn" onclick="saveBidPDF()">⬇ PDF</button>
-      <button class="sticky-btn" style="background:rgba(255,255,255,0.12);color:var(--text);border:1px solid rgba(255,255,255,0.2);" onclick="saveJobToFirebase('bid')">💾 Save</button>`;
-    bar.classList.add('visible');
-  } else if (activeTab === 'invoice') {
-    const total = document.getElementById('invGrandTotal')?.textContent || '$0.00';
-    label.textContent = 'Invoice Total';
-    amount.textContent = total;
-    amount.className = 'sticky-total-amount invoice';
-    actions.innerHTML = `
-      <button class="sticky-btn inv" onclick="saveInvoicePDF()">⬇ PDF</button>
-      <button class="sticky-btn" style="background:rgba(232,194,122,0.15);color:var(--invoice-accent);border:1px solid rgba(232,194,122,0.4);" onclick="saveJobToFirebase('invoice')">💾 Save</button>
-      <button class="sticky-btn" style="background:rgba(232,194,122,0.1);color:var(--invoice-accent);border:1px solid rgba(232,194,122,0.3);" onclick="pushToZoho()">⬆ Zoho</button>`;
-    bar.classList.add('visible');
-  } else {
-    bar.classList.remove('visible');
-  }
-}
-
-// Hook into calculate and calcInvoice
-const _origCalculate = calculate;
-calculate = function() { _origCalculate.apply(this, arguments); updateStickyBar(); };
-const _origCalcInvoice = calcInvoice;
-calcInvoice = function() { _origCalcInvoice.apply(this, arguments); updateStickyBar(); };
 
 // ─────────────────────────────────────────────────
 // COLLAPSIBLE SECTIONS
@@ -4807,18 +4726,6 @@ const _origAddExtra = addExtra;
 addExtra = function() { expandSection('extras'); _origAddExtra.apply(this, arguments); };
 
 </script>
-  <!-- STICKY TOTAL BAR -->
-  <div class="sticky-total" id="stickyTotal">
-    <div>
-      <div class="sticky-total-label" id="stickyLabel">Total Bid</div>
-      <div class="sticky-total-amount" id="stickyAmount">$0.00</div>
-    </div>
-    <div class="sticky-total-actions" id="stickyActions">
-      <button class="sticky-btn ghost" onclick="resetBid()">↺ New Bid</button>
-      <button class="sticky-btn" onclick="saveBidPDF()">⬇ PDF</button>
-      <button class="sticky-btn" onclick="saveJobToFirebase('bid')" style="background:rgba(255,255,255,0.12);color:var(--text);border:1px solid rgba(255,255,255,0.2);">💾 Save</button>
-    </div>
-  </div>
 </div><!-- end appContainer -->
 </body>
 </html>
