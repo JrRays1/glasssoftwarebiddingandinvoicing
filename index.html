@@ -165,6 +165,68 @@ onAuthStateChanged(auth, user => {
   .tab-panel { display: none; }
   .tab-panel.active { display: block; }
 
+  /* ── STICKY TOTAL BAR ── */
+  .sticky-total {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    background: rgba(15,15,15,0.95);
+    backdrop-filter: blur(12px);
+    border-top: 1px solid var(--border);
+    padding: 0.6rem 1.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    z-index: 100;
+    transform: translateY(100%);
+    transition: transform 0.3s ease;
+  }
+  .sticky-total.visible { transform: translateY(0); }
+  .sticky-total-label { font-family:'DM Mono',monospace;font-size:0.65rem;letter-spacing:0.1em;color:var(--muted);text-transform:uppercase; }
+  .sticky-total-amount { font-family:'Bebas Neue',sans-serif;font-size:1.8rem;color:var(--accent);transition:color 0.2s; }
+  .sticky-total-amount.invoice { color:var(--invoice-accent); }
+  .sticky-total-actions { display:flex;gap:0.5rem;flex-shrink:0; }
+  .sticky-btn { background:var(--accent);border:none;border-radius:7px;color:#0f0f0f;cursor:pointer;font-family:'Bebas Neue',sans-serif;font-size:1rem;letter-spacing:0.08em;padding:0.45rem 1.1rem;white-space:nowrap;transition:all 0.15s; }
+  .sticky-btn:hover { background:#ddd; }
+  .sticky-btn.inv { background:var(--invoice-accent);color:#0f0f0f; }
+  .sticky-btn.inv:hover { background:#f0d28e; }
+  .sticky-btn.ghost { background:transparent;border:1px solid var(--border);color:var(--muted);font-family:'DM Mono',monospace;font-size:0.72rem;letter-spacing:0.05em; }
+  .sticky-btn.ghost:hover { border-color:var(--accent);color:var(--accent); }
+  body { padding-bottom: 5rem; }
+
+  /* ── COLLAPSIBLE SECTIONS ── */
+  .collapsible-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    user-select: none;
+  }
+  .collapsible-header .collapse-arrow {
+    font-size: 0.65rem;
+    color: var(--muted);
+    transition: transform 0.2s;
+    margin-left: 0.5rem;
+  }
+  .collapsible-header.open .collapse-arrow { transform: rotate(180deg); }
+  .collapsible-body {
+    overflow: hidden;
+    transition: max-height 0.25s ease, opacity 0.2s;
+    max-height: 0;
+    opacity: 0;
+  }
+  .collapsible-body.open { max-height: 800px; opacity: 1; }
+
+  /* ── BETTER MOBILE BUTTONS ── */
+  @media (max-width: 580px) {
+    .btn-add { padding: 0.7rem 1rem; font-size: 0.85rem; }
+    .btn-remove { width: 32px; height: 32px; font-size: 1rem; }
+    .dim-whole { width: 58px !important; }
+    .dim-frac { width: 80px; }
+    .piece-row { padding: 0.75rem; }
+    .fab-chip { padding: 0.5rem 0.65rem; font-size: 0.78rem; }
+  }
+
   /* ── GRID / CARDS (shared) ── */
   .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
   @media (max-width: 580px) { .grid { grid-template-columns: 1fr; } }
@@ -1174,29 +1236,49 @@ onAuthStateChanged(auth, user => {
 
       <!-- Hardware -->
       <div class="card">
-        <div class="card-label">Hardware Costs</div>
-        <div id="hwList"></div>
-        <button class="btn-add" onclick="addHardware()">+ Add Hardware Item</button>
+        <div class="card-label collapsible-header" onclick="toggleSection('hw')">
+          <span>Hardware Costs</span>
+          <span class="collapse-arrow">▼</span>
+        </div>
+        <div class="collapsible-body" id="hw-body">
+          <div id="hwList"></div>
+          <button class="btn-add" onclick="addHardware()">+ Add Hardware Item</button>
+        </div>
       </div>
 
       <!-- Labor -->
       <div class="card" style="--card-accent:#7ab8e8;">
-        <div class="card-label" style="color:#7ab8e8;">Labor Costs <span style="font-size:0.6rem;background:rgba(122,184,232,0.12);color:#7ab8e8;border:1px solid rgba(122,184,232,0.3);border-radius:3px;padding:0.1rem 0.35rem;letter-spacing:0.06em;margin-left:0.25rem;">TAX FREE</span></div>
-        <div id="laborList"></div>
-        <button class="btn-add" style="color:#7ab8e8;border-color:rgba(122,184,232,0.35);" onclick="addLabor()">+ Add Labor Item</button>
+        <div class="card-label collapsible-header" style="color:#7ab8e8;" onclick="toggleSection('labor')">
+          <span>Labor Costs <span style="font-size:0.6rem;background:rgba(122,184,232,0.12);color:#7ab8e8;border:1px solid rgba(122,184,232,0.3);border-radius:3px;padding:0.1rem 0.35rem;letter-spacing:0.06em;margin-left:0.25rem;">TAX FREE</span></span>
+          <span class="collapse-arrow">▼</span>
+        </div>
+        <div class="collapsible-body" id="labor-body">
+          <div id="laborList"></div>
+          <button class="btn-add" style="color:#7ab8e8;border-color:rgba(122,184,232,0.35);" onclick="addLabor()">+ Add Labor Item</button>
+        </div>
       </div>
 
       <!-- Additional Costs -->
       <div class="card accent-alt">
-        <div class="card-label">Additional Costs</div>
-        <div id="extraList"></div>
-        <button class="btn-add" onclick="addExtra()">+ Add Cost</button>
+        <div class="card-label collapsible-header" onclick="toggleSection('extras')">
+          <span>Additional Costs</span>
+          <span class="collapse-arrow">▼</span>
+        </div>
+        <div class="collapsible-body" id="extras-body">
+          <div id="extraList"></div>
+          <button class="btn-add" onclick="addExtra()">+ Add Cost</button>
+        </div>
       </div>
 
       <!-- Notes -->
       <div class="card full">
-        <div class="card-label">Additional Notes</div>
-        <textarea id="bidNotes" placeholder="e.g. Installation included, customer to provide measurements, lead time 2 weeks..." style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:0.9rem;padding:0.65rem 0.85rem;outline:none;resize:vertical;min-height:90px;transition:border-color 0.2s;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'"></textarea>
+        <div class="card-label collapsible-header" onclick="toggleSection('notes')">
+          <span>Additional Notes</span>
+          <span class="collapse-arrow">▼</span>
+        </div>
+        <div class="collapsible-body" id="notes-body">
+          <textarea id="bidNotes" placeholder="e.g. Installation included, customer to provide measurements, lead time 2 weeks..." style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:0.9rem;padding:0.65rem 0.85rem;outline:none;resize:vertical;min-height:90px;transition:border-color 0.2s;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'"></textarea>
+        </div>
       </div>
 
       <!-- Total -->
@@ -1443,6 +1525,18 @@ onAuthStateChanged(auth, user => {
     </div>
   </div>
 
+  <!-- STICKY TOTAL BAR -->
+  <div class="sticky-total" id="stickyTotal">
+    <div>
+      <div class="sticky-total-label" id="stickyLabel">Total Bid</div>
+      <div class="sticky-total-amount" id="stickyAmount">$0.00</div>
+    </div>
+    <div class="sticky-total-actions" id="stickyActions">
+      <button class="sticky-btn ghost" onclick="resetBid()">↺ New Bid</button>
+      <button class="sticky-btn" onclick="saveBidPDF()">⬇ PDF</button>
+      <button class="sticky-btn" onclick="saveJobToFirebase('bid')" style="background:rgba(255,255,255,0.12);color:var(--text);border:1px solid rgba(255,255,255,0.2);">💾 Save</button>
+    </div>
+  </div>
 </div><!-- end appContainer -->
 
 <script>
@@ -1512,6 +1606,8 @@ function switchTab(tab) {
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === 'tab-' + tab));
   if (tab === 'invoice') calcInvoice();
+  if (tab === 'bid') calculate();
+  setTimeout(updateStickyBar, 50);
 }
 window.switchTab = switchTab;
 
@@ -3864,18 +3960,23 @@ function renderDashboard() {
   filtered.forEach(job => {
     const row = document.createElement('div');
     row.className = 'job-row';
-    const dateStr = job.date ? new Date(job.date+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '—';
+    const dateStr = job.date ? new Date(job.date+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '—';
     const statusLabel = job.type === 'bid' ? 'Bid' : (job.status||'draft');
-    const amountColor = job.type === 'invoice' && job.status === 'paid' ? 'var(--green)' : job.type === 'invoice' && job.status === 'overdue' ? '#e06060' : 'var(--text)';
+    const amountColor = job.type==='invoice'&&job.status==='paid' ? 'var(--green)' : job.type==='invoice'&&job.status==='overdue' ? '#e06060' : job.type==='invoice' ? 'var(--invoice-accent)' : 'var(--text)';
+    const typeIcon = job.type === 'bid' ? '📋' : '🧾';
+    const desc = job.jobDesc || job.invNumber || '';
     row.innerHTML = `
-      <div>
-        <div class="job-name">${job.customer}</div>
-        <div class="job-desc">${job.jobDesc||job.invNumber||'—'}</div>
+      <div style="display:flex;align-items:flex-start;gap:0.65rem;flex:1;min-width:0;">
+        <div style="font-size:1.2rem;flex-shrink:0;margin-top:0.05rem;opacity:0.7;">${typeIcon}</div>
+        <div style="min-width:0;">
+          <div class="job-name">${job.customer}</div>
+          ${desc ? `<div class="job-desc">${desc}</div>` : ''}
+          <div style="font-family:'DM Mono',monospace;font-size:0.68rem;color:var(--muted);margin-top:0.15rem;">${dateStr}</div>
+        </div>
       </div>
-      <div class="job-date">${dateStr}</div>
-      <div style="display:flex;align-items:center;gap:0.5rem;">
-        <span class="job-status-badge ${job.type==='bid'?'bid':job.status||'draft'}">${statusLabel}</span>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:0.25rem;flex-shrink:0;">
         <div class="job-amount" style="color:${amountColor};">${fmt(job.total||0)}</div>
+        <span class="job-status-badge ${job.type==='bid'?'bid':job.status||'draft'}">${statusLabel}</span>
       </div>
       <div class="job-actions">
         <button class="btn-job-open" onclick="openJob('${job.id}')">Open</button>
@@ -4625,7 +4726,99 @@ setTimeout(async () => {
   }
 }, 1500);
 
+
+// ─────────────────────────────────────────────────
+// STICKY TOTAL BAR
+// ─────────────────────────────────────────────────
+function updateStickyBar() {
+  const activeTab = document.querySelector('.tab-btn.active')?.dataset?.tab;
+  const bar = document.getElementById('stickyTotal');
+  const label = document.getElementById('stickyLabel');
+  const amount = document.getElementById('stickyAmount');
+  const actions = document.getElementById('stickyActions');
+  if (!bar) return;
+
+  if (activeTab === 'bid') {
+    const total = document.getElementById('grandTotal')?.textContent || '$0.00';
+    label.textContent = 'Total Bid';
+    amount.textContent = total;
+    amount.className = 'sticky-total-amount';
+    actions.innerHTML = `
+      <button class="sticky-btn ghost" onclick="resetBid()">↺ New</button>
+      <button class="sticky-btn" onclick="saveBidPDF()">⬇ PDF</button>
+      <button class="sticky-btn" style="background:rgba(255,255,255,0.12);color:var(--text);border:1px solid rgba(255,255,255,0.2);" onclick="saveJobToFirebase('bid')">💾 Save</button>`;
+    bar.classList.add('visible');
+  } else if (activeTab === 'invoice') {
+    const total = document.getElementById('invGrandTotal')?.textContent || '$0.00';
+    label.textContent = 'Invoice Total';
+    amount.textContent = total;
+    amount.className = 'sticky-total-amount invoice';
+    actions.innerHTML = `
+      <button class="sticky-btn inv" onclick="saveInvoicePDF()">⬇ PDF</button>
+      <button class="sticky-btn" style="background:rgba(232,194,122,0.15);color:var(--invoice-accent);border:1px solid rgba(232,194,122,0.4);" onclick="saveJobToFirebase('invoice')">💾 Save</button>
+      <button class="sticky-btn" style="background:rgba(232,194,122,0.1);color:var(--invoice-accent);border:1px solid rgba(232,194,122,0.3);" onclick="pushToZoho()">⬆ Zoho</button>`;
+    bar.classList.add('visible');
+  } else {
+    bar.classList.remove('visible');
+  }
+}
+
+// Hook into calculate and calcInvoice
+const _origCalculate = calculate;
+calculate = function() { _origCalculate.apply(this, arguments); updateStickyBar(); };
+const _origCalcInvoice = calcInvoice;
+calcInvoice = function() { _origCalcInvoice.apply(this, arguments); updateStickyBar(); };
+
+// ─────────────────────────────────────────────────
+// COLLAPSIBLE SECTIONS
+// ─────────────────────────────────────────────────
+const _openSections = new Set();
+
+function toggleSection(id) {
+  const body = document.getElementById(id + '-body');
+  const header = body?.previousElementSibling;
+  if (!body) return;
+  if (_openSections.has(id)) {
+    _openSections.delete(id);
+    body.classList.remove('open');
+    if (header) header.classList.remove('open');
+  } else {
+    _openSections.add(id);
+    body.classList.add('open');
+    if (header) header.classList.add('open');
+  }
+}
+
+function expandSection(id) {
+  const body = document.getElementById(id + '-body');
+  const header = body?.previousElementSibling;
+  if (!body || _openSections.has(id)) return;
+  _openSections.add(id);
+  body.classList.add('open');
+  if (header) header.classList.add('open');
+}
+
+// Auto-expand section when items are added
+const _origAddHardware = addHardware;
+addHardware = function() { expandSection('hw'); _origAddHardware.apply(this, arguments); };
+const _origAddLabor = addLabor;
+addLabor = function() { expandSection('labor'); _origAddLabor.apply(this, arguments); };
+const _origAddExtra = addExtra;
+addExtra = function() { expandSection('extras'); _origAddExtra.apply(this, arguments); };
+
 </script>
+  <!-- STICKY TOTAL BAR -->
+  <div class="sticky-total" id="stickyTotal">
+    <div>
+      <div class="sticky-total-label" id="stickyLabel">Total Bid</div>
+      <div class="sticky-total-amount" id="stickyAmount">$0.00</div>
+    </div>
+    <div class="sticky-total-actions" id="stickyActions">
+      <button class="sticky-btn ghost" onclick="resetBid()">↺ New Bid</button>
+      <button class="sticky-btn" onclick="saveBidPDF()">⬇ PDF</button>
+      <button class="sticky-btn" onclick="saveJobToFirebase('bid')" style="background:rgba(255,255,255,0.12);color:var(--text);border:1px solid rgba(255,255,255,0.2);">💾 Save</button>
+    </div>
+  </div>
 </div><!-- end appContainer -->
 </body>
 </html>
