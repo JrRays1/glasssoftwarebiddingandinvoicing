@@ -3531,6 +3531,13 @@ async function saveCustomer() {
       await window._updateDoc(window._doc(db, 'customers', editId), data);
       showToast('✓ Customer updated!');
     } else {
+      // Check for existing customer with same name to prevent duplicates
+      const existing = await window._getDocs(window._collection(db, 'customers'));
+      const duplicate = existing.docs.find(d => d.data().name?.toLowerCase().trim() === name.toLowerCase());
+      if (duplicate) {
+        showToast('Customer "' + name + '" already exists', 'error');
+        return;
+      }
       await window._addDoc(window._collection(db, 'customers'), data);
       showToast('✓ Customer saved!');
     }
@@ -3994,7 +4001,7 @@ async function doLogout() {
 // ─────────────────────────────────────────────────
 // INIT — load jobs after Firebase module ready
 // ─────────────────────────────────────────────────
-setTimeout(() => { if (window.loadJobs && window._db) window.loadJobs(); if (window.loadCustomers && window._db) window.loadCustomers(); }, 1000);
+setTimeout(() => { if (window.loadJobs && window._db) window.loadJobs(); }, 1000);
 
 // ─────────────────────────────────────────────────
 calculate();
@@ -4563,23 +4570,60 @@ async function bulkImportContacts() {
     "address": ""
   }
 ];
-  let count = 0;
+  // Load existing customers first to avoid duplicates
+  const existing = await window._getDocs(window._collection(db, 'customers'));
+  const existingNames = new Set(existing.docs.map(d => d.data().name?.toLowerCase().trim()));
+  let count = 0, skipped = 0;
   for (const c of contacts) {
     try {
+      if (existingNames.has(c.name?.toLowerCase().trim())) { skipped++; continue; }
       await window._addDoc(window._collection(db, 'customers'), {
         ...c,
         savedAt: new Date().toISOString()
       });
+      existingNames.add(c.name?.toLowerCase().trim());
       count++;
     } catch(e) { console.error('Failed to import', c.name, e); }
   }
   localStorage.setItem('alg_contacts_imported_v1', '1');
-  showToast('✓ Imported ' + count + ' contacts!');
+  if (count > 0) showToast('✓ Imported ' + count + ' contacts' + (skipped ? ' (' + skipped + ' already existed)' : '') + '!');
   if (window.loadCustomers) await window.loadCustomers();
 }
 
+// Deduplicate existing customers in Firestore (runs once)
+async function deduplicateCustomers() {
+  const db = window._db;
+  if (!db) return;
+  if (localStorage.getItem('alg_customers_deduped_v1')) return;
+  const snap = await window._getDocs(window._collection(db, 'customers'));
+  const seen = new Map(); // name.lower -> first docId
+  const toDelete = [];
+  snap.docs.forEach(d => {
+    const key = d.data().name?.toLowerCase().trim();
+    if (!key) return;
+    if (seen.has(key)) {
+      toDelete.push(d.id);
+    } else {
+      seen.set(key, d.id);
+    }
+  });
+  for (const id of toDelete) {
+    try { await window._deleteDoc(window._doc(db, 'customers', id)); } catch(e) {}
+  }
+  localStorage.setItem('alg_customers_deduped_v1', '1');
+  if (toDelete.length > 0) {
+    showToast('✓ Removed ' + toDelete.length + ' duplicate customer(s)');
+    if (window.loadCustomers) await window.loadCustomers();
+  }
+}
+
 // Run after Firebase is ready
-setTimeout(() => { if (window._db) bulkImportContacts(); }, 1500);
+setTimeout(async () => {
+  if (window._db) {
+    await deduplicateCustomers();
+    await bulkImportContacts();
+  }
+}, 1500);
 
 </script>
 </div><!-- end appContainer -->
