@@ -1201,6 +1201,13 @@ onAuthStateChanged(auth, user => {
           <span>Glass Pieces — Dimensions</span>
           <button id="roundSqftBtn" onclick="toggleRoundSqft()" style="background:none;border:1px solid var(--border);border-radius:6px;color:var(--muted);cursor:pointer;font-family:'DM Mono',monospace;font-size:0.65rem;letter-spacing:0.1em;padding:0.2rem 0.55rem;transition:color 0.2s,border-color 0.2s;" title="Toggle rounding sq ft to nearest whole number">≈ Round ft²</button>
         </div>
+        <div style="display:flex;gap:0.5rem;margin-bottom:0.85rem;">
+          <input type="text" id="quickAddInput" placeholder='Quick Add — e.g. "22x22 half inch clear tempered"' 
+            onkeydown="if(event.key==='Enter'){event.preventDefault();quickAddPiece();}"
+            style="flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:0.85rem;padding:0.6rem 0.8rem;outline:none;transition:border-color 0.2s;"
+            onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'">
+          <button onclick="quickAddPiece()" style="background:var(--accent);border:none;border-radius:8px;color:#0f0f0f;cursor:pointer;font-family:'Bebas Neue',sans-serif;font-size:0.95rem;letter-spacing:0.05em;padding:0 1.1rem;white-space:nowrap;">+ Add</button>
+        </div>
         <div class="pieces-scroll">
           <div class="pieces-list" id="piecesList"></div>
         </div>
@@ -1775,7 +1782,54 @@ function getPieceGlassTotal(p) {
   const effectiveRate = getPieceEffectiveRate(p);
   return sqft * effectiveRate;
 }
-function removePiece(id) { pieces = pieces.filter(p => p.id !== id); renderPieces(); calculate(); }
+let _lastDeletedPiece = null;
+let _undoToastTimer = null;
+
+function duplicatePiece(id) {
+  const idx = pieces.findIndex(p => p.id === id);
+  if (idx === -1) return;
+  const clone = JSON.parse(JSON.stringify(pieces[idx]));
+  clone.id = uid();
+  pieces.splice(idx + 1, 0, clone);
+  renderPieces();
+  calculate();
+  showToast('✓ Piece duplicated');
+}
+
+function removePiece(id) {
+  const idx = pieces.findIndex(p => p.id === id);
+  if (idx === -1) return;
+  _lastDeletedPiece = { piece: pieces[idx], index: idx };
+  pieces = pieces.filter(p => p.id !== id);
+  renderPieces();
+  calculate();
+  showUndoToast();
+}
+
+function showUndoToast() {
+  clearTimeout(_undoToastTimer);
+  let toastEl = document.getElementById('undoToast');
+  if (!toastEl) {
+    toastEl = document.createElement('div');
+    toastEl.id = 'undoToast';
+    toastEl.style.cssText = 'position:fixed;bottom:1.5rem;left:50%;transform:translateX(-50%);background:#222;border:1px solid var(--border);border-radius:8px;padding:0.6rem 1rem;display:flex;align-items:center;gap:0.75rem;z-index:200;font-family:\'DM Sans\',sans-serif;font-size:0.85rem;color:var(--text);box-shadow:0 4px 20px rgba(0,0,0,0.4);';
+    toastEl.innerHTML = '<span>Piece removed</span><button onclick="undoDeletePiece()" style="background:var(--accent);border:none;border-radius:5px;color:#0f0f0f;cursor:pointer;font-family:\'Bebas Neue\',sans-serif;font-size:0.85rem;letter-spacing:0.05em;padding:0.25rem 0.7rem;">Undo</button>';
+    document.body.appendChild(toastEl);
+  }
+  toastEl.style.display = 'flex';
+  _undoToastTimer = setTimeout(() => { toastEl.style.display = 'none'; _lastDeletedPiece = null; }, 5000);
+}
+
+function undoDeletePiece() {
+  if (!_lastDeletedPiece) return;
+  pieces.splice(_lastDeletedPiece.index, 0, _lastDeletedPiece.piece);
+  _lastDeletedPiece = null;
+  const toastEl = document.getElementById('undoToast');
+  if (toastEl) toastEl.style.display = 'none';
+  renderPieces();
+  calculate();
+  showToast('✓ Piece restored');
+}
 
 function getPieceDisplay(p) {
   const w = getPieceW(p), h = getPieceH(p), qty = parseFloat(p.qty)||1;
@@ -2177,6 +2231,8 @@ function renderPieces() {
           oninput="pieces[${i}].qty=this.value;updatePieceSqft('${p.id}');calculate()" style="max-width:58px;flex-shrink:0;">
         <div class="piece-sqft" id="sqft_${p.id}">${getSqft(p)}</div>
         ${showDecimal ? `<div class="dim-decimal-badge">${wDec} × ${hDec}</div>` : ''}
+        ${(w && h && !parseFloat(p.rate)) ? `<span title="No glass rate set" style="color:#e0a060;font-size:0.9rem;">⚠</span>` : ''}
+        <button class="btn-remove" onclick="duplicatePiece('${p.id}')" style="background:rgba(122,184,232,0.12);border-color:rgba(122,184,232,0.3);color:#7ab8e8;" title="Duplicate this piece">⧉</button>
         <button class="btn-remove" onclick="removePiece('${p.id}')">✕</button>
       </div>
       <div class="piece-row-mid" style="flex-wrap:wrap;gap:0.4rem;">
@@ -4277,6 +4333,113 @@ async function pushToZoho() {
 
   btn.disabled = false;
   btn.style.opacity = '1';
+}
+
+
+// ─────────────────────────────────────────────────
+// QUICK-ADD PIECE PARSER (rule-based, no AI/network)
+// ─────────────────────────────────────────────────
+const FRACTION_WORDS = {
+  'eighth':'1/8"','eighth inch':'1/8"',
+  'three sixteenth':'3/16"','3/16':'3/16"',
+  'quarter':'1/4"','quarter inch':'1/4"','1/4':'1/4"',
+  'three eighth':'3/8"','3/8':'3/8"',
+  'half':'1/2"','half inch':'1/2"','1/2':'1/2"',
+};
+
+function parsePieceLine(line) {
+  const raw = line.trim();
+  if (!raw) return null;
+  const lower = raw.toLowerCase();
+  const result = { wWhole:'', wFrac:0, hWhole:'', hFrac:0, qty:'1', thickness:'', glassCategory:'flat', glassTreatment:'', glassTypeName:'' };
+
+  // Dimensions: "22x22", "22 x 22 1/2", "22\" x 22\""
+  const dimMatch = lower.match(/(\d+(?:\s\d\/\d+)?)\s*["]?\s*[x×]\s*(\d+(?:\s\d\/\d+)?)\s*["]?/);
+  if (dimMatch) {
+    const parseWH = (s) => {
+      const parts = s.trim().split(/\s+/);
+      return { whole: parseInt(parts[0])||0, frac: parts[1] || '' };
+    };
+    const w = parseWH(dimMatch[1]), h = parseWH(dimMatch[2]);
+    result.wWhole = w.whole; result.hWhole = h.whole;
+  }
+
+  // Quantity: "x2", "qty 2", "2 pieces"
+  const qtyMatch = lower.match(/(?:qty\s*|x)(\d+)(?:\s|$)|(\d+)\s*(?:pieces|pcs)/);
+  if (qtyMatch) result.qty = (qtyMatch[1] || qtyMatch[2] || '1');
+
+  // Thickness — check numeric fractions and word forms
+  for (const [word, thick] of Object.entries(FRACTION_WORDS)) {
+    if (lower.includes(word)) { result.thickness = thick; break; }
+  }
+  if (!result.thickness) {
+    const thickMatch = lower.match(/(\d\/\d+)\s*(?:"|in|inch)/);
+    if (thickMatch) result.thickness = thickMatch[1] + '"';
+  }
+
+  // Glass category — insulated vs flat
+  if (/\bIG\b|insulated|dual.?pane|double.?pane/i.test(raw)) result.glassCategory = 'insulated';
+
+  // Treatment
+  if (/tempered/i.test(raw)) result.glassTreatment = 'tempered';
+  else if (/annealed/i.test(raw)) result.glassTreatment = 'annealed';
+
+  // Glass type — match against known catalog names
+  const catalog = result.glassCategory === 'insulated' ? INSULATED_GLASS : FLAT_GLASS;
+  const thickKey = result.thickness || Object.keys(catalog)[0];
+  const typeList = result.glassCategory === 'insulated' ? (catalog[thickKey]?.types||[]) : (catalog[thickKey]||[]);
+  for (const g of typeList) {
+    const nameWords = g.name.toLowerCase().split(/[\s/]+/).filter(w=>w.length>2);
+    if (nameWords.some(w => lower.includes(w))) { result.glassTypeName = g.name; break; }
+  }
+  // Fallback keyword match for common terms across all thicknesses
+  if (!result.glassTypeName) {
+    const commonTerms = ['clear','bronze','grey','gray','low-e','starphire','mirror','rain','niagara'];
+    for (const term of commonTerms) {
+      if (lower.includes(term)) {
+        for (const g of typeList) {
+          if (g.name.toLowerCase().includes(term)) { result.glassTypeName = g.name; break; }
+        }
+        if (result.glassTypeName) break;
+      }
+    }
+  }
+
+  if (!result.wWhole && !result.hWhole) return null; // no usable dimensions found
+  return result;
+}
+
+function quickAddPiece() {
+  const input = document.getElementById('quickAddInput');
+  const text = input.value.trim();
+  if (!text) return;
+
+  // Support multiple pieces separated by commas or newlines
+  const lines = text.split(/[,\n]+/).map(l=>l.trim()).filter(Boolean);
+  let addedCount = 0, failedLines = [];
+
+  lines.forEach(line => {
+    const parsed = parsePieceLine(line);
+    if (!parsed) { failedLines.push(line); return; }
+    const newPiece = { id: uid(), wWhole: parsed.wWhole, wFrac: 0, hWhole: parsed.hWhole, hFrac: 0,
+      qty: parsed.qty, rate: '', thickness: parsed.thickness, glassCategory: parsed.glassCategory,
+      glassTreatment: parsed.glassTreatment, glassTypeName: parsed.glassTypeName, glassAddons: [],
+      glassType: '', edgeName: '', edgeCpf: '', fabrications: {} };
+    pieces.push(newPiece);
+    // Trigger glass rate lookup if we matched a full chain
+    const idx = pieces.length - 1;
+    if (parsed.thickness && parsed.glassTreatment && parsed.glassTypeName) {
+      setTimeout(() => applyInlineGlassSelection(idx), 10);
+    }
+    addedCount++;
+  });
+
+  renderPieces();
+  calculate();
+  input.value = '';
+
+  if (addedCount > 0) showToast('✓ Added ' + addedCount + ' piece' + (addedCount>1?'s':'') + (failedLines.length ? ' (' + failedLines.length + ' unrecognized)' : ''));
+  else showToast('Could not parse — try "22x22 half inch clear"', 'error');
 }
 
 // ─────────────────────────────────────────────────
