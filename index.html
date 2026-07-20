@@ -1601,10 +1601,31 @@ function syncJobInfo() {
 // BID — PIECES
 // ─────────────────────────────────────────────────
 function addPiece() {
-  const globalRate = parseFloat(document.getElementById('pricePerSqft').value) || 0;
-  // w and h are now objects: { whole, frac }
-  pieces.push({ id: uid(), wWhole: '', wFrac: 0, hWhole: '', hFrac: 0, qty: '1', rate: '', thickness: '', glassCategory: '', glassTreatment: '', glassTypeName: '', glassAddons: [], glassType: '', edgeName: '', edgeCpf: '', fabrications: {} });
+  // Carry over the last piece's glass + edge selection — most jobs use the same glass throughout,
+  // so this cuts 4 dropdown taps down to zero for every piece after the first.
+  const last = pieces[pieces.length - 1];
+  const carry = last ? {
+    thickness: last.thickness || '',
+    glassCategory: last.glassCategory || '',
+    glassTreatment: last.glassTreatment || '',
+    glassTypeName: last.glassTypeName || '',
+    glassAddons: [],
+    glassType: last.glassType || '',
+    rate: last.rate || '',
+    edgeName: last.edgeName || '',
+    edgeCpf: last.edgeCpf || '',
+  } : { thickness: '', glassCategory: '', glassTreatment: '', glassTypeName: '', glassAddons: [], glassType: '', rate: '', edgeName: '', edgeCpf: '' };
+
+  pieces.push({ id: uid(), wWhole: '', wFrac: 0, hWhole: '', hFrac: 0, qty: '1', fabrications: {}, ...carry });
   renderPieces();
+  // Focus the new piece's width input so you can start typing dimensions immediately
+  setTimeout(() => {
+    const pieceRows = document.querySelectorAll('.piece-row');
+    if (pieceRows.length) {
+      const widthInput = pieceRows[pieceRows.length - 1].querySelector('.dim-whole');
+      if (widthInput) widthInput.focus();
+    }
+  }, 50);
 }
 
 function getPieceW(p) { return toDecimal(p.wWhole, p.wFrac); }
