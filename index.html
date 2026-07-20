@@ -1202,7 +1202,7 @@ onAuthStateChanged(auth, user => {
           <button id="roundSqftBtn" onclick="toggleRoundSqft()" style="background:none;border:1px solid var(--border);border-radius:6px;color:var(--muted);cursor:pointer;font-family:'DM Mono',monospace;font-size:0.65rem;letter-spacing:0.1em;padding:0.2rem 0.55rem;transition:color 0.2s,border-color 0.2s;" title="Toggle rounding sq ft to nearest whole number">≈ Round ft²</button>
         </div>
         <div style="display:flex;gap:0.5rem;margin-bottom:0.85rem;">
-          <input type="text" id="quickAddInput" placeholder='Quick Add — e.g. "22x22 half inch clear tempered"' 
+          <input type="text" id="quickAddInput" placeholder='Quick Add — e.g. "22x22, 1/2, clear, tempered" (semicolon between pieces)' 
             onkeydown="if(event.key==='Enter'){event.preventDefault();quickAddPiece();}"
             style="flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:0.85rem;padding:0.6rem 0.8rem;outline:none;transition:border-color 0.2s;"
             onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'">
@@ -4347,65 +4347,65 @@ const FRACTION_WORDS = {
   'half':'1/2"','half inch':'1/2"','1/2':'1/2"',
 };
 
+// Each field is comma-separated: "22x22, 1/2, clear, tempered, qty 2"
+// Multiple pieces are separated by semicolons or new lines.
 function parsePieceLine(line) {
   const raw = line.trim();
   if (!raw) return null;
-  const lower = raw.toLowerCase();
+  const fields = raw.split(',').map(f => f.trim()).filter(Boolean);
   const result = { wWhole:'', wFrac:0, hWhole:'', hFrac:0, qty:'1', thickness:'', glassCategory:'flat', glassTreatment:'', glassTypeName:'' };
+  let dimsFound = false;
 
-  // Dimensions: "22x22", "22 x 22 1/2", "22\" x 22\""
-  const dimMatch = lower.match(/(\d+(?:\s\d\/\d+)?)\s*["]?\s*[x×]\s*(\d+(?:\s\d\/\d+)?)\s*["]?/);
-  if (dimMatch) {
-    const parseWH = (s) => {
-      const parts = s.trim().split(/\s+/);
-      return { whole: parseInt(parts[0])||0, frac: parts[1] || '' };
-    };
-    const w = parseWH(dimMatch[1]), h = parseWH(dimMatch[2]);
-    result.wWhole = w.whole; result.hWhole = h.whole;
-  }
+  fields.forEach(field => {
+    const lower = field.toLowerCase();
 
-  // Quantity: "x2", "qty 2", "2 pieces"
-  const qtyMatch = lower.match(/(?:qty\s*|x)(\d+)(?:\s|$)|(\d+)\s*(?:pieces|pcs)/);
-  if (qtyMatch) result.qty = (qtyMatch[1] || qtyMatch[2] || '1');
+    // Dimensions field: "22x22", "22 x 22"
+    const dimMatch = lower.match(/^(\d+(?:\s\d\/\d+)?)\s*["]?\s*[x×]\s*(\d+(?:\s\d\/\d+)?)\s*["]?$/);
+    if (dimMatch) {
+      const parseWH = (s) => parseInt(s.trim().split(/\s+/)[0]) || 0;
+      result.wWhole = parseWH(dimMatch[1]);
+      result.hWhole = parseWH(dimMatch[2]);
+      dimsFound = true;
+      return;
+    }
 
-  // Thickness — check numeric fractions and word forms
-  for (const [word, thick] of Object.entries(FRACTION_WORDS)) {
-    if (lower.includes(word)) { result.thickness = thick; break; }
-  }
-  if (!result.thickness) {
-    const thickMatch = lower.match(/(\d\/\d+)\s*(?:"|in|inch)/);
-    if (thickMatch) result.thickness = thickMatch[1] + '"';
-  }
+    // Quantity field: "qty 2", "x2", "2 pieces", or a bare number like "2"
+    if (!dimMatch) {
+      const qtyMatch = lower.match(/^(?:qty\s*)?(\d+)\s*(?:pieces|pcs)?$/) || lower.match(/^x(\d+)$/);
+      if (qtyMatch) { result.qty = qtyMatch[1] || qtyMatch[2]; return; }
+    }
 
-  // Glass category — insulated vs flat
-  if (/\bIG\b|insulated|dual.?pane|double.?pane/i.test(raw)) result.glassCategory = 'insulated';
+    // Thickness field
+    for (const [word, thick] of Object.entries(FRACTION_WORDS)) {
+      if (lower.includes(word)) { result.thickness = thick; return; }
+    }
+    const thickMatch = lower.match(/^(\d\/\d+)\s*"?(?:in|inch)?$/);
+    if (thickMatch) { result.thickness = thickMatch[1] + '"'; return; }
 
-  // Treatment
-  if (/tempered/i.test(raw)) result.glassTreatment = 'tempered';
-  else if (/annealed/i.test(raw)) result.glassTreatment = 'annealed';
+    // Category field
+    if (/\bIG\b|insulated|dual.?pane|double.?pane/i.test(field)) { result.glassCategory = 'insulated'; return; }
 
-  // Glass type — match against known catalog names
+    // Treatment field
+    if (/tempered/i.test(field)) { result.glassTreatment = 'tempered'; return; }
+    if (/annealed/i.test(field)) { result.glassTreatment = 'annealed'; return; }
+
+    // Otherwise treat as glass type keyword — matched below after all fields scanned
+  });
+
+  // Glass type — match remaining unrecognized fields against catalog names
   const catalog = result.glassCategory === 'insulated' ? INSULATED_GLASS : FLAT_GLASS;
   const thickKey = result.thickness || Object.keys(catalog)[0];
   const typeList = result.glassCategory === 'insulated' ? (catalog[thickKey]?.types||[]) : (catalog[thickKey]||[]);
-  for (const g of typeList) {
-    const nameWords = g.name.toLowerCase().split(/[\s/]+/).filter(w=>w.length>2);
-    if (nameWords.some(w => lower.includes(w))) { result.glassTypeName = g.name; break; }
-  }
-  // Fallback keyword match for common terms across all thicknesses
-  if (!result.glassTypeName) {
-    const commonTerms = ['clear','bronze','grey','gray','low-e','starphire','mirror','rain','niagara'];
-    for (const term of commonTerms) {
-      if (lower.includes(term)) {
-        for (const g of typeList) {
-          if (g.name.toLowerCase().includes(term)) { result.glassTypeName = g.name; break; }
-        }
-        if (result.glassTypeName) break;
-      }
+  const usedFieldTexts = fields.map(f=>f.toLowerCase());
+  for (const fieldLower of usedFieldTexts) {
+    if (result.glassTypeName) break;
+    for (const g of typeList) {
+      const nameWords = g.name.toLowerCase().split(/[\s/]+/).filter(w=>w.length>2);
+      if (nameWords.some(w => fieldLower.includes(w))) { result.glassTypeName = g.name; break; }
     }
   }
 
-  if (!result.wWhole && !result.hWhole) return null; // no usable dimensions found
+  if (!dimsFound) return null; // no usable dimensions found
   return result;
 }
 
@@ -4414,8 +4414,8 @@ function quickAddPiece() {
   const text = input.value.trim();
   if (!text) return;
 
-  // Support multiple pieces separated by commas or newlines
-  const lines = text.split(/[,\n]+/).map(l=>l.trim()).filter(Boolean);
+  // Multiple pieces separated by semicolons or newlines (commas are used within one piece)
+  const lines = text.split(/[;\n]+/).map(l=>l.trim()).filter(Boolean);
   let addedCount = 0, failedLines = [];
 
   lines.forEach(line => {
