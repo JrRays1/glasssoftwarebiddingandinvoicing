@@ -141,7 +141,8 @@ onAuthStateChanged(auth, user => {
     background: transparent;
     transition: background 0.2s;
   }
-  .tab-btn.active { color: var(--text); background: rgba(255,255,255,0.04); }
+  .tab-btn:hover:not(.active) { color: var(--text); background: rgba(255,255,255,0.02); }
+  .tab-btn.active { color: var(--text); background: rgba(255,255,255,0.05); font-weight: 500; }
   .tab-btn.active::after { background: var(--accent); }
   .tab-btn[data-tab="invoice"].active::after { background: var(--invoice-accent); }
   .tab-btn[data-tab="invoice"].active { color: var(--invoice-accent); }
@@ -207,13 +208,14 @@ onAuthStateChanged(auth, user => {
   .card {
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 1.25rem;
+    border-radius: 14px;
+    padding: 1.4rem;
     position: relative;
     overflow: hidden;
-    transition: border-color 0.2s;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2), 0 1px 2px rgba(0,0,0,0.15);
   }
-  .card:hover { border-color: rgba(255,255,255,0.12); }
+  .card:hover { border-color: rgba(255,255,255,0.14); box-shadow: 0 2px 8px rgba(0,0,0,0.25); }
   .card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, var(--accent), transparent); }
   .card.full { grid-column: 1 / -1; }
   .card.accent-alt::before { background: linear-gradient(90deg, var(--accent2), transparent); }
@@ -223,11 +225,12 @@ onAuthStateChanged(auth, user => {
 
   .card-label {
     font-family: 'DM Mono', monospace;
-    font-size: 0.65rem;
-    letter-spacing: 0.15em;
+    font-size: 0.68rem;
+    font-weight: 500;
+    letter-spacing: 0.16em;
     text-transform: uppercase;
     color: var(--accent);
-    margin-bottom: 1rem;
+    margin-bottom: 1.15rem;
     display: flex;
     align-items: center;
     gap: 0.4rem;
@@ -244,17 +247,19 @@ onAuthStateChanged(auth, user => {
     width: 100%;
     background: var(--surface2);
     border: 1px solid var(--border);
-    border-radius: 8px;
+    border-radius: 9px;
     color: var(--text);
     font-family: 'DM Mono', monospace;
     font-size: 1rem;
-    padding: 0.6rem 0.85rem;
+    padding: 0.65rem 0.9rem;
     outline: none;
-    transition: border-color 0.2s, box-shadow 0.2s;
+    transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
     -moz-appearance: textfield;
   }
   input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; }
-  input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(255,255,255,0.06); }
+  input:hover { border-color: rgba(255,255,255,0.2); }
+  input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(255,255,255,0.08); background: rgba(255,255,255,0.02); }
+  input::placeholder { color: #555; }
 
   /* ── FRACTION INPUT ── */
   .dim-input-group {
@@ -310,7 +315,8 @@ onAuthStateChanged(auth, user => {
   .pieces-scroll::-webkit-scrollbar-track { background: transparent; }
   .pieces-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
   .pieces-list { display: flex; flex-direction: column; gap: 0.6rem; }
-  .piece-row { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 0.6rem 0.75rem; display: flex; flex-direction: column; gap: 0.5rem; animation: slideIn 0.2s ease both; }
+  .piece-row { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 0.75rem 0.9rem; display: flex; flex-direction: column; gap: 0.55rem; animation: slideIn 0.2s ease both; transition: border-color 0.15s; }
+  .piece-row:hover { border-color: rgba(255,255,255,0.15); }
   .piece-row-top { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
   .piece-row-bottom { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
   .edge-label { font-family: 'DM Mono', monospace; font-size: 0.65rem; color: var(--muted); letter-spacing: 0.08em; white-space: nowrap; }
@@ -367,7 +373,7 @@ onAuthStateChanged(auth, user => {
   .line-item span:last-child { font-weight: 500; color: var(--text); }
   .line-item.total-glass span:last-child { color: var(--accent); }
   .divider { height: 1px; background: var(--border); margin: 0.5rem 0; }
-  .grand-total { display: flex; justify-content: space-between; align-items: baseline; }
+  .grand-total { display: flex; justify-content: space-between; align-items: baseline; padding-top: 0.9rem; margin-top: 0.4rem; border-top: 1px solid var(--border); }
   .grand-label { font-family: 'Bebas Neue', sans-serif; font-size: 1.6rem; letter-spacing: 0.05em; color: var(--text); }
   .grand-value { font-family: 'Bebas Neue', sans-serif; font-size: 2.8rem; letter-spacing: 0.02em; color: var(--accent); transition: all 0.2s; }
   .btn-print { margin-top: 1.25rem; width: 100%; background: var(--accent); border: none; border-radius: 8px; color: #0f0f0f; cursor: pointer; font-family: 'Bebas Neue', sans-serif; font-size: 1.1rem; letter-spacing: 0.1em; padding: 0.75rem; transition: all 0.15s; }
@@ -919,6 +925,7 @@ onAuthStateChanged(auth, user => {
     position: relative;
     overflow: hidden;
     animation: fadeUp 0.4s ease both;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.5);
   }
   .login-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, var(--accent), transparent); }
   .login-logo { width: 80px; height: 80px; object-fit: contain; margin-bottom: 1rem; }
