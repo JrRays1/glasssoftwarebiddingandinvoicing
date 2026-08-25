@@ -5373,7 +5373,7 @@ function renderProjectCanvas() {
       <div style="text-align:center;font-family:'DM Mono',monospace;font-size:10px;color:#333;margin-top:4px;pointer-events:none;">${wLabel} × ${hLabel}${qtyTag}${isIG?' · IG':''}</div>
       <div style="text-align:center;font-family:'DM Sans',sans-serif;font-size:9px;color:#777;pointer-events:none;">${[u.p.thickness,u.p.glassTypeName].filter(Boolean).join(' · ')||''}</div>`;
 
-    box.addEventListener('pointerdown', (e) => startDragUnit(e, u, box));
+    box.addEventListener('pointerdown', (e) => startDragUnit(e, u, box, units));
     box.addEventListener('click', (e) => {
       if (_dragMoved) { _dragMoved = false; return; } // don't open editor after a drag
       openUnitEditor(u.p);
@@ -5498,7 +5498,7 @@ function saveUnitEdits(pieceId) {
   showToast('✓ Updated');
 }
 
-function startDragUnit(e, u, box) {
+function startDragUnit(e, u, box, allUnits) {
   e.preventDefault();
   _dragUnit = u;
   _dragMoved = false;
@@ -5530,13 +5530,18 @@ function startDragUnit(e, u, box) {
     if (Math.abs(nx - gridSnapX) < SNAP_DIST) nx = gridSnapX;
     if (Math.abs(ny - gridSnapY) < SNAP_DIST) ny = gridSnapY;
 
-    // Snap to alignment with other pieces' edges (left, right, top, bottom)
+    // Snap to alignment with other pieces' TRUE GLASS edges (not the outer DOM box,
+    // which can be wider than the glass for IG pieces due to reserved isometric margin —
+    // using the outer box for snapping was leaving a real gap between glass edges).
     let guideX = null, guideY = null;
-    document.querySelectorAll('.project-unit').forEach(otherBox => {
-      if (otherBox === box) return;
-      const ol = parseFloat(otherBox.style.left), ot = parseFloat(otherBox.style.top), ow = otherBox.offsetWidth, oh = otherBox.offsetHeight;
+    (allUnits || []).forEach(ou => {
+      if (ou === u) return;
+      const ol = ou.pos.x, ot = ou.pos.y, ow = ou.uw, oh = ou.uh;
       [ol, ol + ow - u.uw].forEach(edge => { if (Math.abs(nx - edge) < SNAP_DIST) { nx = edge; guideX = ol; } });
       [ot, ot + oh - u.uh].forEach(edge => { if (Math.abs(ny - edge) < SNAP_DIST) { ny = edge; guideY = ot; } });
+      // Also snap edge-to-edge (right side of dragged piece touching left side of other, etc.)
+      [ol - u.uw, ol + ow].forEach(edge => { if (Math.abs(nx - edge) < SNAP_DIST) { nx = edge; guideX = ol; } });
+      [ot - u.uh, ot + oh].forEach(edge => { if (Math.abs(ny - edge) < SNAP_DIST) { ny = edge; guideY = ot; } });
     });
 
     _dragUnit.pos.x = nx; _dragUnit.pos.y = ny;
