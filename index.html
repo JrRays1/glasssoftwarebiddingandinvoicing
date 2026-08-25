@@ -5051,10 +5051,12 @@ function detectPosition(text) {
 // Draws the piece rectangle + optional frame + optional muntins + dimension lines + annotation
 // Returns the inner SVG markup (without outer <svg> tag) so it can be reused for the full project view
 // Frame material rendering styles
+// inset = width/2 so the frame stroke straddles the glass edge exactly —
+// this makes the frame visually touch/hug the glass with no floating gap
 const FRAME_MATERIALS = {
-  metal: { stroke: '#8a9199', width: 5, inset: 6, hatch: false },
-  wood:  { stroke: '#8a5a34', width: 7, inset: 7, hatch: true },
-  glass: { stroke: '#b8ccd6', width: 2, inset: 2, hatch: false }, // frameless glass fin
+  metal: { stroke: '#8a9199', width: 5, inset: 2.5, hatch: false },
+  wood:  { stroke: '#8a5a34', width: 7, inset: 3.5, hatch: true },
+  glass: { stroke: '#b8ccd6', width: 2, inset: 1,   hatch: false }, // frameless glass fin
 };
 
 // Isometric "exploded" view for insulated glass units — shows the two panes
@@ -5296,6 +5298,33 @@ function autoLayoutUnits(units) {
   });
 }
 
+// Detects clusters of units whose edges are touching (within a small tolerance)
+// so we can show a combined "Overall" dimension for mulled/ganged assemblies.
+function findTouchingClusters(units) {
+  const TOUCH_TOL = 3; // px tolerance to consider two edges "touching"
+  const parent = units.map((_, i) => i);
+  function find(i) { while (parent[i] !== i) { parent[i] = parent[parent[i]]; i = parent[i]; } return i; }
+  function union(a, b) { const ra = find(a), rb = find(b); if (ra !== rb) parent[ra] = rb; }
+
+  for (let i = 0; i < units.length; i++) {
+    for (let j = i + 1; j < units.length; j++) {
+      const a = units[i], b = units[j];
+      const aLeft = a.pos.x, aRight = a.pos.x + a.uw, aTop = a.pos.y, aBottom = a.pos.y + a.uh;
+      const bLeft = b.pos.x, bRight = b.pos.x + b.uw, bTop = b.pos.y, bBottom = b.pos.y + b.uh;
+      // Touching horizontally (side by side) — right/left edges match and vertical ranges overlap
+      const vertOverlap = Math.min(aBottom, bBottom) - Math.max(aTop, bTop) > 4;
+      const horizOverlap = Math.min(aRight, bRight) - Math.max(aLeft, bLeft) > 4;
+      const touchingH = (Math.abs(aRight - bLeft) < TOUCH_TOL || Math.abs(bRight - aLeft) < TOUCH_TOL) && vertOverlap;
+      const touchingV = (Math.abs(aBottom - bTop) < TOUCH_TOL || Math.abs(bBottom - aTop) < TOUCH_TOL) && horizOverlap;
+      if (touchingH || touchingV) union(i, j);
+    }
+  }
+
+  const groups = {};
+  units.forEach((u, i) => { const r = find(i); (groups[r] = groups[r] || []).push(u); });
+  return Object.values(groups).filter(g => g.length > 1); // only clusters of 2+
+}
+
 function renderProjectCanvas() {
   const canvas = document.getElementById('fullProjectCanvas');
   if (!canvas) return;
@@ -5308,7 +5337,7 @@ function renderProjectCanvas() {
 
   canvas.style.position = 'relative';
   canvas.style.width = Math.max(maxX + 30, 400) + 'px';
-  canvas.style.height = Math.max(maxY + 30, 300) + 'px';
+  canvas.style.height = Math.max(maxY + 60, 300) + 'px'; // extra room for overall dimension labels
   canvas.innerHTML = '';
 
   units.forEach((u, idx) => {
@@ -5340,6 +5369,30 @@ function renderProjectCanvas() {
       openUnitEditor(u.p);
     });
     canvas.appendChild(box);
+  });
+
+  // Draw "Overall" combined dimension brackets for any pieces that are touching —
+  // e.g. two panels mulled together show one total width/height across both.
+  const clusters = findTouchingClusters(units);
+  clusters.forEach(group => {
+    const left = Math.min(...group.map(u => u.pos.x));
+    const right = Math.max(...group.map(u => u.pos.x + u.uw));
+    const top = Math.min(...group.map(u => u.pos.y));
+    const bottom = Math.max(...group.map(u => u.pos.y + u.uh));
+    // Compute overall real-world size using each unit's own scale (uw/w gives px-per-inch)
+    const scale = group[0].uw / group[0].w; // assume uniform scale across the layout
+    const overallWReal = (right - left) / scale;
+    const overallHReal = (bottom - top) / scale;
+
+    const bracket = document.createElement('div');
+    bracket.style.cssText = `position:absolute;left:${left}px;top:${top - 26}px;width:${right-left}px;pointer-events:none;`;
+    bracket.innerHTML = `
+      <div style="border-bottom:1.5px solid #4a9eff;position:relative;height:8px;">
+        <div style="position:absolute;left:0;bottom:0;width:1px;height:8px;background:#4a9eff;"></div>
+        <div style="position:absolute;right:0;bottom:0;width:1px;height:8px;background:#4a9eff;"></div>
+      </div>
+      <div style="text-align:center;font-family:'DM Mono',monospace;font-size:10px;color:#2a6fc9;font-weight:600;margin-top:2px;">Overall: ${overallWReal.toFixed(1)}" × ${overallHReal.toFixed(1)}"</div>`;
+    canvas.appendChild(bracket);
   });
 }
 
