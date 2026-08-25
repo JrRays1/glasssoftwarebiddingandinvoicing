@@ -5361,7 +5361,10 @@ function renderProjectCanvas() {
 
     // If this piece is part of a touching cluster, skip its own frame — the cluster
     // gets one shared outer frame drawn as a separate overlay after all units render.
-    const drawOpts = unitInCluster.has(u) ? { frameMaterial: '' } : {};
+    // Grouped units skip their own frame AND muntins — the whole assembly gets one
+    // unified muntin grid (including automatic bars at each seam) drawn as a single
+    // overlay after all units render, instead of each piece drawing its own separate grid.
+    const drawOpts = unitInCluster.has(u) ? { frameMaterial: '', muntinCols: 0, muntinRows: 0 } : {};
     const svgInner = buildPieceSvgGroup(u.p, 0, marginTop, u.uw, u.uh, drawOpts);
     const wLabel = dimDisplay(u.p.wWhole, u.p.wFrac), hLabel = dimDisplay(u.p.hWhole, u.p.hFrac);
     const qtyTag = (parseInt(u.p.qty)||1) > 1 ? ` #${u.unitIndex+1}` : '';
@@ -5446,6 +5449,39 @@ function renderProjectCanvas() {
       seamsH.forEach(sy => { maskInner += `<rect x="0" y="${sy-2}" width="${right-left}" height="4" fill="${seamFill}"/>`; });
       maskSvg.innerHTML = maskInner;
       canvas.appendChild(maskSvg);
+
+      // ── Unified muntin grid for the whole assembly ──────────────────────
+      // A muntin bar is placed automatically at every seam where two pieces butt up
+      // (so the joint itself reads as a proper mullion), plus any additional evenly
+      // spaced muntins from the piece's own Cols/Rows setting distributed across the
+      // FULL assembly width/height — not duplicated per individual piece.
+      const muntinCols = parseInt(group.find(u => u.p.sketchMuntinCols)?.p.sketchMuntinCols) || 0;
+      const muntinRows = parseInt(group.find(u => u.p.sketchMuntinRows)?.p.sketchMuntinRows) || 0;
+      if (seamsV.size || seamsH.size || muntinCols > 0 || muntinRows > 0) {
+        const muntinSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        muntinSvg.setAttribute('width', right - left);
+        muntinSvg.setAttribute('height', bottom - top);
+        muntinSvg.setAttribute('viewBox', `0 0 ${right-left} ${bottom-top}`);
+        muntinSvg.style.cssText = `position:absolute;left:${left}px;top:${top}px;pointer-events:none;`;
+        let muntinInner = '';
+
+        // Bars exactly at each seam — this is what makes the joint itself a mullion
+        seamsV.forEach(sx => { muntinInner += `<line x1="${sx}" y1="0" x2="${sx}" y2="${bottom-top}" stroke="#8a8a8a" stroke-width="3"/>`; });
+        seamsH.forEach(sy => { muntinInner += `<line x1="0" y1="${sy}" x2="${right-left}" y2="${sy}" stroke="#8a8a8a" stroke-width="3"/>`; });
+
+        // Any additional muntins evenly spaced across the whole assembly (not per piece)
+        for (let c = 1; c <= muntinCols; c++) {
+          const mx = (right - left) / (muntinCols + 1) * c;
+          muntinInner += `<line x1="${mx}" y1="0" x2="${mx}" y2="${bottom-top}" stroke="#8a8a8a" stroke-width="3"/>`;
+        }
+        for (let r = 1; r <= muntinRows; r++) {
+          const my = (bottom - top) / (muntinRows + 1) * r;
+          muntinInner += `<line x1="0" y1="${my}" x2="${right-left}" y2="${my}" stroke="#8a8a8a" stroke-width="3"/>`;
+        }
+
+        muntinSvg.innerHTML = muntinInner;
+        canvas.appendChild(muntinSvg);
+      }
     }
   });
 }
