@@ -5683,64 +5683,68 @@ function openFullProjectView() {
 
 function downloadFullProjectView() {
   const canvas = document.getElementById('fullProjectCanvas');
-  if (!canvas) return;
+  if (!canvas) { showToast('Nothing to download', 'error'); return; }
   const w = parseFloat(canvas.style.width), h = parseFloat(canvas.style.height);
   if (!w || !h) { showToast('Nothing to download', 'error'); return; }
 
+  // Temporarily hide the drag alignment guide (if present) so it doesn't end up in the export
+  const guideEl = document.getElementById('alignGuides');
+  const guidePrevDisplay = guideEl ? guideEl.style.display : null;
+  if (guideEl) guideEl.style.display = 'none';
+
   try {
-    let inner = `<rect x="0" y="0" width="${w}" height="${h}" fill="#ffffff"/>`;
+    // Capture the canvas exactly as rendered on screen — this reliably includes every
+    // piece, the continuous frame, seam masks, muntin grid, and dimension brackets,
+    // since it's a direct snapshot of the live DOM rather than a hand-rebuilt copy.
+    const canvasClone = canvas.cloneNode(true);
+    canvasClone.style.position = 'relative';
+    canvasClone.style.left = '0';
+    canvasClone.style.top = '0';
+    const cloneWrapper = document.createElement('div');
+    cloneWrapper.style.cssText = `width:${w}px;height:${h}px;background:#ffffff;position:relative;font-family:'DM Sans',sans-serif;`;
+    cloneWrapper.appendChild(canvasClone);
+    const cloneHtml = new XMLSerializer().serializeToString(cloneWrapper);
 
-    // Walk EVERY direct child of the canvas — this covers glass piece boxes
-    // (.project-unit) as well as the standalone overlay SVGs added on top
-    // (continuous frame, seam mask, unified muntin grid, overall dimension brackets,
-    // alignment guides) — previously only piece boxes were captured, so anything
-    // drawn as an overlay silently never made it into the downloaded image.
-    Array.from(canvas.children).forEach(child => {
-      if (child.id === 'alignGuides') return; // temporary drag guides, not part of the drawing
+    const svgMarkup = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}">
+      <foreignObject width="100%" height="100%">
+        ${cloneHtml}
+      </foreignObject>
+    </svg>`;
 
-      if (child.classList && child.classList.contains('project-unit')) {
-        const left = parseFloat(child.style.left) || 0, top = parseFloat(child.style.top) || 0;
-        const svgEl = child.querySelector('svg');
-        if (!svgEl) return;
-        const svgW = svgEl.getAttribute('width'), svgH = svgEl.getAttribute('height');
-        inner += `<g transform="translate(${left},${top})"><svg width="${svgW}" height="${svgH}">${svgEl.innerHTML}</svg></g>`;
-        const labels = child.querySelectorAll('div');
-        let ly = top + parseFloat(svgH) + 14;
-        labels.forEach((lbl, i) => {
-          inner += `<text x="${left + svgW/2}" y="${ly}" text-anchor="middle" font-family="${i===0?'DM Mono, monospace':'DM Sans, sans-serif'}" font-size="${i===0?10:9}" fill="${i===0?'#333':'#777'}">${(lbl.textContent||'').replace(/&/g,'&amp;').replace(/</g,'&lt;')}</text>`;
-          ly += 13;
-        });
-      } else if (child.tagName === 'svg') {
-        // A standalone overlay SVG (frame outline, seam mask, muntin grid) —
-        // positioned absolutely on the canvas, just carry its position and content over.
-        const left = parseFloat(child.style.left) || 0, top = parseFloat(child.style.top) || 0;
-        inner += `<g transform="translate(${left},${top})">${child.innerHTML}</g>`;
-      } else {
-        // Overall-dimension bracket — a plain div with a border line + text label
-        const left = parseFloat(child.style.left) || 0, top = parseFloat(child.style.top) || 0;
-        const width = parseFloat(child.style.width) || child.offsetWidth || 0;
-        const textEl = child.querySelector('div:last-child');
-        const label = textEl ? textEl.textContent : '';
-        inner += `<line x1="${left}" y1="${top+8}" x2="${left+width}" y2="${top+8}" stroke="#4a9eff" stroke-width="1.5"/>`;
-        inner += `<line x1="${left}" y1="${top}" x2="${left}" y2="${top+8}" stroke="#4a9eff" stroke-width="1"/>`;
-        inner += `<line x1="${left+width}" y1="${top}" x2="${left+width}" y2="${top+8}" stroke="#4a9eff" stroke-width="1"/>`;
-        inner += `<text x="${left+width/2}" y="${top+22}" text-anchor="middle" font-family="DM Mono, monospace" font-size="10" font-weight="600" fill="#2a6fc9">${label.replace(/&/g,'&amp;').replace(/</g,'&lt;')}</text>`;
-      }
-    });
-
-    const fullSvgMarkup = `<svg width="${w}" height="${h}" xmlns="http://www.w3.org/2000/svg">${inner}</svg>`;
-    const wrapper = document.createElement('div');
-    wrapper.innerHTML = fullSvgMarkup;
-    const svgEl = wrapper.querySelector('svg');
-    if (!svgEl) throw new Error('Could not build export SVG');
-    document.body.appendChild(svgEl);
-    svgEl.style.position = 'fixed';
-    svgEl.style.left = '-9999px';
-    svgToPngDownload(svgEl, 'full-project-view.png');
-    setTimeout(() => svgEl.remove(), 800);
+    const svgBlob = new Blob([svgMarkup], { type: 'image/svg+xml;charset=utf-8' });
+    const url = URL.createObjectURL(svgBlob);
+    const img = new Image();
+    img.onload = function() {
+      const outCanvas = document.createElement('canvas');
+      const scaleFactor = 2;
+      outCanvas.width = w * scaleFactor;
+      outCanvas.height = h * scaleFactor;
+      const ctx = outCanvas.getContext('2d');
+      ctx.scale(scaleFactor, scaleFactor);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, w, h);
+      ctx.drawImage(img, 0, 0, w, h);
+      URL.revokeObjectURL(url);
+      outCanvas.toBlob(function(blob) {
+        if (!blob) { showToast('Download failed — try again', 'error'); return; }
+        const link = document.createElement('a');
+        link.download = 'full-project-view.png';
+        link.href = URL.createObjectURL(blob);
+        link.click();
+        showToast('✓ Downloaded');
+        if (guideEl) guideEl.style.display = guidePrevDisplay;
+      });
+    };
+    img.onerror = function() {
+      console.error('Full Project View export: image failed to load from SVG blob');
+      showToast('Download failed — try again', 'error');
+      if (guideEl) guideEl.style.display = guidePrevDisplay;
+    };
+    img.src = url;
   } catch (err) {
     console.error('Download failed:', err);
     showToast('Download failed — try again', 'error');
+    if (guideEl) guideEl.style.display = guidePrevDisplay;
   }
 }
 </script>
