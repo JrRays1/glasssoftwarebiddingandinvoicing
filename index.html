@@ -2260,6 +2260,7 @@ function renderPieces() {
         <div class="piece-sqft" id="sqft_${p.id}">${getSqft(p)}</div>
         ${showDecimal ? `<div class="dim-decimal-badge">${wDec} × ${hDec}</div>` : ''}
         ${(w && h && !parseFloat(p.rate)) ? `<span title="No glass rate set" style="color:#e0a060;font-size:0.9rem;">⚠</span>` : ''}
+        <button class="btn-remove" onclick="openSketch('${p.id}')" style="background:rgba(255,255,255,0.08);border-color:var(--border);color:var(--text);" title="View a scaled sketch of this piece">✏</button>
         <button class="btn-remove" onclick="duplicatePiece('${p.id}')" style="background:rgba(122,184,232,0.12);border-color:rgba(122,184,232,0.3);color:#7ab8e8;" title="Duplicate this piece">⧉</button>
         <button class="btn-remove" onclick="removePiece('${p.id}')">✕</button>
       </div>
@@ -2466,7 +2467,7 @@ function calculate() {
   }).join('');
 
   const laborLines = labor.map(l =>
-    `<div class="line-item" style="color:#7ab8e8;"><span>${l.name||'Labor'} <span style="font-size:0.7rem;opacity:0.6;">tax-free</span></span><span>${fmt(parseFloat(l.cost)||0)}</span></div>`
+    `<div class="line-item" style="color:#7ab8e8;"><span>${l.name||'Labor'}</span><span>${fmt(parseFloat(l.cost)||0)}</span></div>`
   ).join('');
 
   // Per-piece glass lines — show base rate for Chris to see, marked-up total
@@ -2499,8 +2500,7 @@ function calculate() {
     ${fabTotal > 0 ? `<div class="line-item"><span>Fabrication</span><span>${fmt(fabTotal * mkup)}</span></div>` : ''}
     ${extraLines}
     <div class="divider"></div>
-    ${!taxExempt ? `<div class="line-item"><span>Taxable Subtotal</span><span>${fmt(baseSubtotal)}</span></div>` : ''}
-    ${!taxExempt ? `<div class="line-item"><span>Tax (9.10%)</span><span>${fmt(taxAmt)}</span></div>` : ''}
+    <!-- Tax is calculated and included in the grand total automatically; no line shown -->
     ${laborTotal > 0 ? `<div class="divider"></div>${laborLines}<div class="line-item" style="color:#7ab8e8;font-size:0.8rem;"><span>Labor Total (not taxed)</span><span>${fmt(laborTotal)}</span></div>` : ''}`;
 
   const gv = document.getElementById('grandTotal');
@@ -2680,10 +2680,13 @@ function importFromBid() {
     if (base>0) invItems.push({ id: uid(), desc: e.name||'Additional Cost', qty: 1, price: base * glassMkup, basePrice: base });
   });
   labor.forEach(l => {
-    if (parseFloat(l.cost)>0) invItems.push({ id: uid(), desc: (l.name||'Labor')+' (tax-free)', qty: 1, price: parseFloat(l.cost)||0, taxFree: true });
+    if (parseFloat(l.cost)>0) invItems.push({ id: uid(), desc: (l.name||'Labor'), qty: 1, price: parseFloat(l.cost)||0, taxFree: true });
   });
 
-  // ── Penny correction: adjust last taxable item so invoice total = bid total exactly ──
+  // ── Correction: distribute any rounding drift proportionally across ALL taxable
+  // items (weighted by price) instead of dumping it onto a single line. This means
+  // even if a discrepancy exists, no single item's price swings noticeably —
+  // each item only absorbs a tiny fraction proportional to its own size.
   const taxableItems = invItems.filter(i=>!i.taxFree);
   const taxFreeItems = invItems.filter(i=>i.taxFree);
   const taxableSum   = taxableItems.reduce((s,i)=>s+i.price,0);
@@ -2691,8 +2694,14 @@ function importFromBid() {
   const invTaxAmt    = Math.round(Math.round(taxableSum*100)/100*(taxRate/100)*100)/100;
   const invGrand     = taxableSum + invTaxAmt + taxFreeSum;
   const diff         = Math.round((bidGrand - invGrand)*100)/100;
-  if (diff !== 0 && taxableItems.length > 0) {
-    taxableItems[taxableItems.length-1].price = Math.round((taxableItems[taxableItems.length-1].price + diff)*100)/100;
+  if (diff !== 0 && taxableItems.length > 0 && taxableSum > 0) {
+    let remaining = diff;
+    taxableItems.forEach((item, idx) => {
+      const isLast = idx === taxableItems.length - 1;
+      const share = isLast ? remaining : Math.round((diff * (item.price / taxableSum)) * 100) / 100;
+      item.price = Math.round((item.price + share) * 100) / 100;
+      remaining = Math.round((remaining - share) * 100) / 100;
+    });
   }
   const cname   = document.getElementById('customerName').value;
   const jdesc   = document.getElementById('jobDesc').value;
@@ -2768,17 +2777,15 @@ function calcInvoice() {
 
   const itemLines = invItems.map(item => {
     const total = (parseFloat(item.qty)||0)*(parseFloat(item.price)||0);
-    const taxFreeTag = item.taxFree ? `<span style="font-size:0.65rem;color:#7ab8e8;margin-left:0.35rem;">tax-free</span>` : '';
-    return `<div class="line-item"><span>${item.desc||'Line Item'}${taxFreeTag}</span><span>${fmt(total)}</span></div>`;
+    return `<div class="line-item"><span>${item.desc||'Line Item'}</span><span>${fmt(total)}</span></div>`;
   }).join('');
 
   const deposit = grand * 0.5;
   document.getElementById('invBreakdown').innerHTML = `
     ${itemLines}
     <div class="divider"></div>
-    ${!invTaxExemptActive ? `<div class="line-item"><span>Taxable Subtotal</span><span>${fmt(taxableSubtotal)}</span></div>` : ''}
-    ${!invTaxExemptActive ? `<div class="line-item"><span>Tax (9.10%)</span><span>${fmt(taxAmt)}</span></div>` : ''}
-    ${taxFreeSubtotal > 0 ? `<div class="line-item" style="color:#7ab8e8;"><span>Labor (tax-free)</span><span>${fmt(taxFreeSubtotal)}</span></div>` : ''}
+    <!-- Tax is calculated and included in the grand total automatically; no line shown -->
+    ${taxFreeSubtotal > 0 ? `<div class="line-item" style="color:#7ab8e8;"><span>Labor</span><span>${fmt(taxFreeSubtotal)}</span></div>` : ''}
     ${cardFeeActive ? `<div class="line-item" style="color:var(--invoice-accent);"><span>Credit Card Processing Fee (3%)</span><span>${fmt(cardFeeAmt)}</span></div>` : ''}
     <div class="divider"></div>
     <div class="line-item" style="color:var(--invoice-accent);"><span>50% Deposit Required</span><span>${fmt(deposit)}</span></div>
@@ -2982,8 +2989,7 @@ function saveBidPDF() {
       });y+=6;
     }
     divider();
-    if(!taxExempt) row('Taxable Subtotal',fmt(taxableTotal));
-    if(!taxExempt) row('Tax (9.10%)',fmt(taxAmt));
+    // Tax is calculated and included in the grand total automatically; no line printed
     if(labor.length>0){
       y+=4;
       doc.setFontSize(7);doc.setFont('helvetica','bold');doc.setTextColor(122,184,232);
@@ -2996,7 +3002,7 @@ function saveBidPDF() {
         y+=10*1.8;
       });
       doc.setFontSize(9);doc.setFont('helvetica','bold');doc.setTextColor(80,160,220);
-      doc.text('Labor Total (tax-free)',M,y);doc.text(fmt(laborTotal),R,y,{align:'right'});y+=9*1.8;
+      doc.text('Labor Total',M,y);doc.text(fmt(laborTotal),R,y,{align:'right'});y+=9*1.8;
     }
     y+=10;
     fillColor(20);doc.roundedRect(M-12,y-12,pageW-(M-12)*2,52,5,5,'F');
@@ -3206,8 +3212,7 @@ function saveInvoicePDF() {
       gray(20);doc.text(value,R,y,{align:'right'});
       y+=16;
     }
-    if(!invTaxExemptActive) totRow('Taxable Subtotal', fmt(taxableSubtotal));
-    if(!invTaxExemptActive) totRow('Tax (9.10%)', fmt(taxAmt));
+    // Tax is calculated and included in the grand total automatically; no line printed
     if(cardFeeAmtPDF>0){
       doc.setFontSize(9);doc.setFont('helvetica','normal');doc.setTextColor(160,120,40);
       doc.text('Credit Card Processing Fee (3%)',totX,y);
@@ -3216,7 +3221,7 @@ function saveInvoicePDF() {
     }
     if(taxFreeSubtotal > 0){
       doc.setFontSize(9);doc.setFont('helvetica','normal');doc.setTextColor(122,184,232);
-      doc.text('Labor (tax-free)',totX,y);
+      doc.text('Labor',totX,y);
       doc.text(fmt(taxFreeSubtotal),R,y,{align:'right'});
       y+=16;
     }
@@ -4917,6 +4922,356 @@ const _origAddExtra = addExtra;
 addExtra = function() { expandSection('extras'); _origAddExtra.apply(this, arguments); };
 
 </script>
-</div><!-- end appContainer -->
+  <!-- SKETCH MODAL -->
+  <div id="sketchModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:500;align-items:center;justify-content:center;padding:1.25rem;">
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:1.5rem;max-width:560px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.5);">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;">
+        <div class="card-label" style="margin:0;">Piece Sketch</div>
+        <button onclick="closeSketch()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:1.3rem;line-height:1;padding:0.2rem 0.5rem;">✕</button>
+      </div>
+      <div id="sketchCanvas" style="background:#fff;border-radius:10px;padding:1rem;margin-bottom:1rem;display:flex;align-items:center;justify-content:center;min-height:280px;"></div>
+
+      <div style="display:flex;gap:0.6rem;margin-bottom:0.85rem;flex-wrap:wrap;">
+        <div style="display:flex;align-items:center;gap:0.4rem;background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:0.4rem 0.7rem;flex:1 1 auto;">
+          <span style="font-size:0.78rem;color:var(--muted);white-space:nowrap;">Frame</span>
+          <select id="sketchFrameMaterial" onchange="renderSketch()" style="flex:1;background:transparent;border:none;color:var(--text);font-family:'DM Sans',sans-serif;font-size:0.78rem;padding:0.2rem;outline:none;">
+            <option value="">None</option>
+            <option value="metal">Metal</option>
+            <option value="wood">Wood</option>
+            <option value="glass">Glass (frameless)</option>
+          </select>
+        </div>
+        <div style="display:flex;align-items:center;gap:0.4rem;background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:0.4rem 0.7rem;flex:1 1 auto;">
+          <span style="font-size:0.78rem;color:var(--muted);white-space:nowrap;">Muntins</span>
+          <input type="number" id="sketchMuntinCols" placeholder="Cols" min="0" max="10" oninput="renderSketch()" style="max-width:60px;padding:0.25rem 0.4rem;font-size:0.78rem;">
+          <span style="color:var(--muted);font-size:0.75rem;">×</span>
+          <input type="number" id="sketchMuntinRows" placeholder="Rows" min="0" max="10" oninput="renderSketch()" style="max-width:60px;padding:0.25rem 0.4rem;font-size:0.78rem;">
+        </div>
+      </div>
+
+      <label>Description / Notes on this piece</label>
+      <textarea id="sketchDesc" placeholder="e.g. notch top-left corner, cutout for hinge, beveled edge on top..." 
+        oninput="renderSketch()"
+        style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:0.9rem;padding:0.6rem 0.8rem;outline:none;resize:vertical;min-height:70px;margin-bottom:1rem;"></textarea>
+      <div style="display:flex;gap:0.6rem;">
+        <button class="btn-print" onclick="downloadSketch()" style="flex:1;">⬇ Download Sketch</button>
+        <button class="btn-print" onclick="openFullProjectView()" style="flex:1;background:var(--invoice-accent);">🖼 Full Project View</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+// ─────────────────────────────────────────────────
+// PIECE SKETCH — generates a scaled diagram from dimensions + description
+// ─────────────────────────────────────────────────
+let _sketchPieceId = null;
+
+function openSketch(id) {
+  _sketchPieceId = id;
+  const p = pieces.find(pc => pc.id === id);
+  if (!p) return;
+  document.getElementById('sketchDesc').value = p.sketchNote || '';
+  document.getElementById('sketchFrameMaterial').value = p.sketchFrameMaterial || '';
+  document.getElementById('sketchMuntinCols').value = p.sketchMuntinCols || '';
+  document.getElementById('sketchMuntinRows').value = p.sketchMuntinRows || '';
+  document.getElementById('sketchModal').style.display = 'flex';
+  renderSketch();
+}
+
+function closeSketch() {
+  document.getElementById('sketchModal').style.display = 'none';
+  _sketchPieceId = null;
+}
+
+const SKETCH_KEYWORDS = [
+  // Cutting / drilling
+  { match: /notch/i,                  label: 'Notch' },
+  { match: /cutout|cut.?out/i,        label: 'Cutout' },
+  { match: /hole|drill/i,             label: 'Hole' },
+  { match: /finger.?pull/i,           label: 'Finger Pull' },
+  { match: /thumb.?notch/i,           label: 'Thumb Notch' },
+  // Edge treatments
+  { match: /bevel/i,                  label: 'Beveled Edge' },
+  { match: /polish/i,                 label: 'Polished Edge' },
+  { match: /seam/i,                   label: 'Seamed Edge' },
+  { match: /flat.?polish/i,           label: 'Flat Polished Edge' },
+  { match: /pencil.?edge/i,           label: 'Pencil Edge' },
+  { match: /mitered?.?corner/i,       label: 'Mitered Corner' },
+  { match: /radius|round.?corner/i,   label: 'Radius Corner' },
+  // Hardware / fittings
+  { match: /hinge/i,                  label: 'Hinge Cutout' },
+  { match: /pivot/i,                  label: 'Pivot Cutout' },
+  { match: /handle/i,                 label: 'Handle Location' },
+  { match: /lock|strike/i,            label: 'Lock/Strike Cutout' },
+  { match: /clip|clamp/i,             label: 'Clip/Clamp Location' },
+  { match: /standoff/i,               label: 'Standoff Hole' },
+  // Shapes / openings
+  { match: /arch|half.?round|radius.?top/i, label: 'Arched Top' },
+  { match: /angle.?cut|angled?.?corner/i,   label: 'Angled Corner' },
+  { match: /step|offset/i,            label: 'Step/Offset' },
+  // Surface treatments
+  { match: /sandblast/i,              label: 'Sandblasted Area' },
+  { match: /etch/i,                   label: 'Etched Area' },
+  { match: /silk.?screen/i,           label: 'Silk Screen' },
+  { match: /film|safety.?film/i,      label: 'Safety Film' },
+  { match: /decal|logo/i,             label: 'Decal/Logo' },
+  // Damage / repair notes
+  { match: /crack|chip|damage/i,      label: '⚠ Damage Noted' },
+];
+
+// Detects a glass tint/finish word and returns a fill color for the sketch,
+// so the drawing visually reflects the actual glass being used.
+const GLASS_COLOR_MAP = [
+  { match: /bronze/i,   fill: '#d9c39a' },
+  { match: /grey|gray/i,fill: '#cfd3d6' },
+  { match: /black/i,    fill: '#4a4a4a' },
+  { match: /mirror/i,   fill: '#c7ccd1' },
+  { match: /low.?e|low.?iron|starphire/i, fill: '#eaf5f0' },
+  { match: /obscure|rain|niagara|textured|frosted/i, fill: '#e2edf0' },
+  { match: /green/i,    fill: '#d7e8d9' },
+  { match: /blue/i,     fill: '#d6e6f0' },
+  { match: /clear/i,    fill: '#eef4f7' },
+];
+
+function detectGlassFill(p) {
+  const text = (p.glassTypeName || '') + ' ' + (p.sketchNote || '');
+  for (const c of GLASS_COLOR_MAP) {
+    if (c.match.test(text)) return c.fill;
+  }
+  return '#eef4f7'; // default clear-ish
+}
+
+function detectPosition(text) {
+  const t = text.toLowerCase();
+  const vert = t.includes('top') ? 'top' : t.includes('bottom') ? 'bottom' : 'mid';
+  const horiz = t.includes('left') ? 'left' : t.includes('right') ? 'right' : 'mid';
+  return { vert, horiz };
+}
+
+// Draws the piece rectangle + optional frame + optional muntins + dimension lines + annotation
+// Returns the inner SVG markup (without outer <svg> tag) so it can be reused for the full project view
+// Frame material rendering styles
+const FRAME_MATERIALS = {
+  metal: { stroke: '#8a9199', width: 5, inset: 6, hatch: false },
+  wood:  { stroke: '#8a5a34', width: 7, inset: 7, hatch: true },
+  glass: { stroke: '#b8ccd6', width: 2, inset: 2, hatch: false }, // frameless glass fin
+};
+
+function buildPieceSvgGroup(p, x0, y0, rectW, rectH, opts) {
+  opts = opts || {};
+  const frameMaterial = opts.frameMaterial !== undefined ? opts.frameMaterial : (p.sketchFrameMaterial || '');
+  const muntinCols = opts.muntinCols !== undefined ? opts.muntinCols : (parseInt(p.sketchMuntinCols) || 0);
+  const muntinRows = opts.muntinRows !== undefined ? opts.muntinRows : (parseInt(p.sketchMuntinRows) || 0);
+  const desc = opts.desc !== undefined ? opts.desc : (p.sketchNote || '');
+  const fillColor = detectGlassFill(p);
+  const isArched = /arch|half.?round|radius.?top/i.test(desc);
+
+  let shapePath = '';
+  if (isArched) {
+    // Rectangle with a curved (arched) top edge
+    const archHeight = Math.min(rectW * 0.35, rectH * 0.4);
+    shapePath = `M${x0},${y0+archHeight} Q${x0},${y0} ${x0+rectW/2},${y0} Q${x0+rectW},${y0} ${x0+rectW},${y0+archHeight} L${x0+rectW},${y0+rectH} L${x0},${y0+rectH} Z`;
+  }
+
+  let svg = isArched
+    ? `<path d="${shapePath}" fill="${fillColor}" stroke="#333" stroke-width="2"/>`
+    : `<rect x="${x0}" y="${y0}" width="${rectW}" height="${rectH}" fill="${fillColor}" stroke="#333" stroke-width="2"/>`;
+
+  // Frame — drawn as an inset border styled per material (metal, wood, or a thin glass fin for frameless)
+  if (frameMaterial && FRAME_MATERIALS[frameMaterial]) {
+    const fm = FRAME_MATERIALS[frameMaterial];
+    svg += `<rect x="${x0-fm.inset}" y="${y0-fm.inset}" width="${rectW+fm.inset*2}" height="${rectH+fm.inset*2}" fill="none" stroke="${fm.stroke}" stroke-width="${fm.width}" rx="${isArched?10:1}"/>`;
+    if (fm.hatch) {
+      // Simple wood-grain hint — diagonal ticks along the frame
+      const hatchCount = 10;
+      for (let i = 0; i < hatchCount; i++) {
+        const hx = x0 - fm.inset + (rectW + fm.inset*2) * (i / hatchCount);
+        svg += `<line x1="${hx}" y1="${y0-fm.inset}" x2="${hx+4}" y2="${y0-fm.inset-fm.width}" stroke="#6e4527" stroke-width="1"/>`;
+      }
+    }
+  }
+
+  // Muntin bars — evenly spaced grid lines inside the glass
+  if (muntinCols > 0) {
+    for (let c = 1; c <= muntinCols; c++) {
+      const mx = x0 + (rectW / (muntinCols + 1)) * c;
+      svg += `<line x1="${mx}" y1="${y0}" x2="${mx}" y2="${y0+rectH}" stroke="#8a8a8a" stroke-width="3"/>`;
+    }
+  }
+  if (muntinRows > 0) {
+    for (let r = 1; r <= muntinRows; r++) {
+      const my = y0 + (rectH / (muntinRows + 1)) * r;
+      svg += `<line x1="${x0}" y1="${my}" x2="${x0+rectW}" y2="${my}" stroke="#8a8a8a" stroke-width="3"/>`;
+    }
+  }
+
+  // Annotation markers — one per matched keyword, spread around the piece so multiple
+  // features (e.g. "notch top-left, hinge cutout right side") each get their own marker
+  const foundTags = SKETCH_KEYWORDS.filter(k => k.match.test(desc));
+  if (foundTags.length > 0) {
+    const positions = [
+      { x: x0+18, y: y0+18 }, { x: x0+rectW-18, y: y0+18 },
+      { x: x0+18, y: y0+rectH-18 }, { x: x0+rectW-18, y: y0+rectH-18 },
+      { x: x0+rectW/2, y: y0+rectH/2 },
+    ];
+    const pos = detectPosition(desc);
+    let primaryX = x0 + rectW/2, primaryY = y0 + rectH/2;
+    if (pos.vert === 'top') primaryY = y0 + 18;
+    if (pos.vert === 'bottom') primaryY = y0 + rectH - 18;
+    if (pos.horiz === 'left') primaryX = x0 + 18;
+    if (pos.horiz === 'right') primaryX = x0 + rectW - 18;
+
+    foundTags.forEach((tag, idx) => {
+      const mp = idx === 0 ? {x:primaryX,y:primaryY} : positions[idx % positions.length];
+      svg += `
+        <circle cx="${mp.x}" cy="${mp.y}" r="7" fill="none" stroke="#e05050" stroke-width="2"/>
+        <line x1="${mp.x+5}" y1="${mp.y-5}" x2="${mp.x-5}" y2="${mp.y+5}" stroke="#e05050" stroke-width="1.5"/>
+        <line x1="${mp.x-5}" y1="${mp.y-5}" x2="${mp.x+5}" y2="${mp.y+5}" stroke="#e05050" stroke-width="1.5"/>
+        <text x="${mp.x}" y="${mp.y - 14}" text-anchor="middle" font-family="DM Sans, sans-serif" font-size="9.5" fill="#e05050" font-weight="600">${tag.label}</text>`;
+    });
+  }
+
+  return svg;
+}
+
+function renderSketch() {
+  const p = pieces.find(pc => pc.id === _sketchPieceId);
+  if (!p) return;
+  const desc = document.getElementById('sketchDesc').value;
+  p.sketchNote = desc;
+  p.sketchFrameMaterial = document.getElementById('sketchFrameMaterial').value;
+  p.sketchMuntinCols = document.getElementById('sketchMuntinCols').value;
+  p.sketchMuntinRows = document.getElementById('sketchMuntinRows').value;
+
+  const w = getPieceW(p), h = getPieceH(p);
+  const canvas = document.getElementById('sketchCanvas');
+  if (!w || !h) {
+    canvas.innerHTML = '<div style="color:#999;font-family:DM Sans,sans-serif;font-size:0.85rem;">Enter width and height on this piece first</div>';
+    return;
+  }
+
+  const maxW = 380, maxH = 250, pad = 55;
+  const scale = Math.min(maxW / w, maxH / h);
+  const rectW = w * scale, rectH = h * scale;
+  const svgW = rectW + pad * 2, svgH = rectH + pad * 2 + 20;
+  const x0 = pad, y0 = pad;
+
+  const wLabel = dimDisplay(p.wWhole, p.wFrac);
+  const hLabel = dimDisplay(p.hWhole, p.hFrac);
+
+  const groupSvg = buildPieceSvgGroup(p, x0, y0, rectW, rectH, { desc });
+
+  const svg = `
+    <svg width="${svgW}" height="${svgH+30}" viewBox="0 0 ${svgW} ${svgH+30}" xmlns="http://www.w3.org/2000/svg">
+      ${groupSvg}
+      <line x1="${x0}" y1="${y0-14}" x2="${x0+rectW}" y2="${y0-14}" stroke="#666" stroke-width="1"/>
+      <line x1="${x0}" y1="${y0-18}" x2="${x0}" y2="${y0-10}" stroke="#666" stroke-width="1"/>
+      <line x1="${x0+rectW}" y1="${y0-18}" x2="${x0+rectW}" y2="${y0-10}" stroke="#666" stroke-width="1"/>
+      <text x="${x0+rectW/2}" y="${y0-20}" text-anchor="middle" font-family="DM Mono, monospace" font-size="13" fill="#222" font-weight="600">${wLabel}</text>
+      <line x1="${x0-14}" y1="${y0}" x2="${x0-14}" y2="${y0+rectH}" stroke="#666" stroke-width="1"/>
+      <line x1="${x0-18}" y1="${y0}" x2="${x0-10}" y2="${y0}" stroke="#666" stroke-width="1"/>
+      <line x1="${x0-18}" y1="${y0+rectH}" x2="${x0-10}" y2="${y0+rectH}" stroke="#666" stroke-width="1"/>
+      <text x="${x0-24}" y="${y0+rectH/2}" text-anchor="middle" font-family="DM Mono, monospace" font-size="13" fill="#222" font-weight="600" transform="rotate(-90 ${x0-24} ${y0+rectH/2})">${hLabel}</text>
+      <text x="${svgW/2}" y="${svgH+18}" text-anchor="middle" font-family="DM Sans, sans-serif" font-size="11" fill="#555">${[p.thickness, p.glassTypeName].filter(Boolean).join(' · ') || 'Glass type not set'}${(parseFloat(p.qty)||1)>1 ? '  ·  Qty '+p.qty : ''}</text>
+    </svg>`;
+
+  canvas.innerHTML = svg;
+}
+
+function svgToPngDownload(svgEl, filename) {
+  const svgData = new XMLSerializer().serializeToString(svgEl);
+  const canvas = document.createElement('canvas');
+  const scaleFactor = 2;
+  const svgW = parseFloat(svgEl.getAttribute('width'));
+  const svgH = parseFloat(svgEl.getAttribute('height'));
+  canvas.width = svgW * scaleFactor;
+  canvas.height = svgH * scaleFactor;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(scaleFactor, scaleFactor);
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, svgW, svgH);
+
+  const img = new Image();
+  const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
+  const url = URL.createObjectURL(svgBlob);
+  img.onload = function() {
+    ctx.drawImage(img, 0, 0);
+    URL.revokeObjectURL(url);
+    canvas.toBlob(function(blob) {
+      const link = document.createElement('a');
+      link.download = filename;
+      link.href = URL.createObjectURL(blob);
+      link.click();
+      showToast('✓ Downloaded');
+    });
+  };
+  img.src = url;
+}
+
+function downloadSketch() {
+  const svgEl = document.querySelector('#sketchCanvas svg');
+  if (!svgEl) { showToast('Nothing to download', 'error'); return; }
+  const p = pieces.find(pc => pc.id === _sketchPieceId);
+  svgToPngDownload(svgEl, 'piece-sketch-' + (p ? getPieceDisplay(p).replace(/[^a-z0-9]/gi,'_') : 'glass') + '.png');
+}
+
+// ─────────────────────────────────────────────────
+// FULL PROJECT VIEW — combines every piece into one customer-facing elevation
+// ─────────────────────────────────────────────────
+function openFullProjectView() {
+  const validPieces = pieces.filter(p => getPieceW(p) && getPieceH(p));
+  if (!validPieces.length) { showToast('Add piece dimensions first', 'error'); return; }
+
+  const pad = 40, gap = 30, maxPieceW = 220, maxPieceH = 260, labelH = 34;
+  let totalW = pad, maxRowH = 0;
+  const laidOut = validPieces.map(p => {
+    const w = getPieceW(p), h = getPieceH(p);
+    const scale = Math.min(maxPieceW / w, maxPieceH / h);
+    const rw = w * scale, rh = h * scale;
+    maxRowH = Math.max(maxRowH, rh);
+    return { p, w, h, rw, rh };
+  });
+
+  const svgH = pad * 2 + maxRowH + labelH + 30;
+  let x = pad;
+  let groups = '';
+  laidOut.forEach(({p, w, h, rw, rh}) => {
+    const y0 = pad + (maxRowH - rh); // align bottoms like a real elevation
+    groups += buildPieceSvgGroup(p, x, y0, rw, rh, {});
+    // Dimension caption under each panel
+    const wLabel = dimDisplay(p.wWhole, p.wFrac), hLabel = dimDisplay(p.hWhole, p.hFrac);
+    groups += `<text x="${x+rw/2}" y="${y0+rh+18}" text-anchor="middle" font-family="DM Mono, monospace" font-size="11" fill="#333">${wLabel} × ${hLabel}</text>`;
+    groups += `<text x="${x+rw/2}" y="${y0+rh+32}" text-anchor="middle" font-family="DM Sans, sans-serif" font-size="9.5" fill="#666">${[p.thickness,p.glassTypeName].filter(Boolean).join(' · ')||''}</text>`;
+    x += rw + gap;
+  });
+  const svgW = x - gap + pad;
+
+  const svg = `<svg width="${svgW}" height="${svgH}" viewBox="0 0 ${svgW} ${svgH}" xmlns="http://www.w3.org/2000/svg">
+    <rect x="0" y="0" width="${svgW}" height="${svgH}" fill="#ffffff"/>
+    ${groups}
+  </svg>`;
+
+  const modal = document.createElement('div');
+  modal.id = 'fullProjectModal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:600;display:flex;align-items:center;justify-content:center;padding:1.25rem;';
+  modal.innerHTML = `
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:1.5rem;max-width:900px;width:100%;max-height:92vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.5);">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;">
+        <div class="card-label" style="margin:0;">Full Project View</div>
+        <button onclick="document.getElementById('fullProjectModal').remove()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:1.3rem;line-height:1;padding:0.2rem 0.5rem;">✕</button>
+      </div>
+      <div id="fullProjectCanvas" style="background:#fff;border-radius:10px;padding:1.25rem;margin-bottom:1rem;overflow-x:auto;display:flex;justify-content:center;">${svg}</div>
+      <button class="btn-print" onclick="downloadFullProjectView()">⬇ Download Full Project View</button>
+    </div>`;
+  document.body.appendChild(modal);
+}
+
+function downloadFullProjectView() {
+  const svgEl = document.querySelector('#fullProjectCanvas svg');
+  if (!svgEl) return;
+  svgToPngDownload(svgEl, 'full-project-view.png');
+}
+</script>
+
 </body>
 </html>
