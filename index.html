@@ -5340,6 +5340,13 @@ function renderProjectCanvas() {
   canvas.style.height = Math.max(maxY + 60, 300) + 'px'; // extra room for overall dimension labels
   canvas.innerHTML = '';
 
+  // Compute clusters BEFORE drawing units so we know which pieces are part of a
+  // combined assembly and should have their individual frame suppressed —
+  // the group gets one continuous outer frame drawn afterward instead.
+  const clustersForFrame = findTouchingClusters(units);
+  const unitInCluster = new Set();
+  clustersForFrame.forEach(group => group.forEach(u => unitInCluster.add(u)));
+
   units.forEach((u, idx) => {
     const box = document.createElement('div');
     box.className = 'project-unit';
@@ -5352,7 +5359,10 @@ function renderProjectCanvas() {
     const svgW = u.uw + marginRight, svgH = u.uh + marginTop;
     box.style.cssText = `position:absolute;left:${u.pos.x}px;top:${u.pos.y - marginTop}px;width:${svgW}px;cursor:grab;user-select:none;touch-action:none;`;
 
-    const svgInner = buildPieceSvgGroup(u.p, 0, marginTop, u.uw, u.uh, {});
+    // If this piece is part of a touching cluster, skip its own frame — the cluster
+    // gets one shared outer frame drawn as a separate overlay after all units render.
+    const drawOpts = unitInCluster.has(u) ? { frameMaterial: '' } : {};
+    const svgInner = buildPieceSvgGroup(u.p, 0, marginTop, u.uw, u.uh, drawOpts);
     const wLabel = dimDisplay(u.p.wWhole, u.p.wFrac), hLabel = dimDisplay(u.p.hWhole, u.p.hFrac);
     const qtyTag = (parseInt(u.p.qty)||1) > 1 ? ` #${u.unitIndex+1}` : '';
 
@@ -5393,6 +5403,34 @@ function renderProjectCanvas() {
       </div>
       <div style="text-align:center;font-family:'DM Mono',monospace;font-size:10px;color:#2a6fc9;font-weight:600;margin-top:2px;">Overall: ${overallWReal.toFixed(1)}" × ${overallHReal.toFixed(1)}"</div>`;
     canvas.appendChild(bracket);
+
+    // ── One continuous frame around the whole assembly, plus thin mullion lines
+    // at each internal seam where pieces touch — matches a real storefront/partition
+    // shop drawing instead of showing separate frames per pane.
+    const anyMaterial = group.find(u => u.p.sketchFrameMaterial)?.p.sketchFrameMaterial;
+    if (anyMaterial && FRAME_MATERIALS[anyMaterial]) {
+      const fm = FRAME_MATERIALS[anyMaterial];
+      const frameSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      frameSvg.setAttribute('width', right - left + fm.width*2);
+      frameSvg.setAttribute('height', bottom - top + fm.width*2);
+      frameSvg.setAttribute('viewBox', `0 0 ${right-left+fm.width*2} ${bottom-top+fm.width*2}`);
+      frameSvg.style.cssText = `position:absolute;left:${left-fm.width}px;top:${top-fm.width}px;pointer-events:none;`;
+
+      let frameInner = `<rect x="${fm.width/2}" y="${fm.width/2}" width="${right-left+fm.width}" height="${bottom-top+fm.width}" fill="none" stroke="${fm.stroke}" stroke-width="${fm.width}"/>`;
+
+      // Thin mullion lines at each unique internal seam (vertical + horizontal)
+      const seamsV = new Set(), seamsH = new Set();
+      group.forEach(a => group.forEach(b => {
+        if (a === b) return;
+        if (Math.abs((a.pos.x + a.uw) - b.pos.x) < 3) seamsV.add(Math.round(b.pos.x - left));
+        if (Math.abs((a.pos.y + a.uh) - b.pos.y) < 3) seamsH.add(Math.round(b.pos.y - top));
+      }));
+      seamsV.forEach(sx => { frameInner += `<line x1="${sx+fm.width/2}" y1="${fm.width/2}" x2="${sx+fm.width/2}" y2="${bottom-top+fm.width/2}" stroke="${fm.stroke}" stroke-width="${Math.max(2,fm.width*0.6)}"/>`; });
+      seamsH.forEach(sy => { frameInner += `<line x1="${fm.width/2}" y1="${sy+fm.width/2}" x2="${right-left+fm.width/2}" y2="${sy+fm.width/2}" stroke="${fm.stroke}" stroke-width="${Math.max(2,fm.width*0.6)}"/>`; });
+
+      frameSvg.innerHTML = frameInner;
+      canvas.appendChild(frameSvg);
+    }
   });
 }
 
@@ -5531,6 +5569,8 @@ function startDragUnit(e, u, box) {
     if (guideEl) guideEl.innerHTML = '';
     window.removeEventListener('pointermove', onMove);
     window.removeEventListener('pointerup', onUp);
+    // Recompute touching clusters and overall dimension brackets now that the piece has moved
+    if (_dragMoved) renderProjectCanvas();
   };
   window.addEventListener('pointermove', onMove);
   window.addEventListener('pointerup', onUp);
