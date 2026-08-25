@@ -5305,7 +5305,7 @@ function autoLayoutUnits(units) {
 // Detects clusters of units whose edges are touching (within a small tolerance)
 // so we can show a combined "Overall" dimension for mulled/ganged assemblies.
 function findTouchingClusters(units) {
-  const TOUCH_TOL = 3; // px tolerance to consider two edges "touching"
+  const TOUCH_TOL = 10; // px tolerance to consider two edges "touching" — generous enough to catch near-perfect drags, not just pixel-exact snaps
   const parent = units.map((_, i) => i);
   function find(i) { while (parent[i] !== i) { parent[i] = parent[parent[i]]; i = parent[i]; } return i; }
   function union(a, b) { const ra = find(a), rb = find(b); if (ra !== rb) parent[ra] = rb; }
@@ -5449,8 +5449,8 @@ function renderProjectCanvas() {
     const seamsV = new Set(), seamsH = new Set();
     group.forEach(a => group.forEach(b => {
       if (a === b) return;
-      if (Math.abs((a.pos.x + a.uw) - b.pos.x) < 3) seamsV.add(Math.round(b.pos.x - left));
-      if (Math.abs((a.pos.y + a.uh) - b.pos.y) < 3) seamsH.add(Math.round(b.pos.y - top));
+      if (Math.abs((a.pos.x + a.uw) - b.pos.x) < 10) seamsV.add(Math.round(b.pos.x - left));
+      if (Math.abs((a.pos.y + a.uh) - b.pos.y) < 10) seamsH.add(Math.round(b.pos.y - top));
     }));
 
     if (seamsV.size || seamsH.size) {
