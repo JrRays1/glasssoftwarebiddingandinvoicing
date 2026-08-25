@@ -5287,7 +5287,11 @@ function buildProjectUnits() {
 }
 
 function autoLayoutUnits(units) {
-  const pad = 30, gap = 24;
+  // Top padding needs to be large enough to reserve room for both the isometric
+  // offset on insulated glass pieces (which extends up and to the right beyond
+  // the piece's own bounds) and the overall dimension bracket drawn above any
+  // touching cluster — otherwise either can render above y=0 and get clipped.
+  const pad = 70, gap = 24;
   let x = pad, rowH = 0, y = pad;
   const maxRowW = 780;
   units.forEach(u => {
