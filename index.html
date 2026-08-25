@@ -5218,58 +5218,185 @@ function downloadSketch() {
 // ─────────────────────────────────────────────────
 // FULL PROJECT VIEW — combines every piece into one customer-facing elevation
 // ─────────────────────────────────────────────────
+// ─────────────────────────────────────────────────
+// FULL PROJECT VIEW — CAD-style draggable layout
+// Every unit of quantity becomes its own separate, movable piece.
+// Positions are remembered per session on the piece object (p.layoutUnits).
+// ─────────────────────────────────────────────────
+let _dragUnit = null, _dragOffsetX = 0, _dragOffsetY = 0;
+
+function buildProjectUnits() {
+  // Expand each piece into N individual units based on quantity
+  const validPieces = pieces.filter(p => getPieceW(p) && getPieceH(p));
+  const units = [];
+  const maxUnitW = 190, maxUnitH = 220;
+
+  validPieces.forEach(p => {
+    const qty = Math.max(1, parseInt(p.qty) || 1);
+    const w = getPieceW(p), h = getPieceH(p);
+    const scale = Math.min(maxUnitW / w, maxUnitH / h);
+    const uw = w * scale, uh = h * scale;
+
+    // Restore saved positions if this piece was laid out before, otherwise auto-flow
+    if (!p.layoutUnits || p.layoutUnits.length !== qty) {
+      p.layoutUnits = Array.from({length: qty}, () => ({ x: null, y: null }));
+    }
+    for (let i = 0; i < qty; i++) {
+      units.push({ pieceId: p.id, unitIndex: i, p, w, h, uw, uh, pos: p.layoutUnits[i] });
+    }
+  });
+  return units;
+}
+
+function autoLayoutUnits(units) {
+  const pad = 30, gap = 24;
+  let x = pad, rowH = 0, y = pad;
+  const maxRowW = 780;
+  units.forEach(u => {
+    if (x + u.uw > maxRowW && x > pad) { x = pad; y += rowH + 40; rowH = 0; }
+    if (u.pos.x === null) { u.pos.x = x; u.pos.y = y; }
+    rowH = Math.max(rowH, u.uh);
+    x += u.uw + gap;
+  });
+}
+
+function renderProjectCanvas() {
+  const canvas = document.getElementById('fullProjectCanvas');
+  if (!canvas) return;
+  const units = buildProjectUnits();
+  if (!units.length) { canvas.innerHTML = '<div style="color:#999;padding:2rem;text-align:center;">Add piece dimensions first</div>'; return; }
+  autoLayoutUnits(units);
+
+  let maxX = 0, maxY = 0;
+  units.forEach(u => { maxX = Math.max(maxX, u.pos.x + u.uw); maxY = Math.max(maxY, u.pos.y + u.uh + 45); });
+
+  canvas.style.position = 'relative';
+  canvas.style.width = Math.max(maxX + 30, 400) + 'px';
+  canvas.style.height = Math.max(maxY + 30, 300) + 'px';
+  canvas.innerHTML = '';
+
+  units.forEach((u, idx) => {
+    const box = document.createElement('div');
+    box.className = 'project-unit';
+    box.dataset.pieceId = u.pieceId;
+    box.dataset.unitIndex = u.unitIndex;
+    box.style.cssText = `position:absolute;left:${u.pos.x}px;top:${u.pos.y}px;width:${u.uw}px;cursor:grab;user-select:none;touch-action:none;`;
+
+    const svgInner = buildPieceSvgGroup(u.p, 0, 0, u.uw, u.uh, {});
+    const wLabel = dimDisplay(u.p.wWhole, u.p.wFrac), hLabel = dimDisplay(u.p.hWhole, u.p.hFrac);
+    const qtyTag = (parseInt(u.p.qty)||1) > 1 ? ` #${u.unitIndex+1}` : '';
+
+    box.innerHTML = `
+      <svg width="${u.uw}" height="${u.uh}" viewBox="0 0 ${u.uw} ${u.uh}" xmlns="http://www.w3.org/2000/svg" style="display:block;pointer-events:none;">
+        ${svgInner}
+      </svg>
+      <div style="text-align:center;font-family:'DM Mono',monospace;font-size:10px;color:#333;margin-top:4px;pointer-events:none;">${wLabel} × ${hLabel}${qtyTag}</div>
+      <div style="text-align:center;font-family:'DM Sans',sans-serif;font-size:9px;color:#777;pointer-events:none;">${[u.p.thickness,u.p.glassTypeName].filter(Boolean).join(' · ')||''}</div>`;
+
+    box.addEventListener('pointerdown', (e) => startDragUnit(e, u, box));
+    canvas.appendChild(box);
+  });
+}
+
+function startDragUnit(e, u, box) {
+  e.preventDefault();
+  _dragUnit = u;
+  const canvas = document.getElementById('fullProjectCanvas');
+  const canvasRect = canvas.getBoundingClientRect();
+  _dragOffsetX = e.clientX - canvasRect.left - u.pos.x;
+  _dragOffsetY = e.clientY - canvasRect.top - u.pos.y;
+  box.style.cursor = 'grabbing';
+  box.style.zIndex = 50;
+  box.style.opacity = '0.85';
+
+  const onMove = (ev) => {
+    if (!_dragUnit) return;
+    const rect = canvas.getBoundingClientRect();
+    let nx = ev.clientX - rect.left - _dragOffsetX;
+    let ny = ev.clientY - rect.top - _dragOffsetY;
+    nx = Math.max(0, nx); ny = Math.max(0, ny);
+    _dragUnit.pos.x = nx; _dragUnit.pos.y = ny;
+    box.style.left = nx + 'px';
+    box.style.top = ny + 'px';
+    // Expand canvas if dragged near edge
+    const canvasW = parseFloat(canvas.style.width), canvasH = parseFloat(canvas.style.height);
+    if (nx + u.uw + 40 > canvasW) canvas.style.width = (nx + u.uw + 60) + 'px';
+    if (ny + u.uh + 60 > canvasH) canvas.style.height = (ny + u.uh + 90) + 'px';
+  };
+  const onUp = () => {
+    box.style.cursor = 'grab';
+    box.style.zIndex = '';
+    box.style.opacity = '1';
+    _dragUnit = null;
+    window.removeEventListener('pointermove', onMove);
+    window.removeEventListener('pointerup', onUp);
+  };
+  window.addEventListener('pointermove', onMove);
+  window.addEventListener('pointerup', onUp);
+}
+
+function resetProjectLayout() {
+  pieces.forEach(p => { p.layoutUnits = null; });
+  renderProjectCanvas();
+  showToast('✓ Layout reset');
+}
+
 function openFullProjectView() {
   const validPieces = pieces.filter(p => getPieceW(p) && getPieceH(p));
   if (!validPieces.length) { showToast('Add piece dimensions first', 'error'); return; }
-
-  const pad = 40, gap = 30, maxPieceW = 220, maxPieceH = 260, labelH = 34;
-  let totalW = pad, maxRowH = 0;
-  const laidOut = validPieces.map(p => {
-    const w = getPieceW(p), h = getPieceH(p);
-    const scale = Math.min(maxPieceW / w, maxPieceH / h);
-    const rw = w * scale, rh = h * scale;
-    maxRowH = Math.max(maxRowH, rh);
-    return { p, w, h, rw, rh };
-  });
-
-  const svgH = pad * 2 + maxRowH + labelH + 30;
-  let x = pad;
-  let groups = '';
-  laidOut.forEach(({p, w, h, rw, rh}) => {
-    const y0 = pad + (maxRowH - rh); // align bottoms like a real elevation
-    groups += buildPieceSvgGroup(p, x, y0, rw, rh, {});
-    // Dimension caption under each panel
-    const wLabel = dimDisplay(p.wWhole, p.wFrac), hLabel = dimDisplay(p.hWhole, p.hFrac);
-    groups += `<text x="${x+rw/2}" y="${y0+rh+18}" text-anchor="middle" font-family="DM Mono, monospace" font-size="11" fill="#333">${wLabel} × ${hLabel}</text>`;
-    groups += `<text x="${x+rw/2}" y="${y0+rh+32}" text-anchor="middle" font-family="DM Sans, sans-serif" font-size="9.5" fill="#666">${[p.thickness,p.glassTypeName].filter(Boolean).join(' · ')||''}</text>`;
-    x += rw + gap;
-  });
-  const svgW = x - gap + pad;
-
-  const svg = `<svg width="${svgW}" height="${svgH}" viewBox="0 0 ${svgW} ${svgH}" xmlns="http://www.w3.org/2000/svg">
-    <rect x="0" y="0" width="${svgW}" height="${svgH}" fill="#ffffff"/>
-    ${groups}
-  </svg>`;
 
   const modal = document.createElement('div');
   modal.id = 'fullProjectModal';
   modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:600;display:flex;align-items:center;justify-content:center;padding:1.25rem;';
   modal.innerHTML = `
-    <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:1.5rem;max-width:900px;width:100%;max-height:92vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.5);">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;">
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:1.5rem;max-width:960px;width:100%;max-height:94vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.5);">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.5rem;">
         <div class="card-label" style="margin:0;">Full Project View</div>
         <button onclick="document.getElementById('fullProjectModal').remove()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:1.3rem;line-height:1;padding:0.2rem 0.5rem;">✕</button>
       </div>
-      <div id="fullProjectCanvas" style="background:#fff;border-radius:10px;padding:1.25rem;margin-bottom:1rem;overflow-x:auto;display:flex;justify-content:center;">${svg}</div>
-      <button class="btn-print" onclick="downloadFullProjectView()">⬇ Download Full Project View</button>
+      <div style="font-size:0.75rem;color:var(--muted);margin-bottom:0.85rem;">Drag any piece to rearrange the layout — every quantity is shown as its own separate piece, just like the finished project.</div>
+      <div style="background:#fff;border-radius:10px;padding:1.25rem;margin-bottom:1rem;overflow:auto;max-height:60vh;">
+        <div id="fullProjectCanvas"></div>
+      </div>
+      <div style="display:flex;gap:0.6rem;">
+        <button class="btn-print" onclick="downloadFullProjectView()" style="flex:1;">⬇ Download Image</button>
+        <button class="btn-print" onclick="resetProjectLayout()" style="flex:1;background:var(--surface2);color:var(--text);">↺ Reset Layout</button>
+      </div>
     </div>`;
   document.body.appendChild(modal);
+  renderProjectCanvas();
 }
 
 function downloadFullProjectView() {
-  const svgEl = document.querySelector('#fullProjectCanvas svg');
-  if (!svgEl) return;
+  const canvas = document.getElementById('fullProjectCanvas');
+  if (!canvas) return;
+  const w = parseFloat(canvas.style.width), h = parseFloat(canvas.style.height);
+
+  // Serialize each unit's SVG + labels into one flat SVG for export
+  let inner = `<rect x="0" y="0" width="${w}" height="${h}" fill="#ffffff"/>`;
+  document.querySelectorAll('.project-unit').forEach(box => {
+    const left = parseFloat(box.style.left), top = parseFloat(box.style.top);
+    const svgEl = box.querySelector('svg');
+    const svgW = svgEl.getAttribute('width'), svgH = svgEl.getAttribute('height');
+    const svgContent = svgEl.innerHTML;
+    inner += `<g transform="translate(${left},${top})"><svg width="${svgW}" height="${svgH}">${svgContent}</svg></g>`;
+    const labels = box.querySelectorAll('div');
+    let ly = top + parseFloat(svgH) + 14;
+    labels.forEach((lbl, i) => {
+      inner += `<text x="${left + svgW/2}" y="${ly}" text-anchor="middle" font-family="${i===0?'DM Mono, monospace':'DM Sans, sans-serif'}" font-size="${i===0?10:9}" fill="${i===0?'#333':'#777'}">${lbl.textContent}</text>`;
+      ly += 13;
+    });
+  });
+
+  const fullSvg = `<svg width="${w}" height="${h}" xmlns="http://www.w3.org/2000/svg">${inner}</svg>`;
+  const wrapper = document.createElement('div');
+  wrapper.innerHTML = fullSvg;
+  const svgEl = wrapper.querySelector('svg');
+  document.body.appendChild(svgEl);
+  svgEl.style.position = 'fixed';
+  svgEl.style.left = '-9999px';
   svgToPngDownload(svgEl, 'full-project-view.png');
+  setTimeout(() => svgEl.remove(), 500);
 }
 </script>
 
