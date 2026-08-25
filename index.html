@@ -5294,13 +5294,83 @@ function renderProjectCanvas() {
       <div style="text-align:center;font-family:'DM Sans',sans-serif;font-size:9px;color:#777;pointer-events:none;">${[u.p.thickness,u.p.glassTypeName].filter(Boolean).join(' · ')||''}</div>`;
 
     box.addEventListener('pointerdown', (e) => startDragUnit(e, u, box));
+    box.addEventListener('click', (e) => {
+      if (_dragMoved) { _dragMoved = false; return; } // don't open editor after a drag
+      openUnitEditor(u.p);
+    });
     canvas.appendChild(box);
   });
+}
+
+let _dragMoved = false;
+
+// ── Quick per-piece editor popover, shown from within the project view ──
+function openUnitEditor(p) {
+  const existing = document.getElementById('unitEditorPopover');
+  if (existing) existing.remove();
+
+  const popover = document.createElement('div');
+  popover.id = 'unitEditorPopover';
+  popover.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:700;display:flex;align-items:center;justify-content:center;padding:1.25rem;';
+  popover.innerHTML = `
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:1.25rem;max-width:380px;width:100%;box-shadow:0 12px 40px rgba(0,0,0,0.5);" onclick="event.stopPropagation()">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.9rem;">
+        <div class="card-label" style="margin:0;">${getPieceDisplay(p)}</div>
+        <button onclick="document.getElementById('unitEditorPopover').remove()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:1.2rem;line-height:1;">✕</button>
+      </div>
+      <div style="display:flex;gap:0.5rem;margin-bottom:0.75rem;">
+        <div style="flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:0.4rem 0.6rem;">
+          <div style="font-size:0.68rem;color:var(--muted);margin-bottom:0.2rem;">Frame</div>
+          <select id="unitFrameMaterial" style="width:100%;background:transparent;border:none;color:var(--text);font-family:'DM Sans',sans-serif;font-size:0.8rem;outline:none;">
+            <option value="">None</option>
+            <option value="metal">Metal</option>
+            <option value="wood">Wood</option>
+            <option value="glass">Glass (frameless)</option>
+          </select>
+        </div>
+      </div>
+      <div style="display:flex;gap:0.5rem;margin-bottom:0.75rem;">
+        <div style="flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:0.4rem 0.6rem;">
+          <div style="font-size:0.68rem;color:var(--muted);margin-bottom:0.2rem;">Muntin Cols</div>
+          <input type="number" id="unitMuntinCols" min="0" max="10" style="width:100%;background:transparent;border:none;color:var(--text);font-family:'DM Mono',monospace;font-size:0.8rem;outline:none;">
+        </div>
+        <div style="flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:0.4rem 0.6rem;">
+          <div style="font-size:0.68rem;color:var(--muted);margin-bottom:0.2rem;">Muntin Rows</div>
+          <input type="number" id="unitMuntinRows" min="0" max="10" style="width:100%;background:transparent;border:none;color:var(--text);font-family:'DM Mono',monospace;font-size:0.8rem;outline:none;">
+        </div>
+      </div>
+      <div style="margin-bottom:1rem;">
+        <label style="font-size:0.75rem;">Description / Notes</label>
+        <textarea id="unitDesc" placeholder="e.g. notch top-left, hinge cutout, arched top..." style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:0.85rem;padding:0.55rem 0.7rem;outline:none;resize:vertical;min-height:60px;"></textarea>
+      </div>
+      <button class="btn-print" onclick="saveUnitEdits('${p.id}')" style="width:100%;">Apply to This Piece</button>
+    </div>`;
+  popover.addEventListener('click', () => popover.remove());
+  document.body.appendChild(popover);
+
+  document.getElementById('unitFrameMaterial').value = p.sketchFrameMaterial || '';
+  document.getElementById('unitMuntinCols').value = p.sketchMuntinCols || '';
+  document.getElementById('unitMuntinRows').value = p.sketchMuntinRows || '';
+  document.getElementById('unitDesc').value = p.sketchNote || '';
+}
+
+function saveUnitEdits(pieceId) {
+  const p = pieces.find(pc => pc.id === pieceId);
+  if (!p) return;
+  p.sketchFrameMaterial = document.getElementById('unitFrameMaterial').value;
+  p.sketchMuntinCols = document.getElementById('unitMuntinCols').value;
+  p.sketchMuntinRows = document.getElementById('unitMuntinRows').value;
+  p.sketchNote = document.getElementById('unitDesc').value;
+  document.getElementById('unitEditorPopover').remove();
+  renderProjectCanvas();
+  showToast('✓ Updated');
 }
 
 function startDragUnit(e, u, box) {
   e.preventDefault();
   _dragUnit = u;
+  _dragMoved = false;
+  const startX = e.clientX, startY = e.clientY;
   const canvas = document.getElementById('fullProjectCanvas');
   const canvasRect = canvas.getBoundingClientRect();
   _dragOffsetX = e.clientX - canvasRect.left - u.pos.x;
@@ -5311,6 +5381,7 @@ function startDragUnit(e, u, box) {
 
   const onMove = (ev) => {
     if (!_dragUnit) return;
+    if (Math.abs(ev.clientX - startX) > 4 || Math.abs(ev.clientY - startY) > 4) _dragMoved = true;
     const rect = canvas.getBoundingClientRect();
     let nx = ev.clientX - rect.left - _dragOffsetX;
     let ny = ev.clientY - rect.top - _dragOffsetY;
