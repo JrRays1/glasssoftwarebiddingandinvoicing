@@ -5057,6 +5057,35 @@ const FRAME_MATERIALS = {
   glass: { stroke: '#b8ccd6', width: 2, inset: 2, hatch: false }, // frameless glass fin
 };
 
+// Isometric "exploded" view for insulated glass units — shows the two panes
+// and the airspace between them, drawn as an axonometric (angled) projection.
+// This is standard technical-drawing practice for IG units, achievable reliably
+// in flat SVG without needing a full 3D engine.
+function buildInsulatedGlassSvg(p, x0, y0, rectW, rectH, opts) {
+  const fillColor = detectGlassFill(p);
+  const offset = Math.min(rectW, rectH) * 0.22; // diagonal offset representing depth
+  const bx = x0 + offset, by = y0 - offset; // back pane position (up-right)
+
+  let svg = '';
+
+  // Back pane (further away, drawn first, slightly transparent)
+  svg += `<rect x="${bx}" y="${by}" width="${rectW}" height="${rectH}" fill="${fillColor}" fill-opacity="0.55" stroke="#555" stroke-width="1.5"/>`;
+
+  // Connecting edge lines (the spacer / airspace) at all 4 corners
+  const corners = [[x0,y0],[x0+rectW,y0],[x0,y0+rectH],[x0+rectW,y0+rectH]];
+  corners.forEach(([cx,cy]) => {
+    svg += `<line x1="${cx}" y1="${cy}" x2="${cx+offset}" y2="${cy-offset}" stroke="#999" stroke-width="1" stroke-dasharray="3,2"/>`;
+  });
+
+  // Front pane (closer, drawn on top, full opacity)
+  svg += `<rect x="${x0}" y="${y0}" width="${rectW}" height="${rectH}" fill="${fillColor}" stroke="#333" stroke-width="2"/>`;
+
+  // Airspace label
+  svg += `<text x="${x0+rectW/2+offset/2}" y="${y0-offset/2-6}" text-anchor="middle" font-family="DM Sans, sans-serif" font-size="8.5" fill="#777">Airspace</text>`;
+
+  return svg;
+}
+
 function buildPieceSvgGroup(p, x0, y0, rectW, rectH, opts) {
   opts = opts || {};
   const frameMaterial = opts.frameMaterial !== undefined ? opts.frameMaterial : (p.sketchFrameMaterial || '');
@@ -5065,6 +5094,7 @@ function buildPieceSvgGroup(p, x0, y0, rectW, rectH, opts) {
   const desc = opts.desc !== undefined ? opts.desc : (p.sketchNote || '');
   const fillColor = detectGlassFill(p);
   const isArched = /arch|half.?round|radius.?top/i.test(desc);
+  const isInsulated = p.glassCategory === 'insulated';
 
   let shapePath = '';
   if (isArched) {
@@ -5073,9 +5103,15 @@ function buildPieceSvgGroup(p, x0, y0, rectW, rectH, opts) {
     shapePath = `M${x0},${y0+archHeight} Q${x0},${y0} ${x0+rectW/2},${y0} Q${x0+rectW},${y0} ${x0+rectW},${y0+archHeight} L${x0+rectW},${y0+rectH} L${x0},${y0+rectH} Z`;
   }
 
-  let svg = isArched
-    ? `<path d="${shapePath}" fill="${fillColor}" stroke="#333" stroke-width="2"/>`
-    : `<rect x="${x0}" y="${y0}" width="${rectW}" height="${rectH}" fill="${fillColor}" stroke="#333" stroke-width="2"/>`;
+  let svg;
+  if (isInsulated && !isArched) {
+    // IG units get the isometric exploded view instead of a flat rectangle
+    svg = buildInsulatedGlassSvg(p, x0, y0, rectW, rectH, opts);
+  } else if (isArched) {
+    svg = `<path d="${shapePath}" fill="${fillColor}" stroke="#333" stroke-width="2"/>`;
+  } else {
+    svg = `<rect x="${x0}" y="${y0}" width="${rectW}" height="${rectH}" fill="${fillColor}" stroke="#333" stroke-width="2"/>`;
+  }
 
   // Frame — drawn as an inset border styled per material (metal, wood, or a thin glass fin for frameless)
   if (frameMaterial && FRAME_MATERIALS[frameMaterial]) {
@@ -5280,17 +5316,22 @@ function renderProjectCanvas() {
     box.className = 'project-unit';
     box.dataset.pieceId = u.pieceId;
     box.dataset.unitIndex = u.unitIndex;
-    box.style.cssText = `position:absolute;left:${u.pos.x}px;top:${u.pos.y}px;width:${u.uw}px;cursor:grab;user-select:none;touch-action:none;`;
+    // IG pieces need extra room top-right for the isometric offset — reserve margin so it never clips
+    const isIG = u.p.glassCategory === 'insulated';
+    const marginTop = isIG ? Math.min(u.uw, u.uh) * 0.22 + 14 : 0;
+    const marginRight = marginTop;
+    const svgW = u.uw + marginRight, svgH = u.uh + marginTop;
+    box.style.cssText = `position:absolute;left:${u.pos.x}px;top:${u.pos.y - marginTop}px;width:${svgW}px;cursor:grab;user-select:none;touch-action:none;`;
 
-    const svgInner = buildPieceSvgGroup(u.p, 0, 0, u.uw, u.uh, {});
+    const svgInner = buildPieceSvgGroup(u.p, 0, marginTop, u.uw, u.uh, {});
     const wLabel = dimDisplay(u.p.wWhole, u.p.wFrac), hLabel = dimDisplay(u.p.hWhole, u.p.hFrac);
     const qtyTag = (parseInt(u.p.qty)||1) > 1 ? ` #${u.unitIndex+1}` : '';
 
     box.innerHTML = `
-      <svg width="${u.uw}" height="${u.uh}" viewBox="0 0 ${u.uw} ${u.uh}" xmlns="http://www.w3.org/2000/svg" style="display:block;pointer-events:none;">
+      <svg width="${svgW}" height="${svgH}" viewBox="0 0 ${svgW} ${svgH}" xmlns="http://www.w3.org/2000/svg" style="display:block;pointer-events:none;overflow:visible;">
         ${svgInner}
       </svg>
-      <div style="text-align:center;font-family:'DM Mono',monospace;font-size:10px;color:#333;margin-top:4px;pointer-events:none;">${wLabel} × ${hLabel}${qtyTag}</div>
+      <div style="text-align:center;font-family:'DM Mono',monospace;font-size:10px;color:#333;margin-top:4px;pointer-events:none;">${wLabel} × ${hLabel}${qtyTag}${isIG?' · IG':''}</div>
       <div style="text-align:center;font-family:'DM Sans',sans-serif;font-size:9px;color:#777;pointer-events:none;">${[u.p.thickness,u.p.glassTypeName].filter(Boolean).join(' · ')||''}</div>`;
 
     box.addEventListener('pointerdown', (e) => startDragUnit(e, u, box));
@@ -5379,6 +5420,12 @@ function startDragUnit(e, u, box) {
   box.style.zIndex = 50;
   box.style.opacity = '0.85';
 
+  const isIG = u.p.glassCategory === 'insulated';
+  const marginTop = isIG ? Math.min(u.uw, u.uh) * 0.22 + 14 : 0;
+
+  const SNAP_DIST = 8; // pixels — snaps to grid lines and other pieces' edges within this distance
+  const GRID = 20;
+
   const onMove = (ev) => {
     if (!_dragUnit) return;
     if (Math.abs(ev.clientX - startX) > 4 || Math.abs(ev.clientY - startY) > 4) _dragMoved = true;
@@ -5386,9 +5433,37 @@ function startDragUnit(e, u, box) {
     let nx = ev.clientX - rect.left - _dragOffsetX;
     let ny = ev.clientY - rect.top - _dragOffsetY;
     nx = Math.max(0, nx); ny = Math.max(0, ny);
+
+    // Snap to grid
+    const gridSnapX = Math.round(nx / GRID) * GRID, gridSnapY = Math.round(ny / GRID) * GRID;
+    if (Math.abs(nx - gridSnapX) < SNAP_DIST) nx = gridSnapX;
+    if (Math.abs(ny - gridSnapY) < SNAP_DIST) ny = gridSnapY;
+
+    // Snap to alignment with other pieces' edges (left, right, top, bottom)
+    let guideX = null, guideY = null;
+    document.querySelectorAll('.project-unit').forEach(otherBox => {
+      if (otherBox === box) return;
+      const ol = parseFloat(otherBox.style.left), ot = parseFloat(otherBox.style.top), ow = otherBox.offsetWidth, oh = otherBox.offsetHeight;
+      [ol, ol + ow - u.uw].forEach(edge => { if (Math.abs(nx - edge) < SNAP_DIST) { nx = edge; guideX = ol; } });
+      [ot, ot + oh - u.uh].forEach(edge => { if (Math.abs(ny - edge) < SNAP_DIST) { ny = edge; guideY = ot; } });
+    });
+
     _dragUnit.pos.x = nx; _dragUnit.pos.y = ny;
     box.style.left = nx + 'px';
-    box.style.top = ny + 'px';
+    box.style.top = (ny - marginTop) + 'px';
+
+    // Draw temporary alignment guide lines
+    let guideEl = document.getElementById('alignGuides');
+    if (!guideEl) {
+      guideEl = document.createElement('div');
+      guideEl.id = 'alignGuides';
+      guideEl.style.cssText = 'position:absolute;inset:0;pointer-events:none;';
+      canvas.appendChild(guideEl);
+    }
+    guideEl.innerHTML = '';
+    if (guideX !== null) guideEl.innerHTML += `<div style="position:absolute;left:${guideX}px;top:0;bottom:0;width:1px;background:#4a9eff;"></div>`;
+    if (guideY !== null) guideEl.innerHTML += `<div style="position:absolute;top:${guideY}px;left:0;right:0;height:1px;background:#4a9eff;"></div>`;
+
     // Expand canvas if dragged near edge
     const canvasW = parseFloat(canvas.style.width), canvasH = parseFloat(canvas.style.height);
     if (nx + u.uw + 40 > canvasW) canvas.style.width = (nx + u.uw + 60) + 'px';
@@ -5399,6 +5474,8 @@ function startDragUnit(e, u, box) {
     box.style.zIndex = '';
     box.style.opacity = '1';
     _dragUnit = null;
+    const guideEl = document.getElementById('alignGuides');
+    if (guideEl) guideEl.innerHTML = '';
     window.removeEventListener('pointermove', onMove);
     window.removeEventListener('pointerup', onUp);
   };
