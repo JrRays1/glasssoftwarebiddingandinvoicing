@@ -5687,31 +5687,52 @@ function downloadFullProjectView() {
   const w = parseFloat(canvas.style.width), h = parseFloat(canvas.style.height);
   if (!w || !h) { showToast('Nothing to download', 'error'); return; }
 
-  // Temporarily hide the drag alignment guide (if present) so it doesn't end up in the export
-  const guideEl = document.getElementById('alignGuides');
-  const guidePrevDisplay = guideEl ? guideEl.style.display : null;
-  if (guideEl) guideEl.style.display = 'none';
-
   try {
-    // Capture the canvas exactly as rendered on screen — this reliably includes every
-    // piece, the continuous frame, seam masks, muntin grid, and dimension brackets,
-    // since it's a direct snapshot of the live DOM rather than a hand-rebuilt copy.
-    const canvasClone = canvas.cloneNode(true);
-    canvasClone.style.position = 'relative';
-    canvasClone.style.left = '0';
-    canvasClone.style.top = '0';
-    const cloneWrapper = document.createElement('div');
-    cloneWrapper.style.cssText = `width:${w}px;height:${h}px;background:#ffffff;position:relative;font-family:'DM Sans',sans-serif;`;
-    cloneWrapper.appendChild(canvasClone);
-    const cloneHtml = new XMLSerializer().serializeToString(cloneWrapper);
+    // Build one FLAT svg — every piece and overlay is pasted in as plain SVG primitives
+    // (rect/line/text/circle) inside a <g transform> wrapper, with NO nested <svg> tags
+    // and no embedded HTML. This is the same proven technique the single-piece sketch
+    // download already uses reliably — avoiding foreignObject/nested-svg entirely sidesteps
+    // the cross-browser image-loading and canvas-tainting issues those approaches hit.
+    let inner = `<rect x="0" y="0" width="${w}" height="${h}" fill="#ffffff"/>`;
 
-    const svgMarkup = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}">
-      <foreignObject width="100%" height="100%">
-        ${cloneHtml}
-      </foreignObject>
-    </svg>`;
+    Array.from(canvas.children).forEach(child => {
+      if (child.id === 'alignGuides') return; // temporary drag guide, not part of the drawing
 
-    const svgBlob = new Blob([svgMarkup], { type: 'image/svg+xml;charset=utf-8' });
+      if (child.classList && child.classList.contains('project-unit')) {
+        const left = parseFloat(child.style.left) || 0, top = parseFloat(child.style.top) || 0;
+        const svgEl = child.querySelector('svg');
+        if (!svgEl) return;
+        // Paste the piece's own flat SVG content directly — no nested <svg> wrapper needed
+        inner += `<g transform="translate(${left},${top})">${svgEl.innerHTML}</g>`;
+        const labels = child.querySelectorAll('div');
+        const svgH = parseFloat(svgEl.getAttribute('height')) || 0;
+        const svgW = parseFloat(svgEl.getAttribute('width')) || 0;
+        let ly = top + svgH + 14;
+        labels.forEach((lbl, i) => {
+          const txt = (lbl.textContent || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+          inner += `<text x="${left + svgW/2}" y="${ly}" text-anchor="middle" font-family="${i===0?'DM Mono, monospace':'DM Sans, sans-serif'}" font-size="${i===0?10:9}" fill="${i===0?'#333':'#777'}">${txt}</text>`;
+          ly += 13;
+        });
+      } else if (child.tagName === 'svg') {
+        // Standalone overlay SVG (continuous frame, seam mask, muntin grid) — already flat content
+        const left = parseFloat(child.style.left) || 0, top = parseFloat(child.style.top) || 0;
+        inner += `<g transform="translate(${left},${top})">${child.innerHTML}</g>`;
+      } else {
+        // Overall-dimension bracket — a plain div with a border line + text label
+        const left = parseFloat(child.style.left) || 0, top = parseFloat(child.style.top) || 0;
+        const width = parseFloat(child.style.width) || child.offsetWidth || 0;
+        const textEl = child.querySelector('div:last-child');
+        const label = (textEl ? textEl.textContent : '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        inner += `<line x1="${left}" y1="${top+8}" x2="${left+width}" y2="${top+8}" stroke="#4a9eff" stroke-width="1.5"/>`;
+        inner += `<line x1="${left}" y1="${top}" x2="${left}" y2="${top+8}" stroke="#4a9eff" stroke-width="1"/>`;
+        inner += `<line x1="${left+width}" y1="${top}" x2="${left+width}" y2="${top+8}" stroke="#4a9eff" stroke-width="1"/>`;
+        inner += `<text x="${left+width/2}" y="${top+22}" text-anchor="middle" font-family="DM Mono, monospace" font-size="10" font-weight="600" fill="#2a6fc9">${label}</text>`;
+      }
+    });
+
+    const fullSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">${inner}</svg>`;
+
+    const svgBlob = new Blob([fullSvg], { type: 'image/svg+xml;charset=utf-8' });
     const url = URL.createObjectURL(svgBlob);
     const img = new Image();
     img.onload = function() {
@@ -5732,19 +5753,16 @@ function downloadFullProjectView() {
         link.href = URL.createObjectURL(blob);
         link.click();
         showToast('✓ Downloaded');
-        if (guideEl) guideEl.style.display = guidePrevDisplay;
       });
     };
     img.onerror = function() {
-      console.error('Full Project View export: image failed to load from SVG blob');
+      console.error('Full Project View export: SVG failed to load as image');
       showToast('Download failed — try again', 'error');
-      if (guideEl) guideEl.style.display = guidePrevDisplay;
     };
     img.src = url;
   } catch (err) {
     console.error('Download failed:', err);
     showToast('Download failed — try again', 'error');
-    if (guideEl) guideEl.style.display = guidePrevDisplay;
   }
 }
 </script>
