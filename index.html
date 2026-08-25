@@ -5376,7 +5376,10 @@ function renderProjectCanvas() {
     box.addEventListener('pointerdown', (e) => startDragUnit(e, u, box, units));
     box.addEventListener('click', (e) => {
       if (_dragMoved) { _dragMoved = false; return; } // don't open editor after a drag
-      openUnitEditor(u.p);
+      // If this piece is connected to others, editing it edits the whole connected group
+      const group = clustersForFrame.find(g => g.includes(u));
+      const groupPieces = group ? [...new Set(group.map(gu => gu.p))] : [u.p];
+      openUnitEditor(u.p, groupPieces);
     });
     canvas.appendChild(box);
   });
@@ -5416,20 +5419,33 @@ function renderProjectCanvas() {
       frameSvg.setAttribute('viewBox', `0 0 ${right-left+fm.width*2} ${bottom-top+fm.width*2}`);
       frameSvg.style.cssText = `position:absolute;left:${left-fm.width}px;top:${top-fm.width}px;pointer-events:none;`;
 
+      // Only the outer perimeter is drawn — no line at internal seams where pieces
+      // touch, so two connected pieces read as one continuous glass surface with a
+      // single frame around the whole assembly (butt-glazed style, seam invisible).
       let frameInner = `<rect x="${fm.width/2}" y="${fm.width/2}" width="${right-left+fm.width}" height="${bottom-top+fm.width}" fill="none" stroke="${fm.stroke}" stroke-width="${fm.width}"/>`;
 
-      // Thin mullion lines at each unique internal seam (vertical + horizontal)
+      frameSvg.innerHTML = frameInner;
+      canvas.appendChild(frameSvg);
+
+      // Mask over each individual piece's own glass border where it touches a
+      // neighbor, so no thin black seam line remains between connected pieces.
+      const seamFill = detectGlassFill(group[0].p);
+      const maskSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      maskSvg.setAttribute('width', right - left);
+      maskSvg.setAttribute('height', bottom - top);
+      maskSvg.setAttribute('viewBox', `0 0 ${right-left} ${bottom-top}`);
+      maskSvg.style.cssText = `position:absolute;left:${left}px;top:${top}px;pointer-events:none;`;
+      let maskInner = '';
       const seamsV = new Set(), seamsH = new Set();
       group.forEach(a => group.forEach(b => {
         if (a === b) return;
         if (Math.abs((a.pos.x + a.uw) - b.pos.x) < 3) seamsV.add(Math.round(b.pos.x - left));
         if (Math.abs((a.pos.y + a.uh) - b.pos.y) < 3) seamsH.add(Math.round(b.pos.y - top));
       }));
-      seamsV.forEach(sx => { frameInner += `<line x1="${sx+fm.width/2}" y1="${fm.width/2}" x2="${sx+fm.width/2}" y2="${bottom-top+fm.width/2}" stroke="${fm.stroke}" stroke-width="${Math.max(2,fm.width*0.6)}"/>`; });
-      seamsH.forEach(sy => { frameInner += `<line x1="${fm.width/2}" y1="${sy+fm.width/2}" x2="${right-left+fm.width/2}" y2="${sy+fm.width/2}" stroke="${fm.stroke}" stroke-width="${Math.max(2,fm.width*0.6)}"/>`; });
-
-      frameSvg.innerHTML = frameInner;
-      canvas.appendChild(frameSvg);
+      seamsV.forEach(sx => { maskInner += `<rect x="${sx-2}" y="0" width="4" height="${bottom-top}" fill="${seamFill}"/>`; });
+      seamsH.forEach(sy => { maskInner += `<rect x="0" y="${sy-2}" width="${right-left}" height="4" fill="${seamFill}"/>`; });
+      maskSvg.innerHTML = maskInner;
+      canvas.appendChild(maskSvg);
     }
   });
 }
@@ -5437,9 +5453,15 @@ function renderProjectCanvas() {
 let _dragMoved = false;
 
 // ── Quick per-piece editor popover, shown from within the project view ──
-function openUnitEditor(p) {
+let _unitEditorGroupIds = [];
+
+function openUnitEditor(p, groupPieces) {
   const existing = document.getElementById('unitEditorPopover');
   if (existing) existing.remove();
+
+  const group = groupPieces && groupPieces.length > 1 ? groupPieces : [p];
+  _unitEditorGroupIds = group.map(gp => gp.id);
+  const isGrouped = group.length > 1;
 
   const popover = document.createElement('div');
   popover.id = 'unitEditorPopover';
@@ -5447,12 +5469,13 @@ function openUnitEditor(p) {
   popover.innerHTML = `
     <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:1.25rem;max-width:380px;width:100%;box-shadow:0 12px 40px rgba(0,0,0,0.5);" onclick="event.stopPropagation()">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.9rem;">
-        <div class="card-label" style="margin:0;">${getPieceDisplay(p)}</div>
+        <div class="card-label" style="margin:0;">${isGrouped ? `Connected Assembly (${group.length} pieces)` : getPieceDisplay(p)}</div>
         <button onclick="document.getElementById('unitEditorPopover').remove()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:1.2rem;line-height:1;">✕</button>
       </div>
+      ${isGrouped ? `<div style="font-size:0.7rem;color:var(--muted);margin-bottom:0.85rem;">These pieces are touching — frame and muntins will apply to the whole connected assembly.</div>` : ''}
       <div style="display:flex;gap:0.5rem;margin-bottom:0.75rem;">
         <div style="flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:0.4rem 0.6rem;">
-          <div style="font-size:0.68rem;color:var(--muted);margin-bottom:0.2rem;">Frame</div>
+          <div style="font-size:0.68rem;color:var(--muted);margin-bottom:0.2rem;">Frame${isGrouped?' (whole assembly)':''}</div>
           <select id="unitFrameMaterial" style="width:100%;background:transparent;border:none;color:var(--text);font-family:'DM Sans',sans-serif;font-size:0.8rem;outline:none;">
             <option value="">None</option>
             <option value="metal">Metal</option>
@@ -5463,19 +5486,19 @@ function openUnitEditor(p) {
       </div>
       <div style="display:flex;gap:0.5rem;margin-bottom:0.75rem;">
         <div style="flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:0.4rem 0.6rem;">
-          <div style="font-size:0.68rem;color:var(--muted);margin-bottom:0.2rem;">Muntin Cols</div>
+          <div style="font-size:0.68rem;color:var(--muted);margin-bottom:0.2rem;">Muntin Cols${isGrouped?' (each pane)':''}</div>
           <input type="number" id="unitMuntinCols" min="0" max="10" style="width:100%;background:transparent;border:none;color:var(--text);font-family:'DM Mono',monospace;font-size:0.8rem;outline:none;">
         </div>
         <div style="flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:0.4rem 0.6rem;">
-          <div style="font-size:0.68rem;color:var(--muted);margin-bottom:0.2rem;">Muntin Rows</div>
+          <div style="font-size:0.68rem;color:var(--muted);margin-bottom:0.2rem;">Muntin Rows${isGrouped?' (each pane)':''}</div>
           <input type="number" id="unitMuntinRows" min="0" max="10" style="width:100%;background:transparent;border:none;color:var(--text);font-family:'DM Mono',monospace;font-size:0.8rem;outline:none;">
         </div>
       </div>
       <div style="margin-bottom:1rem;">
-        <label style="font-size:0.75rem;">Description / Notes</label>
+        <label style="font-size:0.75rem;">Description / Notes${isGrouped?' (this piece only)':''}</label>
         <textarea id="unitDesc" placeholder="e.g. notch top-left, hinge cutout, arched top..." style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:0.85rem;padding:0.55rem 0.7rem;outline:none;resize:vertical;min-height:60px;"></textarea>
       </div>
-      <button class="btn-print" onclick="saveUnitEdits('${p.id}')" style="width:100%;">Apply to This Piece</button>
+      <button class="btn-print" onclick="saveUnitEdits('${p.id}')" style="width:100%;">${isGrouped ? 'Apply to Whole Assembly' : 'Apply to This Piece'}</button>
     </div>`;
   popover.addEventListener('click', () => popover.remove());
   document.body.appendChild(popover);
@@ -5487,15 +5510,26 @@ function openUnitEditor(p) {
 }
 
 function saveUnitEdits(pieceId) {
-  const p = pieces.find(pc => pc.id === pieceId);
-  if (!p) return;
-  p.sketchFrameMaterial = document.getElementById('unitFrameMaterial').value;
-  p.sketchMuntinCols = document.getElementById('unitMuntinCols').value;
-  p.sketchMuntinRows = document.getElementById('unitMuntinRows').value;
-  p.sketchNote = document.getElementById('unitDesc').value;
+  const frameMaterial = document.getElementById('unitFrameMaterial').value;
+  const muntinCols = document.getElementById('unitMuntinCols').value;
+  const muntinRows = document.getElementById('unitMuntinRows').value;
+  const desc = document.getElementById('unitDesc').value;
+
+  // Frame + muntins apply to every piece in the connected group so the whole
+  // assembly stays visually consistent; description stays specific to the clicked piece.
+  const targetIds = _unitEditorGroupIds.length ? _unitEditorGroupIds : [pieceId];
+  targetIds.forEach(id => {
+    const gp = pieces.find(pc => pc.id === id);
+    if (!gp) return;
+    gp.sketchFrameMaterial = frameMaterial;
+    gp.sketchMuntinCols = muntinCols;
+    gp.sketchMuntinRows = muntinRows;
+    if (id === pieceId) gp.sketchNote = desc;
+  });
+
   document.getElementById('unitEditorPopover').remove();
   renderProjectCanvas();
-  showToast('✓ Updated');
+  showToast(targetIds.length > 1 ? '✓ Applied to whole assembly' : '✓ Updated');
 }
 
 function startDragUnit(e, u, box, allUnits) {
