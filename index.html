@@ -4998,13 +4998,13 @@ const SKETCH_KEYWORDS = [
   { match: /pencil.?edge/i,           label: 'Pencil Edge' },
   { match: /mitered?.?corner/i,       label: 'Mitered Corner' },
   { match: /radius|round.?corner/i,   label: 'Radius Corner' },
-  // Hardware / fittings
-  { match: /hinge/i,                  label: 'Hinge Cutout' },
-  { match: /pivot/i,                  label: 'Pivot Cutout' },
-  { match: /handle/i,                 label: 'Handle Location' },
-  { match: /lock|strike/i,            label: 'Lock/Strike Cutout' },
-  { match: /clip|clamp/i,             label: 'Clip/Clamp Location' },
-  { match: /standoff/i,               label: 'Standoff Hole' },
+  // Hardware / fittings — these get a distinct icon shape instead of the generic X marker
+  { match: /hinge/i,                  label: 'Hinge Cutout',       icon: 'hinge' },
+  { match: /pivot/i,                  label: 'Pivot Cutout',       icon: 'hinge' },
+  { match: /handle/i,                 label: 'Handle Location',    icon: 'handle' },
+  { match: /lock|strike/i,            label: 'Lock/Strike Cutout', icon: 'lock' },
+  { match: /clip|clamp/i,             label: 'Clip/Clamp Location',icon: 'clip' },
+  { match: /standoff/i,               label: 'Standoff Hole',      icon: 'standoff' },
   // Shapes / openings
   { match: /arch|half.?round|radius.?top/i, label: 'Arched Top' },
   { match: /angle.?cut|angled?.?corner/i,   label: 'Angled Corner' },
@@ -5088,6 +5088,8 @@ function buildInsulatedGlassSvg(p, x0, y0, rectW, rectH, opts) {
   return svg;
 }
 
+let _svgIdCounter = 0;
+
 function buildPieceSvgGroup(p, x0, y0, rectW, rectH, opts) {
   opts = opts || {};
   const frameMaterial = opts.frameMaterial !== undefined ? opts.frameMaterial : (p.sketchFrameMaterial || '');
@@ -5097,6 +5099,7 @@ function buildPieceSvgGroup(p, x0, y0, rectW, rectH, opts) {
   const fillColor = detectGlassFill(p);
   const isArched = /arch|half.?round|radius.?top/i.test(desc);
   const isInsulated = p.glassCategory === 'insulated';
+  const uid = 'g' + (_svgIdCounter++); // unique suffix so gradient ids never collide between pieces on the same canvas
 
   let shapePath = '';
   if (isArched) {
@@ -5105,41 +5108,64 @@ function buildPieceSvgGroup(p, x0, y0, rectW, rectH, opts) {
     shapePath = `M${x0},${y0+archHeight} Q${x0},${y0} ${x0+rectW/2},${y0} Q${x0+rectW},${y0} ${x0+rectW},${y0+archHeight} L${x0+rectW},${y0+rectH} L${x0},${y0+rectH} Z`;
   }
 
-  let svg;
+  // Gradient + reflection defs for a more realistic glass look — subtle top-light-to-
+  // bottom-dark sheen plus a soft diagonal highlight streak, like light catching a real pane.
+  let defs = `<defs>
+    <linearGradient id="glassFill-${uid}" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="${fillColor}" stop-opacity="0.55"/>
+      <stop offset="55%" stop-color="${fillColor}" stop-opacity="0.82"/>
+      <stop offset="100%" stop-color="${fillColor}" stop-opacity="0.95"/>
+    </linearGradient>
+    <linearGradient id="metalFill-${uid}" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#c4cbd2"/><stop offset="45%" stop-color="#8a9199"/><stop offset="100%" stop-color="#5c636b"/>
+    </linearGradient>
+    <linearGradient id="woodFill-${uid}" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#a97a4e"/><stop offset="50%" stop-color="#8a5a34"/><stop offset="100%" stop-color="#6b4326"/>
+    </linearGradient>
+  </defs>`;
+
+  let svg = defs;
   if (isInsulated && !isArched) {
     // IG units get the isometric exploded view instead of a flat rectangle
-    svg = buildInsulatedGlassSvg(p, x0, y0, rectW, rectH, opts);
+    svg += buildInsulatedGlassSvg(p, x0, y0, rectW, rectH, opts);
   } else if (isArched) {
-    svg = `<path d="${shapePath}" fill="${fillColor}" stroke="#333" stroke-width="2"/>`;
+    svg += `<path d="${shapePath}" fill="url(#glassFill-${uid})" stroke="#2a2a2a" stroke-width="2"/>`;
   } else {
-    svg = `<rect x="${x0}" y="${y0}" width="${rectW}" height="${rectH}" fill="${fillColor}" stroke="#333" stroke-width="2"/>`;
+    svg += `<rect x="${x0}" y="${y0}" width="${rectW}" height="${rectH}" fill="url(#glassFill-${uid})" stroke="#2a2a2a" stroke-width="2"/>`;
+    // Soft diagonal highlight streak — reads as light catching real glass
+    const streakW = rectW * 0.22;
+    svg += `<polygon points="${x0+rectW*0.12},${y0} ${x0+rectW*0.12+streakW},${y0} ${x0+streakW*0.3},${y0+rectH} ${x0},${y0+rectH}" fill="#ffffff" opacity="0.10"/>`;
+    svg += `<polygon points="${x0+rectW*0.55},${y0} ${x0+rectW*0.55+streakW*0.6},${y0} ${x0+rectW*0.3},${y0+rectH} ${x0+rectW*0.15},${y0+rectH}" fill="#ffffff" opacity="0.06"/>`;
   }
 
-  // Frame — drawn as an inset border styled per material (metal, wood, or a thin glass fin for frameless)
+  // Frame — drawn with a gradient for a subtle beveled, 3D look instead of a flat color
   if (frameMaterial && FRAME_MATERIALS[frameMaterial]) {
     const fm = FRAME_MATERIALS[frameMaterial];
-    svg += `<rect x="${x0-fm.inset}" y="${y0-fm.inset}" width="${rectW+fm.inset*2}" height="${rectH+fm.inset*2}" fill="none" stroke="${fm.stroke}" stroke-width="${fm.width}" rx="${isArched?10:1}"/>`;
+    const gradFill = frameMaterial === 'metal' ? `url(#metalFill-${uid})` : frameMaterial === 'wood' ? `url(#woodFill-${uid})` : fm.stroke;
+    svg += `<rect x="${x0-fm.inset}" y="${y0-fm.inset}" width="${rectW+fm.inset*2}" height="${rectH+fm.inset*2}" fill="none" stroke="${gradFill}" stroke-width="${fm.width}" rx="${isArched?10:1}"/>`;
     if (fm.hatch) {
       // Simple wood-grain hint — diagonal ticks along the frame
       const hatchCount = 10;
       for (let i = 0; i < hatchCount; i++) {
         const hx = x0 - fm.inset + (rectW + fm.inset*2) * (i / hatchCount);
-        svg += `<line x1="${hx}" y1="${y0-fm.inset}" x2="${hx+4}" y2="${y0-fm.inset-fm.width}" stroke="#6e4527" stroke-width="1"/>`;
+        svg += `<line x1="${hx}" y1="${y0-fm.inset}" x2="${hx+4}" y2="${y0-fm.inset-fm.width}" stroke="#5a3a1e" stroke-width="1" opacity="0.7"/>`;
       }
     }
   }
 
-  // Muntin bars — evenly spaced grid lines inside the glass
+  // Muntin bars — evenly spaced grid lines inside the glass, with a subtle bevel highlight
   if (muntinCols > 0) {
     for (let c = 1; c <= muntinCols; c++) {
       const mx = x0 + (rectW / (muntinCols + 1)) * c;
-      svg += `<line x1="${mx}" y1="${y0}" x2="${mx}" y2="${y0+rectH}" stroke="#8a8a8a" stroke-width="3"/>`;
+      svg += `<line x1="${mx}" y1="${y0}" x2="${mx}" y2="${y0+rectH}" stroke="#6e6e6e" stroke-width="3.5"/>`;
+      svg += `<line x1="${mx-1}" y1="${y0}" x2="${mx-1}" y2="${y0+rectH}" stroke="#bdbdbd" stroke-width="0.8" opacity="0.6"/>`;
     }
   }
   if (muntinRows > 0) {
     for (let r = 1; r <= muntinRows; r++) {
       const my = y0 + (rectH / (muntinRows + 1)) * r;
-      svg += `<line x1="${x0}" y1="${my}" x2="${x0+rectW}" y2="${my}" stroke="#8a8a8a" stroke-width="3"/>`;
+      svg += `<line x1="${x0}" y1="${my}" x2="${x0+rectW}" y2="${my}" stroke="#6e6e6e" stroke-width="3.5"/>`;
+      svg += `<line x1="${x0}" y1="${my-1}" x2="${x0+rectW}" y2="${my-1}" stroke="#bdbdbd" stroke-width="0.8" opacity="0.6"/>`;
     }
   }
 
@@ -5161,11 +5187,35 @@ function buildPieceSvgGroup(p, x0, y0, rectW, rectH, opts) {
 
     foundTags.forEach((tag, idx) => {
       const mp = idx === 0 ? {x:primaryX,y:primaryY} : positions[idx % positions.length];
-      svg += `
-        <circle cx="${mp.x}" cy="${mp.y}" r="7" fill="none" stroke="#e05050" stroke-width="2"/>
-        <line x1="${mp.x+5}" y1="${mp.y-5}" x2="${mp.x-5}" y2="${mp.y+5}" stroke="#e05050" stroke-width="1.5"/>
-        <line x1="${mp.x-5}" y1="${mp.y-5}" x2="${mp.x+5}" y2="${mp.y+5}" stroke="#e05050" stroke-width="1.5"/>
-        <text x="${mp.x}" y="${mp.y - 14}" text-anchor="middle" font-family="DM Sans, sans-serif" font-size="9.5" fill="#e05050" font-weight="600">${tag.label}</text>`;
+      const c = '#2a6fc9'; // hardware icons use blue to visually separate from red cut/damage markers
+      let iconSvg;
+      switch (tag.icon) {
+        case 'hinge':
+          // Small rectangle with a pin dot — reads as a hinge plate
+          iconSvg = `<rect x="${mp.x-6}" y="${mp.y-9}" width="12" height="18" rx="2" fill="none" stroke="${c}" stroke-width="1.8"/><circle cx="${mp.x}" cy="${mp.y-9}" r="1.8" fill="${c}"/><circle cx="${mp.x}" cy="${mp.y+9}" r="1.8" fill="${c}"/>`;
+          break;
+        case 'handle':
+          // A short bar standing off the surface — reads as a pull handle
+          iconSvg = `<line x1="${mp.x}" y1="${mp.y-9}" x2="${mp.x}" y2="${mp.y+9}" stroke="${c}" stroke-width="3"/><circle cx="${mp.x}" cy="${mp.y-9}" r="1.8" fill="${c}"/><circle cx="${mp.x}" cy="${mp.y+9}" r="1.8" fill="${c}"/>`;
+          break;
+        case 'lock':
+          // A simple padlock shape
+          iconSvg = `<rect x="${mp.x-6}" y="${mp.y-2}" width="12" height="9" rx="1.5" fill="none" stroke="${c}" stroke-width="1.8"/><path d="M${mp.x-4},${mp.y-2} v-3 a4,4 0 0 1 8,0 v3" fill="none" stroke="${c}" stroke-width="1.8"/>`;
+          break;
+        case 'clip':
+          // A small bracket shape
+          iconSvg = `<path d="M${mp.x-6},${mp.y-7} h5 v14 h-5" fill="none" stroke="${c}" stroke-width="1.8"/><line x1="${mp.x-1}" y1="${mp.y}" x2="${mp.x+6}" y2="${mp.y}" stroke="${c}" stroke-width="1.8"/>`;
+          break;
+        case 'standoff':
+          // A hollow circle representing a drilled standoff hole
+          iconSvg = `<circle cx="${mp.x}" cy="${mp.y}" r="6" fill="none" stroke="${c}" stroke-width="1.8"/><circle cx="${mp.x}" cy="${mp.y}" r="2" fill="${c}"/>`;
+          break;
+        default:
+          // Generic X marker for non-hardware annotations (cuts, damage, surface treatments)
+          iconSvg = `<circle cx="${mp.x}" cy="${mp.y}" r="7" fill="none" stroke="#e05050" stroke-width="2"/><line x1="${mp.x+5}" y1="${mp.y-5}" x2="${mp.x-5}" y2="${mp.y+5}" stroke="#e05050" stroke-width="1.5"/><line x1="${mp.x-5}" y1="${mp.y-5}" x2="${mp.x+5}" y2="${mp.y+5}" stroke="#e05050" stroke-width="1.5"/>`;
+      }
+      const labelColor = tag.icon ? c : '#e05050';
+      svg += `${iconSvg}<text x="${mp.x}" y="${mp.y - 14}" text-anchor="middle" font-family="DM Sans, sans-serif" font-size="9.5" fill="${labelColor}" font-weight="600">${tag.label}</text>`;
     });
   }
 
@@ -5271,7 +5321,11 @@ function buildProjectUnits() {
 
   validPieces.forEach(p => {
     const qty = Math.max(1, parseInt(p.qty) || 1);
-    const w = getPieceW(p), h = getPieceH(p);
+    // A rotated piece swaps its effective width/height for layout purposes —
+    // e.g. a transom that needs to sit sideways in the assembly.
+    const rotated = !!p.sketchRotated;
+    const rawW = getPieceW(p), rawH = getPieceH(p);
+    const w = rotated ? rawH : rawW, h = rotated ? rawW : rawH;
     const scale = Math.min(maxUnitW / w, maxUnitH / h);
     const uw = w * scale, uh = h * scale;
 
@@ -5280,7 +5334,7 @@ function buildProjectUnits() {
       p.layoutUnits = Array.from({length: qty}, () => ({ x: null, y: null }));
     }
     for (let i = 0; i < qty; i++) {
-      units.push({ pieceId: p.id, unitIndex: i, p, w, h, uw, uh, pos: p.layoutUnits[i] });
+      units.push({ pieceId: p.id, unitIndex: i, p, w, h, uw, uh, rotated, pos: p.layoutUnits[i] });
     }
   });
   return units;
@@ -5362,8 +5416,26 @@ function renderProjectCanvas() {
 
   canvas.style.position = 'relative';
   canvas.style.width = Math.max(maxX + 30, 400) + 'px';
-  canvas.style.height = Math.max(maxY + 60 + topOffset, 300) + 'px'; // extra room for overall dimension labels + top safety offset
+  const canvasH = Math.max(maxY + 80 + topOffset, 320); // extra room for labels + top safety offset + ground line
+  canvas.style.height = canvasH + 'px';
   canvas.innerHTML = '';
+
+  // ── Ground/floor reference line — gives the whole layout a sense of real-world
+  // scale and orientation, like a true elevation drawing sitting on a floor line ──
+  const groundY = canvasH - 22;
+  const groundLine = document.createElement('div');
+  groundLine.id = 'groundLine';
+  groundLine.dataset.groundY = groundY;
+  groundLine.dataset.width = Math.max(maxX + 30, 400);
+  groundLine.dataset.hatchCount = Math.floor(Math.max(maxX + 30, 400) / 14);
+  groundLine.style.cssText = `position:absolute;left:0;top:${groundY}px;width:${Math.max(maxX + 30, 400)}px;pointer-events:none;`;
+  const hatchCount = Math.floor(Math.max(maxX + 30, 400) / 14);
+  let hatchTicks = '';
+  for (let i = 0; i < hatchCount; i++) {
+    hatchTicks += `<div style="position:absolute;left:${i*14}px;top:2px;width:8px;height:1px;background:#aaa;transform:rotate(45deg);transform-origin:left top;"></div>`;
+  }
+  groundLine.innerHTML = `<div style="border-top:1.5px solid #999;position:relative;"></div><div style="position:relative;">${hatchTicks}</div>`;
+  canvas.appendChild(groundLine);
 
   units.forEach((u, idx) => {
     const box = document.createElement('div');
@@ -5375,7 +5447,8 @@ function renderProjectCanvas() {
     const marginTop = igMarginTop(u);
     const marginRight = marginTop;
     const svgW = u.uw + marginRight, svgH = u.uh + marginTop;
-    box.style.cssText = `position:absolute;left:${u.pos.x}px;top:${u.pos.y - marginTop + topOffset}px;width:${svgW}px;cursor:grab;user-select:none;touch-action:none;`;
+    box.style.cssText = `position:absolute;left:${u.pos.x}px;top:${u.pos.y - marginTop + topOffset}px;width:${svgW}px;cursor:grab;user-select:none;touch-action:none;filter:drop-shadow(0 2px 5px rgba(0,0,0,0.18));`;
+    box.style.position = 'absolute'; // ensure the rotate button's absolute positioning is relative to this box
 
     // If this piece is part of a touching cluster, skip its own frame — the cluster
     // gets one shared outer frame drawn as a separate overlay after all units render.
@@ -5384,6 +5457,8 @@ function renderProjectCanvas() {
     // overlay after all units render, instead of each piece drawing its own separate grid.
     const drawOpts = unitInCluster.has(u) ? { frameMaterial: '', muntinCols: 0, muntinRows: 0 } : {};
     const svgInner = buildPieceSvgGroup(u.p, 0, marginTop, u.uw, u.uh, drawOpts);
+    // Dimension label always shows the true physical W × H regardless of rotation —
+    // rotation only affects how the piece is oriented in the layout, not its real size.
     const wLabel = dimDisplay(u.p.wWhole, u.p.wFrac), hLabel = dimDisplay(u.p.hWhole, u.p.hFrac);
     const qtyTag = (parseInt(u.p.qty)||1) > 1 ? ` #${u.unitIndex+1}` : '';
 
@@ -5391,10 +5466,16 @@ function renderProjectCanvas() {
       <svg width="${svgW}" height="${svgH}" viewBox="0 0 ${svgW} ${svgH}" xmlns="http://www.w3.org/2000/svg" style="display:block;pointer-events:none;overflow:visible;">
         ${svgInner}
       </svg>
-      <div style="text-align:center;font-family:'DM Mono',monospace;font-size:10px;color:#333;margin-top:4px;pointer-events:none;">${wLabel} × ${hLabel}${qtyTag}${isIG?' · IG':''}</div>
-      <div style="text-align:center;font-family:'DM Sans',sans-serif;font-size:9px;color:#777;pointer-events:none;">${[u.p.thickness,u.p.glassTypeName].filter(Boolean).join(' · ')||''}</div>`;
+      <div style="text-align:center;font-family:'DM Mono',monospace;font-size:10px;color:#333;margin-top:4px;pointer-events:none;">${wLabel} × ${hLabel}${u.rotated?' ↻':''}${qtyTag}${isIG?' · IG':''}</div>
+      <div style="text-align:center;font-family:'DM Sans',sans-serif;font-size:9px;color:#777;pointer-events:none;">${[u.p.thickness,u.p.glassTypeName].filter(Boolean).join(' · ')||''}</div>
+      <button class="unit-rotate-btn" data-piece-id="${u.pieceId}" title="Rotate 90°" style="position:absolute;top:2px;right:2px;width:20px;height:20px;background:rgba(255,255,255,0.9);border:1px solid #ccc;border-radius:4px;cursor:pointer;font-size:11px;line-height:1;pointer-events:auto;z-index:10;">↻</button>`;
 
     box.addEventListener('pointerdown', (e) => startDragUnit(e, u, box, units, topOffset));
+    box.querySelector('.unit-rotate-btn').addEventListener('click', (e) => {
+      e.stopPropagation();
+      u.p.sketchRotated = !u.p.sketchRotated;
+      renderProjectCanvas();
+    });
     box.addEventListener('click', (e) => {
       if (_dragMoved) { _dragMoved = false; return; } // don't open editor after a drag
       // If this piece is connected to others, editing it edits the whole connected group
@@ -5418,6 +5499,12 @@ function renderProjectCanvas() {
     const overallWReal = (right - left) / scale;
     const overallHReal = (bottom - top) / scale;
 
+    // Assembly label (e.g. "Front Entry") is shown right alongside the overall size,
+    // on the same line, so the download/export logic (which reads one label div) still
+    // captures everything without needing structural changes.
+    const groupLabel = group.find(u => u.p.sketchGroupLabel)?.p.sketchGroupLabel || '';
+    const labelPrefix = groupLabel ? `${groupLabel} — ` : '';
+
     const bracket = document.createElement('div');
     bracket.style.cssText = `position:absolute;left:${left}px;top:${top - 26 + topOffset}px;width:${right-left}px;pointer-events:none;`;
     bracket.innerHTML = `
@@ -5425,7 +5512,7 @@ function renderProjectCanvas() {
         <div style="position:absolute;left:0;bottom:0;width:1px;height:8px;background:#4a9eff;"></div>
         <div style="position:absolute;right:0;bottom:0;width:1px;height:8px;background:#4a9eff;"></div>
       </div>
-      <div style="text-align:center;font-family:'DM Mono',monospace;font-size:10px;color:#2a6fc9;font-weight:600;margin-top:2px;">Overall: ${overallWReal.toFixed(1)}" × ${overallHReal.toFixed(1)}"</div>`;
+      <div style="text-align:center;font-family:'DM Mono',monospace;font-size:10px;color:#2a6fc9;font-weight:600;margin-top:2px;">${labelPrefix}Overall: ${overallWReal.toFixed(1)}" × ${overallHReal.toFixed(1)}"</div>`;
     canvas.appendChild(bracket);
 
     // ── One continuous frame around the whole assembly (if a material is set) ──
@@ -5525,6 +5612,10 @@ function openUnitEditor(p, groupPieces) {
         <button onclick="document.getElementById('unitEditorPopover').remove()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:1.2rem;line-height:1;">✕</button>
       </div>
       ${isGrouped ? `<div style="font-size:0.7rem;color:var(--muted);margin-bottom:0.85rem;">These pieces are touching — frame and muntins will apply to the whole connected assembly.</div>` : ''}
+      ${isGrouped ? `<div style="margin-bottom:0.75rem;">
+        <div style="font-size:0.68rem;color:var(--muted);margin-bottom:0.2rem;">Assembly Label</div>
+        <input type="text" id="unitGroupLabel" placeholder="e.g. Front Entry, Shower Wall..." style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:7px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:0.82rem;padding:0.45rem 0.6rem;outline:none;">
+      </div>` : ''}
       <div style="display:flex;gap:0.5rem;margin-bottom:0.75rem;">
         <div style="flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:0.4rem 0.6rem;">
           <div style="font-size:0.68rem;color:var(--muted);margin-bottom:0.2rem;">Frame${isGrouped?' (whole assembly)':''}</div>
@@ -5559,6 +5650,8 @@ function openUnitEditor(p, groupPieces) {
   document.getElementById('unitMuntinCols').value = p.sketchMuntinCols || '';
   document.getElementById('unitMuntinRows').value = p.sketchMuntinRows || '';
   document.getElementById('unitDesc').value = p.sketchNote || '';
+  const groupLabelInput = document.getElementById('unitGroupLabel');
+  if (groupLabelInput) groupLabelInput.value = p.sketchGroupLabel || '';
 }
 
 function saveUnitEdits(pieceId) {
@@ -5566,9 +5659,11 @@ function saveUnitEdits(pieceId) {
   const muntinCols = document.getElementById('unitMuntinCols').value;
   const muntinRows = document.getElementById('unitMuntinRows').value;
   const desc = document.getElementById('unitDesc').value;
+  const groupLabelInput = document.getElementById('unitGroupLabel');
+  const groupLabel = groupLabelInput ? groupLabelInput.value : '';
 
-  // Frame + muntins apply to every piece in the connected group so the whole
-  // assembly stays visually consistent; description stays specific to the clicked piece.
+  // Frame + muntins + assembly label apply to every piece in the connected group so
+  // the whole assembly stays visually consistent; description stays piece-specific.
   const targetIds = _unitEditorGroupIds.length ? _unitEditorGroupIds : [pieceId];
   targetIds.forEach(id => {
     const gp = pieces.find(pc => pc.id === id);
@@ -5576,6 +5671,7 @@ function saveUnitEdits(pieceId) {
     gp.sketchFrameMaterial = frameMaterial;
     gp.sketchMuntinCols = muntinCols;
     gp.sketchMuntinRows = muntinRows;
+    if (groupLabelInput) gp.sketchGroupLabel = groupLabel;
     if (id === pieceId) gp.sketchNote = desc;
   });
 
@@ -5716,6 +5812,19 @@ function downloadFullProjectView() {
 
     Array.from(canvas.children).forEach(child => {
       if (child.id === 'alignGuides') return; // temporary drag guide, not part of the drawing
+
+      if (child.id === 'groundLine') {
+        // Floor/ground reference line — a solid horizontal line with diagonal hatch ticks
+        const gy = parseFloat(child.dataset.groundY) || 0;
+        const gw = parseFloat(child.dataset.width) || 0;
+        const hatchCount = parseInt(child.dataset.hatchCount) || 0;
+        inner += `<line x1="0" y1="${gy}" x2="${gw}" y2="${gy}" stroke="#999" stroke-width="1.5"/>`;
+        for (let i = 0; i < hatchCount; i++) {
+          const hx = i * 14;
+          inner += `<line x1="${hx}" y1="${gy+2}" x2="${hx+6}" y2="${gy+8}" stroke="#aaa" stroke-width="1"/>`;
+        }
+        return;
+      }
 
       if (child.classList && child.classList.contains('project-unit')) {
         const left = parseFloat(child.style.left) || 0, top = parseFloat(child.style.top) || 0;
