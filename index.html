@@ -338,6 +338,14 @@ onAuthStateChanged(auth, user => {
   .piece-menu-item:hover { background: rgba(255,255,255,0.06); }
   .piece-menu-item.danger:hover { background: rgba(224,80,80,0.12); color: #e05050; }
   .piece-info-icon { font-size: 0.85rem; color: var(--muted); cursor: help; }
+
+  /* ── Sketch marker toolbar ── */
+  .marker-type-btn { background: var(--surface2); border: 1px solid var(--border); border-radius: 7px; color: var(--text); cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 0.78rem; padding: 0.4rem 0.7rem; transition: all 0.15s; }
+  .marker-type-btn:hover { border-color: rgba(255,255,255,0.3); }
+  .marker-type-btn.active { background: #2a6fc9; border-color: #2a6fc9; color: #fff; }
+  .marker-list-item { display: flex; align-items: center; gap: 0.5rem; background: var(--surface2); border: 1px solid var(--border); border-radius: 7px; padding: 0.4rem 0.6rem; margin-bottom: 0.35rem; font-size: 0.78rem; }
+  .marker-list-item .marker-del { margin-left: auto; background: none; border: none; color: var(--muted); cursor: pointer; font-size: 0.9rem; }
+  .marker-list-item .marker-del:hover { color: #e05050; }
   .piece-row:hover { border-color: rgba(255,255,255,0.15); }
   .piece-summary:hover { background: rgba(255,255,255,0.045); }
   .piece-row-top { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
@@ -4968,7 +4976,28 @@ addExtra = function() { expandSection('extras'); _origAddExtra.apply(this, argum
         <div class="card-label" style="margin:0;">Piece Sketch</div>
         <button onclick="closeSketch()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:1.3rem;line-height:1;padding:0.2rem 0.5rem;">✕</button>
       </div>
-      <div id="sketchCanvas" style="background:#fff;border-radius:10px;padding:1rem;margin-bottom:1rem;display:flex;align-items:center;justify-content:center;min-height:280px;"></div>
+      <div id="sketchCanvas" style="background:#fff;border-radius:10px;padding:1rem;margin-bottom:0.6rem;display:flex;align-items:center;justify-content:center;min-height:280px;cursor:crosshair;"></div>
+      <div id="sketchClickHint" style="text-align:center;font-size:0.7rem;color:var(--muted);margin-bottom:0.85rem;">Pick a marker type below, then click on the glass to place it exactly where it goes</div>
+
+      <!-- Marker placement toolbar -->
+      <div style="margin-bottom:0.85rem;">
+        <label style="margin-bottom:0.4rem;">Add Marker — click glass after selecting</label>
+        <div id="markerTypeRow" style="display:flex;gap:0.4rem;flex-wrap:wrap;margin-bottom:0.5rem;">
+          <button class="marker-type-btn" data-mtype="hole" onclick="selectMarkerType('hole')">⊙ Hole</button>
+          <button class="marker-type-btn" data-mtype="hinge" onclick="selectMarkerType('hinge')">▭ Hinge</button>
+          <button class="marker-type-btn" data-mtype="handle" onclick="selectMarkerType('handle')">| Handle</button>
+          <button class="marker-type-btn" data-mtype="lock" onclick="selectMarkerType('lock')">🔒 Lock</button>
+          <button class="marker-type-btn" data-mtype="standoff" onclick="selectMarkerType('standoff')">◎ Standoff</button>
+          <button class="marker-type-btn" data-mtype="notch" onclick="selectMarkerType('notch')">✕ Notch</button>
+        </div>
+        <div id="markerSizeRow" style="display:none;align-items:center;gap:0.5rem;background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:0.45rem 0.7rem;margin-bottom:0.5rem;">
+          <span style="font-size:0.78rem;color:var(--muted);">Diameter</span>
+          <input type="number" id="markerSizeInput" min="0.125" step="0.125" value="0.5" style="max-width:70px;padding:0.25rem 0.4rem;font-size:0.78rem;">
+          <span style="font-size:0.78rem;color:var(--muted);">in</span>
+          <button onclick="cancelMarkerPlacement()" style="margin-left:auto;background:none;border:1px solid var(--border);border-radius:6px;color:var(--muted);cursor:pointer;font-size:0.72rem;padding:0.3rem 0.6rem;">Cancel</button>
+        </div>
+        <div id="markerListWrap"></div>
+      </div>
 
       <div style="display:flex;gap:0.6rem;margin-bottom:0.85rem;flex-wrap:wrap;">
         <div style="display:flex;align-items:center;gap:0.4rem;background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:0.4rem 0.7rem;flex:1 1 auto;">
@@ -5020,6 +5049,121 @@ function openSketch(id) {
 function closeSketch() {
   document.getElementById('sketchModal').style.display = 'none';
   _sketchPieceId = null;
+  cancelMarkerPlacement();
+}
+
+// ─────────────────────────────────────────────────
+// PRECISE HARDWARE/HOLE MARKERS — click-to-place, exact position + dimensions
+// ─────────────────────────────────────────────────
+let _sketchGeom = null; // {x0, y0, rectW, rectH, realW, realH} for the currently rendered sketch
+let _selectedMarkerType = null;
+
+const MARKER_LABELS = { hole: 'Hole', hinge: 'Hinge', handle: 'Handle', lock: 'Lock', standoff: 'Standoff', notch: 'Notch' };
+
+function selectMarkerType(type) {
+  _selectedMarkerType = type;
+  document.querySelectorAll('.marker-type-btn').forEach(b => b.classList.toggle('active', b.dataset.mtype === type));
+  document.getElementById('markerSizeRow').style.display = type === 'hole' ? 'flex' : 'none';
+  document.getElementById('sketchClickHint').textContent = 'Click on the glass to place the ' + MARKER_LABELS[type];
+}
+
+function cancelMarkerPlacement() {
+  _selectedMarkerType = null;
+  document.querySelectorAll('.marker-type-btn').forEach(b => b.classList.remove('active'));
+  const sizeRow = document.getElementById('markerSizeRow');
+  if (sizeRow) sizeRow.style.display = 'none';
+  const hint = document.getElementById('sketchClickHint');
+  if (hint) hint.textContent = 'Pick a marker type below, then click on the glass to place it exactly where it goes';
+}
+
+function handleSketchCanvasClick(e) {
+  if (!_selectedMarkerType || !_sketchGeom) return;
+  const svg = e.currentTarget;
+  const rect = svg.getBoundingClientRect();
+  const vb = svg.viewBox.baseVal;
+  const scaleX = vb.width / rect.width, scaleY = vb.height / rect.height;
+  const svgX = (e.clientX - rect.left) * scaleX + vb.x;
+  const svgY = (e.clientY - rect.top) * scaleY + vb.y;
+
+  const { x0, y0, rectW, rectH, realW, realH } = _sketchGeom;
+  if (svgX < x0 || svgX > x0 + rectW || svgY < y0 || svgY > y0 + rectH) return; // click landed outside the glass
+
+  const xIn = ((svgX - x0) / rectW) * realW;
+  const yIn = ((svgY - y0) / rectH) * realH;
+
+  const p = pieces.find(pc => pc.id === _sketchPieceId);
+  if (!p) return;
+  if (!p.sketchMarkers) p.sketchMarkers = [];
+  const size = _selectedMarkerType === 'hole' ? (parseFloat(document.getElementById('markerSizeInput').value) || 0.5) : null;
+  p.sketchMarkers.push({ id: uid(), type: _selectedMarkerType, size, xIn: Math.round(xIn*100)/100, yIn: Math.round(yIn*100)/100 });
+  cancelMarkerPlacement();
+  renderSketch();
+}
+
+function removeMarker(id) {
+  const p = pieces.find(pc => pc.id === _sketchPieceId);
+  if (!p || !p.sketchMarkers) return;
+  p.sketchMarkers = p.sketchMarkers.filter(m => m.id !== id);
+  renderSketch();
+}
+
+function renderMarkerList() {
+  const p = pieces.find(pc => pc.id === _sketchPieceId);
+  const wrap = document.getElementById('markerListWrap');
+  if (!wrap) return;
+  if (!p || !p.sketchMarkers || !p.sketchMarkers.length) { wrap.innerHTML = ''; return; }
+  wrap.innerHTML = p.sketchMarkers.map(m => `
+    <div class="marker-list-item">
+      <span>${MARKER_LABELS[m.type]||m.type}${m.size?' ⌀'+m.size+'"':''}</span>
+      <span style="color:var(--muted);">${m.xIn}" from left · ${m.yIn}" from top</span>
+      <button class="marker-del" onclick="removeMarker('${m.id}')" title="Remove marker">✕</button>
+    </div>`).join('');
+}
+
+// Draws the actual icon shape + dimension lines/labels for a precisely placed marker.
+// Called from buildPieceSvgGroup so this renders identically in the sketch modal,
+// Full Project View, and downloaded images — anywhere the piece is drawn.
+function buildPreciseMarkerSvg(marker, x0, y0, rectW, rectH, realW, realH) {
+  const px = x0 + (marker.xIn / realW) * rectW;
+  const py = y0 + (marker.yIn / realH) * rectH;
+  const c = marker.type === 'hole' || marker.type === 'notch' ? '#e05050' : '#2a6fc9';
+  let icon = '';
+
+  switch (marker.type) {
+    case 'hole':
+      const holeR = Math.max(3, Math.min(10, (marker.size||0.5) * (rectW/realW) / 2));
+      icon = `<circle cx="${px}" cy="${py}" r="${holeR}" fill="none" stroke="${c}" stroke-width="1.8"/>`;
+      break;
+    case 'hinge':
+      icon = `<rect x="${px-6}" y="${py-9}" width="12" height="18" rx="2" fill="none" stroke="${c}" stroke-width="1.8"/><circle cx="${px}" cy="${py-9}" r="1.8" fill="${c}"/><circle cx="${px}" cy="${py+9}" r="1.8" fill="${c}"/>`;
+      break;
+    case 'handle':
+      icon = `<line x1="${px}" y1="${py-9}" x2="${px}" y2="${py+9}" stroke="${c}" stroke-width="3"/><circle cx="${px}" cy="${py-9}" r="1.8" fill="${c}"/><circle cx="${px}" cy="${py+9}" r="1.8" fill="${c}"/>`;
+      break;
+    case 'lock':
+      icon = `<rect x="${px-6}" y="${py-2}" width="12" height="9" rx="1.5" fill="none" stroke="${c}" stroke-width="1.8"/><path d="M${px-4},${py-2} v-3 a4,4 0 0 1 8,0 v3" fill="none" stroke="${c}" stroke-width="1.8"/>`;
+      break;
+    case 'standoff':
+      icon = `<circle cx="${px}" cy="${py}" r="6" fill="none" stroke="${c}" stroke-width="1.8"/><circle cx="${px}" cy="${py}" r="2" fill="${c}"/>`;
+      break;
+    case 'notch':
+    default:
+      icon = `<circle cx="${px}" cy="${py}" r="6" fill="none" stroke="${c}" stroke-width="1.8"/><line x1="${px+4}" y1="${py-4}" x2="${px-4}" y2="${py+4}" stroke="${c}" stroke-width="1.4"/><line x1="${px-4}" y1="${py-4}" x2="${px+4}" y2="${py+4}" stroke="${c}" stroke-width="1.4"/>`;
+  }
+
+  // Dimension lines to the nearest edges, with the real-world inch distance labeled —
+  // this is what lets the shop floor see exactly where to drill/cut without guessing.
+  const dimColor = '#999';
+  let dims = `
+    <line x1="${x0}" y1="${py}" x2="${px}" y2="${py}" stroke="${dimColor}" stroke-width="0.75" stroke-dasharray="2,2"/>
+    <text x="${(x0+px)/2}" y="${py-4}" text-anchor="middle" font-family="DM Mono, monospace" font-size="8" fill="${dimColor}">${marker.xIn}"</text>
+    <line x1="${px}" y1="${y0}" x2="${px}" y2="${py}" stroke="${dimColor}" stroke-width="0.75" stroke-dasharray="2,2"/>
+    <text x="${px+5}" y="${(y0+py)/2}" text-anchor="start" font-family="DM Mono, monospace" font-size="8" fill="${dimColor}">${marker.yIn}"</text>`;
+
+  const sizeLabel = marker.size ? ` ⌀${marker.size}"` : '';
+  const nameLabel = `<text x="${px}" y="${py+18}" text-anchor="middle" font-family="DM Sans, sans-serif" font-size="8.5" fill="${c}" font-weight="600">${MARKER_LABELS[marker.type]}${sizeLabel}</text>`;
+
+  return dims + icon + nameLabel;
 }
 
 const SKETCH_KEYWORDS = [
@@ -5258,6 +5402,17 @@ function buildPieceSvgGroup(p, x0, y0, rectW, rectH, opts) {
     });
   }
 
+  // Precise, click-placed hardware/hole markers — exact position with real dimension
+  // callouts, drawn on top of everything else so they're always clearly visible.
+  if (p.sketchMarkers && p.sketchMarkers.length) {
+    const realW = getPieceW(p), realH = getPieceH(p);
+    if (realW && realH) {
+      p.sketchMarkers.forEach(marker => {
+        svg += buildPreciseMarkerSvg(marker, x0, y0, rectW, rectH, realW, realH);
+      });
+    }
+  }
+
   return svg;
 }
 
@@ -5277,11 +5432,15 @@ function renderSketch() {
     return;
   }
 
-  const maxW = 380, maxH = 250, pad = 55;
+  const maxW = 420, maxH = 320, pad = 55;
   const scale = Math.min(maxW / w, maxH / h);
   const rectW = w * scale, rectH = h * scale;
   const svgW = rectW + pad * 2, svgH = rectH + pad * 2 + 20;
   const x0 = pad, y0 = pad;
+
+  // Save the exact geometry used for this render so click placement can convert
+  // screen coordinates back into real-world inches accurately.
+  _sketchGeom = { x0, y0, rectW, rectH, realW: w, realH: h };
 
   const wLabel = dimDisplay(p.wWhole, p.wFrac);
   const hLabel = dimDisplay(p.hWhole, p.hFrac);
@@ -5289,7 +5448,7 @@ function renderSketch() {
   const groupSvg = buildPieceSvgGroup(p, x0, y0, rectW, rectH, { desc });
 
   const svg = `
-    <svg width="${svgW}" height="${svgH+30}" viewBox="0 0 ${svgW} ${svgH+30}" xmlns="http://www.w3.org/2000/svg">
+    <svg width="${svgW}" height="${svgH+30}" viewBox="0 0 ${svgW} ${svgH+30}" xmlns="http://www.w3.org/2000/svg" onclick="handleSketchCanvasClick(event)">
       ${groupSvg}
       <line x1="${x0}" y1="${y0-14}" x2="${x0+rectW}" y2="${y0-14}" stroke="#666" stroke-width="1"/>
       <line x1="${x0}" y1="${y0-18}" x2="${x0}" y2="${y0-10}" stroke="#666" stroke-width="1"/>
@@ -5303,6 +5462,7 @@ function renderSketch() {
     </svg>`;
 
   canvas.innerHTML = svg;
+  renderMarkerList();
 }
 
 function svgToPngDownload(svgEl, filename) {
