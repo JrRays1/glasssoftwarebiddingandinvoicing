@@ -1458,7 +1458,12 @@ function switchTab(tab) {
   if (saveActions) saveActions.style.display = isQuickPrice ? 'none' : '';
   if (quickNote) quickNote.style.display = isQuickPrice ? '' : 'none';
 
-  if (tab === 'bid' || tab === 'quickprice') calculate();
+  if (tab === 'bid' || tab === 'quickprice') {
+    // Always keep at least one empty, ready-to-type piece row present — never make
+    // someone click "+ Add Piece" just to see the first set of dimension inputs.
+    if (pieces.length === 0) addPiece();
+    calculate();
+  }
 }
 window.switchTab = switchTab;
 
