@@ -2896,6 +2896,7 @@ function pdfHeader(doc, title, subtitle, date) {
   doc.text(date, pageW-50, 52, {align:'right'});
   doc.setFontSize(7.5);
   doc.text('Licensed  •  Bonded  •  Insured    ROC: 365507', 100, 66);
+  doc.text('americanlegacyglass@gmail.com', pageW-50, 66, {align:'right'});
   return 90;
 }
 
@@ -3010,10 +3011,11 @@ function saveBidPDF() {
     doc.setFontSize(9);doc.setFont('helvetica','bold');gray(40);
     doc.text('Glass & Fabrication Total',M,y);doc.text(fmt(glassSectionTotal),R,y,{align:'right'});y+=9*1.8;
     y+=6;
-    sectionLabel('Hardware');
-    if(hardware.length===0)row('No hardware items',fmt(0));
-    else hardware.forEach(h=>row(h.name||'Hardware item',fmt((parseFloat(h.cost)||0)*hwMkup)));
-    y+=6;
+    if(hardware.length>0){
+      sectionLabel('Hardware');
+      hardware.forEach(h=>row(h.name||'Hardware item',fmt((parseFloat(h.cost)||0)*hwMkup)));
+      y+=6;
+    }
     if(extras.length>0){
       sectionLabel('Additional Costs');
       extras.forEach(e=>{
