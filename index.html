@@ -144,8 +144,13 @@ onAuthStateChanged(auth, user => {
   .tab-btn:hover:not(.active) { color: var(--text); background: rgba(255,255,255,0.02); }
   .tab-btn.active { color: var(--text); background: rgba(255,255,255,0.05); font-weight: 500; }
   .tab-btn.active::after { background: var(--accent); }
-  .tab-btn[data-tab="invoice"].active::after { background: var(--invoice-accent); }
-  .tab-btn[data-tab="invoice"].active { color: var(--invoice-accent); }
+  .tab-btn[data-tab="quickprice"].active::after { background: #4ecdc4; }
+  .tab-btn[data-tab="quickprice"].active { color: #4ecdc4; }
+  /* Quick Price mode gets a distinct teal accent bar on the summary card so it's
+     never confused with the Bid tab's white/accent styling, even though they share
+     the same panel underneath. */
+  .card.total-card.quickprice-active::before { background: linear-gradient(90deg, #4ecdc4, transparent) !important; }
+  .card.total-card.quickprice-active .grand-value { color: #4ecdc4 !important; }
   .tab-btn:hover:not(.active) { color: var(--accent2); background: rgba(255,255,255,0.02); }
 
   .tab-pill {
@@ -318,12 +323,12 @@ onAuthStateChanged(auth, user => {
   .piece-row { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 0.75rem 0.9rem; display: flex; flex-direction: column; gap: 0.55rem; animation: slideIn 0.2s ease both; transition: border-color 0.15s; }
 
   /* ── Collapsed piece summary + expandable details ── */
-  .piece-summary { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; cursor: pointer; }
+  .piece-summary { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; cursor: pointer; border-radius: 7px; transition: background 0.15s; }
   .piece-summary-total { margin-left: auto; font-family: 'Bebas Neue', sans-serif; font-size: 1.05rem; color: var(--accent); white-space: nowrap; }
   .piece-expand-arrow { font-size: 0.65rem; color: var(--muted); transition: transform 0.2s; flex-shrink: 0; }
   .piece-expand-arrow.open { transform: rotate(90deg); }
-  .piece-details { overflow: hidden; max-height: 0; opacity: 0; transition: max-height 0.25s ease, opacity 0.2s; display: flex; flex-direction: column; gap: 0.5rem; }
-  .piece-details.open { max-height: 2000px; opacity: 1; margin-top: 0.5rem; }
+  .piece-details { overflow: hidden; max-height: 0; opacity: 0; transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s ease; display: flex; flex-direction: column; gap: 0.5rem; }
+  .piece-details.open { max-height: 1600px; opacity: 1; margin-top: 0.5rem; }
   .piece-menu-wrap { position: relative; flex-shrink: 0; }
   .piece-menu-btn { background: none; border: 1px solid var(--border); border-radius: 6px; color: var(--muted); cursor: pointer; width: 30px; height: 30px; font-size: 1rem; line-height: 1; }
   .piece-menu-btn:hover { border-color: rgba(255,255,255,0.3); color: var(--text); }
@@ -334,6 +339,7 @@ onAuthStateChanged(auth, user => {
   .piece-menu-item.danger:hover { background: rgba(224,80,80,0.12); color: #e05050; }
   .piece-info-icon { font-size: 0.85rem; color: var(--muted); cursor: help; }
   .piece-row:hover { border-color: rgba(255,255,255,0.15); }
+  .piece-summary:hover { background: rgba(255,255,255,0.045); }
   .piece-row-top { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
   .piece-row-bottom { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
   .edge-label { font-family: 'DM Mono', monospace; font-size: 0.65rem; color: var(--muted); letter-spacing: 0.08em; white-space: nowrap; }
@@ -1288,7 +1294,7 @@ onAuthStateChanged(auth, user => {
       </div>
 
       <!-- Total -->
-      <div class="card total-card">
+      <div class="card total-card" id="bidSummaryCard">
         <div class="card-label">Bid Summary</div>
         <div class="breakdown" id="breakdown"></div>
         <div style="display:flex;gap:0.75rem;margin-bottom:1rem;padding:0.75rem;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:8px;flex-wrap:wrap;align-items:flex-end;">
@@ -1511,6 +1517,8 @@ function switchTab(tab) {
   if (quickNote) quickNote.style.display = isQuickPrice ? '' : 'none';
   const headerResetBtn = document.getElementById('headerResetBtn');
   if (headerResetBtn) headerResetBtn.textContent = isQuickPrice ? '↺ CLEAR' : '↺ NEW BID';
+  const summaryCard = document.getElementById('bidSummaryCard');
+  if (summaryCard) summaryCard.classList.toggle('quickprice-active', isQuickPrice);
 
   if (tab === 'bid' || tab === 'quickprice') {
     const desiredContext = isQuickPrice ? 'quickprice' : 'bid';
@@ -4025,7 +4033,15 @@ function renderDashboard() {
 
   const list = document.getElementById('jobList');
   if (!filtered.length) {
-    list.innerHTML = '<div class="dash-empty"><div class="dash-empty-icon">📋</div>' + (q ? 'No jobs match "' + q + '".' : 'No jobs match this filter.') + '</div>';
+    let msg;
+    if (q) {
+      msg = `<div class="dash-empty-icon">🔍</div>No jobs match "${q}".`;
+    } else if (!allJobs.length) {
+      msg = `<div class="dash-empty-icon">📋</div><div style="font-weight:600;margin-bottom:0.3rem;">No jobs yet</div><div style="font-size:0.8rem;color:var(--muted);">Start a bid or check a quick price to see it show up here.</div>`;
+    } else {
+      msg = `<div class="dash-empty-icon">📋</div>No jobs match this filter.`;
+    }
+    list.innerHTML = `<div class="dash-empty">${msg}</div>`;
     return;
   }
 
