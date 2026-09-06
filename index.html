@@ -1106,7 +1106,7 @@ onAuthStateChanged(auth, user => {
       <h1>American Legacy <span>Glass</span></h1>
     </div>
     <div style="margin-left:auto;display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;">
-      <button onclick="resetBid()" style="background:none;border:1px solid var(--border);border-radius:8px;color:var(--muted);cursor:pointer;font-family:'DM Mono',monospace;font-size:0.72rem;letter-spacing:0.08em;padding:0.45rem 0.9rem;transition:all 0.15s;white-space:nowrap;" onmouseover="this.style.borderColor='var(--danger)';this.style.color='var(--danger)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">↺ NEW BID</button>
+      <button id="headerResetBtn" onclick="resetBid()" style="background:none;border:1px solid var(--border);border-radius:8px;color:var(--muted);cursor:pointer;font-family:'DM Mono',monospace;font-size:0.72rem;letter-spacing:0.08em;padding:0.45rem 0.9rem;transition:all 0.15s;white-space:nowrap;" onmouseover="this.style.borderColor='var(--danger)';this.style.color='var(--danger)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">↺ NEW BID</button>
       <button onclick="doLogout()" style="background:none;border:1px solid var(--border);border-radius:8px;color:var(--muted);cursor:pointer;font-family:'DM Mono',monospace;font-size:0.72rem;letter-spacing:0.08em;padding:0.45rem 0.9rem;transition:all 0.15s;white-space:nowrap;" onmouseover="this.style.borderColor='var(--danger)';this.style.color='var(--danger)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">⎋ Logout</button>
     </div>
   </header>
@@ -1426,7 +1426,9 @@ function dimDisplay(whole, frac) {
 }
 
 // ─────────────────────────────────────────────────
-// SHARED STATE
+// SHARED STATE — Bid and Quick Price reuse the exact same pricing engine
+// (pieces/hardware/labor/extras/etc) but each keeps its own independent data.
+// Switching tabs swaps which data is loaded into these live variables.
 // ─────────────────────────────────────────────────
 let pieces   = [];
 let hardware = [];
@@ -1437,6 +1439,56 @@ let payments = [];
 let invStatus = 'draft';
 let invTaxExemptActive = false;
 
+let activeDataContext = 'bid'; // 'bid' | 'quickprice'
+let bidState = null; // holds Bid tab's data while Quick Price is active
+let qpState  = null; // holds Quick Price tab's data while Bid is active
+
+function captureCurrentState() {
+  return {
+    pieces: pieces, hardware: hardware, labor: labor, extras: extras,
+    margin: document.getElementById('bidMargin')?.value || '',
+    surcharge: document.getElementById('bidSurcharge')?.value || '',
+    taxExempt: window.taxExemptActive || false,
+    depositRequired: depositRequired,
+    person: activePerson,
+  };
+}
+
+function applyState(state) {
+  pieces = state.pieces; hardware = state.hardware; labor = state.labor; extras = state.extras;
+  const marginEl = document.getElementById('bidMargin');
+  const surchargeEl = document.getElementById('bidSurcharge');
+  if (marginEl) marginEl.value = state.margin || '';
+  if (surchargeEl) surchargeEl.value = state.surcharge || '';
+
+  window.taxExemptActive = state.taxExempt || false;
+  const texBtn = document.getElementById('taxExemptBtn');
+  if (texBtn) {
+    texBtn.textContent = state.taxExempt ? '✓ Tax Exempt' : '○ Not Exempt';
+    texBtn.style.cssText = state.taxExempt
+      ? 'background:rgba(255,255,255,0.1);border:1px solid var(--accent);border-radius:8px;color:var(--accent);cursor:pointer;font-family:DM Mono,monospace;font-size:0.8rem;padding:0.6rem 0.85rem;text-align:left;'
+      : 'background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--muted);cursor:pointer;font-family:DM Mono,monospace;font-size:0.8rem;padding:0.6rem 0.85rem;text-align:left;';
+  }
+
+  depositRequired = state.depositRequired !== undefined ? state.depositRequired : true;
+  const depBtn = document.getElementById('depositToggleBtn');
+  const depLabel = document.getElementById('depositLabel');
+  if (depBtn && depLabel) {
+    if (depositRequired) {
+      depBtn.textContent = 'Deposit: ON';
+      depBtn.style.background='var(--surface2)'; depBtn.style.borderColor='var(--border)'; depBtn.style.color='var(--muted)';
+      depLabel.textContent = '50% deposit required';
+    } else {
+      depBtn.textContent = 'Deposit: OFF';
+      depBtn.style.background='rgba(122,184,232,0.15)'; depBtn.style.borderColor='#7ab8e8'; depBtn.style.color='#7ab8e8';
+      depLabel.textContent = 'No deposit required';
+    }
+  }
+
+  setActivePerson(state.person || 'chris');
+  renderPieces(); renderHardware(); renderLabor(); renderExtras();
+}
+
 function uid() { return Math.random().toString(36).slice(2,7); }
 function fmt(n) { const safe = isNaN(n) ? 0 : n; return '$' + safe.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
 
@@ -1445,8 +1497,8 @@ function fmt(n) { const safe = isNaN(n) ? 0 : n; return '$' + safe.toFixed(2).re
 // ─────────────────────────────────────────────────
 function switchTab(tab) {
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
-  // Quick Price shares the same underlying bid panel/data — it's a stripped-down
-  // view of it (no customer info, no save/PDF), not a separate set of pieces.
+  // Quick Price reuses the same underlying panel/pricing engine as Bid, but keeps
+  // fully independent data — switching between them swaps which set is loaded in.
   const targetPanelId = (tab === 'quickprice') ? 'tab-bid' : 'tab-' + tab;
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === targetPanelId));
 
@@ -1457,8 +1509,34 @@ function switchTab(tab) {
   if (jobInfoCard) jobInfoCard.style.display = isQuickPrice ? 'none' : '';
   if (saveActions) saveActions.style.display = isQuickPrice ? 'none' : '';
   if (quickNote) quickNote.style.display = isQuickPrice ? '' : 'none';
+  const headerResetBtn = document.getElementById('headerResetBtn');
+  if (headerResetBtn) headerResetBtn.textContent = isQuickPrice ? '↺ CLEAR' : '↺ NEW BID';
 
   if (tab === 'bid' || tab === 'quickprice') {
+    const desiredContext = isQuickPrice ? 'quickprice' : 'bid';
+    if (desiredContext !== activeDataContext) {
+      // Save whatever we're leaving, load whatever we're entering
+      const captured = captureCurrentState();
+      if (activeDataContext === 'bid') bidState = captured; else qpState = captured;
+      const incoming = desiredContext === 'bid' ? bidState : qpState;
+      if (incoming) {
+        applyState(incoming);
+      } else {
+        // First time entering this context — start completely clean
+        pieces = []; hardware = []; labor = []; extras = [];
+        const marginEl = document.getElementById('bidMargin'); if (marginEl) marginEl.value = '';
+        const surchargeEl = document.getElementById('bidSurcharge'); if (surchargeEl) surchargeEl.value = '';
+        window.taxExemptActive = false;
+        const texBtn = document.getElementById('taxExemptBtn');
+        if (texBtn) { texBtn.textContent = '○ Not Exempt'; texBtn.style.cssText='background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--muted);cursor:pointer;font-family:DM Mono,monospace;font-size:0.8rem;padding:0.6rem 0.85rem;text-align:left;'; }
+        depositRequired = true;
+        const depBtn = document.getElementById('depositToggleBtn');
+        const depLabel = document.getElementById('depositLabel');
+        if (depBtn && depLabel) { depBtn.textContent='Deposit: ON'; depBtn.style.background='var(--surface2)'; depBtn.style.borderColor='var(--border)'; depBtn.style.color='var(--muted)'; depLabel.textContent='50% deposit required'; }
+        renderPieces(); renderHardware(); renderLabor(); renderExtras();
+      }
+      activeDataContext = desiredContext;
+    }
     // Always keep at least one empty, ready-to-type piece row present — never make
     // someone click "+ Add Piece" just to see the first set of dimension inputs.
     if (pieces.length === 0) addPiece();
@@ -2205,7 +2283,7 @@ function renderPieces() {
           ${p.fabrications && Object.keys(p.fabrications).length ? `<span class="fab-total-badge">${Object.keys(p.fabrications).length} selected · ${fmt(getPieceFabTotal(p))}</span>` : ''}
         </div>
         <div class="fab-panel ${(p.fabrications&&Object.keys(p.fabrications).length)?'open':''}">
-          ${FABRICATION_TYPES.map(g => {
+          ${FABRICATION_TYPES.filter(g => p.glassCategory === 'insulated' ? g.insulated : !g.insulated).map(g => {
             const isSpecial = g.group === 'Special Fabrication';
             const isInsulated = g.insulated;
             const sqft = (getPieceW(p) * getPieceH(p)) / 144 * (p.qty || 1);
@@ -2746,13 +2824,28 @@ function updateDueFromTerms() {
 // RESET
 // ─────────────────────────────────────────────────
 function resetBid() {
-  if (!confirm('Start a new bid? This will clear everything.')) return;
+  // This button is shared between the Bid and Quick Price tabs (they use the same
+  // panel/engine), so it clears whichever one is currently active — never the other.
+  const isQP = activeDataContext === 'quickprice';
+  const confirmMsg = isQP ? 'Clear the Quick Price calculator? This will remove all pieces.' : 'Start a new bid? This will clear everything.';
+  if (!confirm(confirmMsg)) return;
+
   pieces=[]; hardware=[]; labor=[]; extras=[];
-  currentJobId = null; window._currentJobType = null;
-  ['customerName','customerPhone','customerEmail','jobDesc','jobLocation','pricePerSqft','glassThickness','glassType','bidNotes','bidMargin','bidSurcharge'].forEach(id => {
-    const el=document.getElementById(id); if(el) el.value='';
-  });
-  document.getElementById('bidDate').valueAsDate = new Date();
+  // Forget the saved snapshot for whichever context we just cleared, so switching
+  // tabs and back doesn't silently bring the old data back.
+  if (isQP) qpState = null; else bidState = null;
+
+  if (!isQP) {
+    currentJobId = null; window._currentJobType = null;
+    ['customerName','customerPhone','customerEmail','jobDesc','jobLocation','pricePerSqft','glassThickness','glassType','bidNotes'].forEach(id => {
+      const el=document.getElementById(id); if(el) el.value='';
+    });
+    document.getElementById('bidDate').valueAsDate = new Date();
+    document.getElementById('bidSaveStatus').textContent = '💾 Save this bid to the dashboard';
+  }
+
+  const marginEl = document.getElementById('bidMargin'); if (marginEl) marginEl.value='';
+  const surchargeEl = document.getElementById('bidSurcharge'); if (surchargeEl) surchargeEl.value='';
   window.taxExemptActive = false;
   document.getElementById('taxExemptBtn').textContent = '○ Not Exempt';
   document.getElementById('taxExemptBtn').style.cssText='background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--muted);cursor:pointer;font-family:DM Mono,monospace;font-size:0.8rem;padding:0.6rem 0.85rem;text-align:left;';
@@ -2764,7 +2857,6 @@ function resetBid() {
     depBtn.style.background='var(--surface2)'; depBtn.style.borderColor='var(--border)'; depBtn.style.color='var(--muted)';
     depLabel.textContent = '50% deposit required';
   }
-  document.getElementById('bidSaveStatus').textContent = '💾 Save this bid to the dashboard';
   renderHardware(); renderLabor(); renderExtras();
   addPiece(); calculate();
 }
@@ -4024,6 +4116,10 @@ function openJob(id) {
     pieces.forEach((p, i) => { if (!p.glassCategory) p.glassCategory = ''; if (!p.glassTreatment) p.glassTreatment = ''; if (!p.glassTypeName) p.glassTypeName = ''; if (!p.glassAddons) p.glassAddons = []; });
     renderPieces(); renderHardware(); renderLabor(); renderExtras(); calculate();
     document.getElementById('bidSaveStatus').textContent = '✓ Loaded — click to update';
+    // We just manually loaded this job's data into the live state — mark the context
+    // as already 'bid' so switchTab doesn't try to swap in old bidState over it.
+    activeDataContext = 'bid';
+    bidState = null;
     switchTab('bid');
   } else {
     // The Invoice tab has been removed — invoicing is now handled directly in Zoho.
