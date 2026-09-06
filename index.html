@@ -1101,7 +1101,7 @@ onAuthStateChanged(auth, user => {
     <button class="tab-btn" data-tab="dashboard" onclick="switchTab('dashboard')">🏠 Dashboard</button>
 
     <button class="tab-btn active" data-tab="bid" onclick="switchTab('bid')">📋 Bid Estimate</button>
-    <button class="tab-btn" data-tab="invoice" onclick="switchTab('invoice')">🧾 Invoice</button>
+
     <button class="tab-btn" data-tab="customers" onclick="switchTab('customers')">👤 Customers</button>
   </div>
 
@@ -1159,7 +1159,7 @@ onAuthStateChanged(auth, user => {
           <div class="field" style="flex:1;min-width:180px;margin-bottom:0;position:relative;">
             <label>Customer Name</label>
             <div style="display:flex;gap:0.5rem;align-items:center;">
-              <input type="text" id="customerName" placeholder="e.g. John Smith" oninput="syncJobInfo()" style="flex:1;">
+              <input type="text" id="customerName" placeholder="e.g. John Smith" style="flex:1;">
               <button class="btn-autofill" onclick="toggleCustPicker()">+ Customer</button>
             </div>
             <div class="cust-picker" id="custPicker" style="display:none;"></div>
@@ -1174,11 +1174,11 @@ onAuthStateChanged(auth, user => {
           </div>
           <div class="field" style="flex:1;min-width:180px;margin-bottom:0;">
             <label>Job Description</label>
-            <input type="text" id="jobDesc" placeholder="e.g. Shower enclosure" oninput="syncJobInfo()">
+            <input type="text" id="jobDesc" placeholder="e.g. Shower enclosure">
           </div>
           <div class="field" style="flex:1;min-width:200px;margin-bottom:0;">
             <label>Job Location</label>
-            <input type="text" id="jobLocation" placeholder="e.g. 123 Main St, Phoenix AZ" oninput="syncJobInfo()">
+            <input type="text" id="jobLocation" placeholder="e.g. 123 Main St, Phoenix AZ">
           </div>
           <div class="field" style="width:160px;margin-bottom:0;">
             <label>Date</label>
@@ -1299,170 +1299,6 @@ onAuthStateChanged(auth, user => {
 
   
   <!-- INVOICE TAB --><!-- INVOICE TAB -->
-  <div class="tab-panel" id="tab-invoice">
-    <div class="grid">
-
-      <!-- Import from bid -->
-      <div class="card full invoice-accent" style="padding:1rem 1.25rem;">
-        <div class="card-label">Quick Import</div>
-        <div class="import-bar">
-          <div class="import-bar-text">Import line items from your current Bid Estimate <span>— populates items, customer & totals automatically</span></div>
-          <button class="btn-import" onclick="importFromBid()">⬆ Import from Bid</button>
-        </div>
-        <!-- Status & Invoice # row -->
-        <div style="display:flex;gap:1rem;flex-wrap:wrap;align-items:flex-end;">
-          <div style="flex:1;min-width:160px;">
-            <label>Invoice #</label>
-            <input type="text" id="invNumber" placeholder="INV-0001">
-          </div>
-          <div style="flex:1;min-width:160px;">
-            <label>Invoice Date</label>
-            <input type="date" id="invDate">
-          </div>
-          <div style="flex:1;min-width:160px;">
-            <label>Due Date</label>
-            <input type="date" id="invDueDate">
-          </div>
-          <div style="flex:1;min-width:140px;">
-            <label>Payment Terms</label>
-            <select class="terms-select" id="invTerms" onchange="updateDueFromTerms()">
-              <option value="custom">Custom Date</option>
-              <option value="completed">When Completed</option>
-              <option value="0">Due on Receipt</option>
-              <option value="15">Net 15</option>
-              <option value="30" selected>Net 30</option>
-              <option value="60">Net 60</option>
-            </select>
-          </div>
-        </div>
-      </div>
-
-      <!-- Customer / Bill To -->
-      <div class="card invoice-accent">
-        <div class="card-label">Bill To</div>
-        <div class="field">
-          <label>Customer Name</label>
-          <input type="text" id="invCustomer" placeholder="e.g. John Smith">
-        </div>
-        <div class="field">
-          <label>Company (optional)</label>
-          <input type="text" id="invCompany" placeholder="e.g. Smith Renovations LLC">
-        </div>
-        <div class="field">
-          <label>Address</label>
-          <input type="text" id="invAddress" placeholder="Street address">
-        </div>
-        <div class="field">
-          <label>City, State, ZIP</label>
-          <input type="text" id="invCityState" placeholder="Phoenix, AZ 85001">
-        </div>
-        <div class="field">
-          <label>Phone</label>
-          <input type="text" id="invContact" placeholder="(602) 555-0000">
-        </div>
-        <div class="field" style="margin-bottom:0;">
-          <label>Email</label>
-          <input type="text" id="invEmail" placeholder="e.g. john@email.com">
-        </div>
-      </div>
-
-      <!-- Job Info (invoice side) -->
-      <div class="card invoice-accent">
-        <div class="card-label">Job Details</div>
-        <div class="field">
-          <label>Job Description</label>
-          <input type="text" id="invJobDesc" placeholder="e.g. Shower enclosure — master bath">
-        </div>
-        <div class="field">
-          <label>Job Address (if different)</label>
-          <input type="text" id="invJobAddress" placeholder="e.g. 123 Main St, Scottsdale AZ">
-        </div>
-        <div class="field">
-          <label>Purchase Order # (optional)</label>
-          <input type="text" id="invPO" placeholder="PO-XXXX">
-        </div>
-        <div class="field">
-          <label>Invoice Status</label>
-          <div class="status-bar" style="margin-top:0.25rem;">
-            <div class="status-badge active-status" data-status="draft" onclick="setInvStatus('draft')"><div class="status-dot"></div>Draft</div>
-            <div class="status-badge" data-status="sent" onclick="setInvStatus('sent')"><div class="status-dot"></div>Sent</div>
-            <div class="status-badge" data-status="paid" onclick="setInvStatus('paid')"><div class="status-dot"></div>Paid</div>
-            <div class="status-badge" data-status="overdue" onclick="setInvStatus('overdue')"><div class="status-dot"></div>Overdue</div>
-          </div>
-        </div>
-        <div class="field" style="margin-bottom:0;">
-          <label>Tax Exempt</label>
-          <button id="invTaxExemptBtn" onclick="toggleInvTaxExempt()" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--muted);cursor:pointer;font-family:'DM Mono',monospace;font-size:0.8rem;padding:0.6rem 0.85rem;text-align:left;transition:all 0.2s;">○ Not Exempt</button>
-        </div>
-      </div>
-
-      <!-- Line Items -->
-      <div class="card full invoice-accent">
-        <div class="card-label">Line Items</div>
-        <div class="inv-col-header">
-          <span>Description</span><span>Qty</span><span>Unit Price</span><span>Total</span><span></span>
-        </div>
-        <div class="inv-items-list" id="invItemsList"></div>
-        <button class="btn-add invoice-btn" onclick="addInvItem()">+ Add Line Item</button>
-      </div>
-
-      <!-- Payments Received -->
-      <div class="card invoice-accent">
-        <div class="card-label">Payments Received</div>
-        <div id="paymentsList"></div>
-        <button class="btn-add invoice-btn" onclick="addPayment()">+ Record Payment</button>
-        <div class="balance-block" id="balanceBlock">
-          <div>
-            <div class="balance-label">Balance Due</div>
-            <div style="font-family:'DM Mono',monospace;font-size:0.72rem;color:var(--muted);" id="balanceSub">After payments</div>
-          </div>
-          <div class="balance-value" id="balanceDue">$0.00</div>
-        </div>
-      </div>
-
-      <!-- Invoice Notes / Terms -->
-      <div class="card invoice-accent">
-        <div class="card-label">Notes & Terms</div>
-        <div class="field">
-          <label>Invoice Notes</label>
-          <textarea id="invNotes" placeholder="e.g. Thank you for your business! All work guaranteed for 1 year." style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:0.9rem;padding:0.65rem 0.85rem;outline:none;resize:vertical;min-height:80px;transition:border-color 0.2s;" onfocus="this.style.borderColor='var(--invoice-accent)'" onblur="this.style.borderColor='var(--border)'"></textarea>
-        </div>
-        <div class="field" style="margin-bottom:0;">
-          <label>Payment Instructions</label>
-          <textarea id="invPayInstructions" placeholder="e.g. Make checks payable to American Legacy Glass. Venmo: @amlegacyglass. Card accepted." style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:0.9rem;padding:0.65rem 0.85rem;outline:none;resize:vertical;min-height:70px;transition:border-color 0.2s;" onfocus="this.style.borderColor='var(--invoice-accent)'" onblur="this.style.borderColor='var(--border)'"></textarea>
-        </div>
-      </div>
-
-      <!-- Invoice Total -->
-      <div class="card invoice-total-card" style="position:relative;">
-        <div class="card-label" style="color:var(--invoice-accent);">Invoice Summary</div>
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:8px;padding:0.6rem 0.85rem;">
-          <div>
-            <div style="font-family:'DM Mono',monospace;font-size:0.72rem;color:var(--muted);letter-spacing:0.08em;">PAYMENT METHOD</div>
-            <div id="cardFeeLabel" style="font-family:'DM Mono',monospace;font-size:0.75rem;color:var(--muted);margin-top:0.15rem;">No processing fee</div>
-          </div>
-          <button id="cardToggleBtn" onclick="toggleCardFee()" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--muted);cursor:pointer;font-family:'Bebas Neue',sans-serif;font-size:0.95rem;letter-spacing:0.1em;padding:0.45rem 0.9rem;transition:all 0.2s;white-space:nowrap;">💳 Card Payment</button>
-        </div>
-        <div class="breakdown" id="invBreakdown"></div>
-        <div class="grand-total">
-          <div class="grand-label">Invoice Total</div>
-          <div class="grand-value invoice" id="invGrandTotal">$0.00</div>
-        </div>
-        <button class="btn-print invoice" onclick="saveInvoicePDF()">⬇ Save Invoice as PDF</button>
-        <div class="save-bar" style="margin-top:0.75rem;margin-bottom:0;border-color:rgba(232,194,122,0.2);background:rgba(232,194,122,0.04);">
-          <div class="save-bar-text" style="color:var(--invoice-accent);" id="invSaveStatus">💾 Save this invoice to the dashboard</div>
-          <button class="btn-save-job" id="btnSaveInv" onclick="saveJobToFirebase('invoice')" style="background:var(--invoice-accent);color:#1a1000;">Save Invoice</button>
-        </div>
-        <button id="btnPushZoho" onclick="pushToZoho()" style="margin-top:0.75rem;width:100%;background:rgba(232,194,122,0.12);border:1px solid rgba(232,194,122,0.4);border-radius:8px;color:var(--invoice-accent);cursor:pointer;font-family:'Bebas Neue',sans-serif;font-size:1.05rem;letter-spacing:0.1em;padding:0.7rem;transition:all 0.2s;display:flex;align-items:center;justify-content:center;gap:0.5rem;">
-          <span>⬆</span><span id="zohoBtn Text">Push to Zoho Books</span>
-        </button>
-        <div id="zohoStatus" style="display:none;margin-top:0.5rem;font-family:'DM Mono',monospace;font-size:0.72rem;text-align:center;padding:0.5rem;border-radius:6px;"></div>
-      </div>
-
-    </div>
-  </div>
-
-  <!-- CUSTOMERS TAB -->
   <div class="tab-panel" id="tab-customers">
     <div class="grid">
 
@@ -1512,6 +1348,7 @@ onAuthStateChanged(auth, user => {
     </div>
   </div>
 
+  </div><!-- end .container -->
 </div><!-- end appContainer -->
 
 <script>
@@ -1580,7 +1417,6 @@ function fmt(n) { const safe = isNaN(n) ? 0 : n; return '$' + safe.toFixed(2).re
 function switchTab(tab) {
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === 'tab-' + tab));
-  if (tab === 'invoice') calcInvoice();
   if (tab === 'bid') calculate();
 }
 window.switchTab = switchTab;
@@ -1588,22 +1424,6 @@ window.switchTab = switchTab;
 // ─────────────────────────────────────────────────
 // SYNC JOB INFO → INVOICE
 // ─────────────────────────────────────────────────
-function syncJobInfo() {
-  const name  = document.getElementById('customerName').value;
-  const desc  = document.getElementById('jobDesc').value;
-  const loc   = document.getElementById('jobLocation').value;
-  const phone = document.getElementById('customerPhone').value;
-  const email = document.getElementById('customerEmail').value;
-  if (!document.getElementById('invCustomer').value)    document.getElementById('invCustomer').value    = name;
-  if (!document.getElementById('invJobDesc').value)     document.getElementById('invJobDesc').value     = desc;
-  if (!document.getElementById('invJobAddress').value)  document.getElementById('invJobAddress').value  = loc;
-  if (!document.getElementById('invAddress').value)     document.getElementById('invAddress').value     = loc;
-  if (!document.getElementById('invContact').value && phone)
-    document.getElementById('invContact').value = phone;
-  if (!document.getElementById('invEmail').value && email)
-    document.getElementById('invEmail').value = email;
-}
-
 // ─────────────────────────────────────────────────
 // BID — PIECES
 // ─────────────────────────────────────────────────
@@ -1688,6 +1508,16 @@ function onEdgeSelect(i, selectEl) {
 // thin = 1/8"–1/4", mid = 3/8", thick = 1/2"
 // ─────────────────────────────────────────────────
 const FABRICATION_TYPES = [
+  { group: 'Holes',
+    items: [
+      { name: 'Hole Up To 1"',   thin: 4.75,  mid: 5.64,  thick: 6.53  },
+      { name: 'Hole Up To 2"',   thin: 10.40, mid: 16.04, thick: 21.68 },
+      { name: 'Hole Up To 3"',   thin: 12.77, mid: 18.41, thick: 24.06 },
+      { name: 'Hole Up To 4"',   thin: 15.15, mid: 20.79, thick: 26.43 },
+      { name: 'Hole Over 4"',    thin: 29.70, mid: 59.40, thick: 89.10 },
+      { name: 'Counter Sink Add',thin: 10.69, mid: 13.07, thick: 15.44 },
+    ]
+  },
   { group: 'Fabrication',
     items: [
       { name: 'Triangles, Octagons, Parallelograms (PMC 7–40)', thin: 7.72,  mid: 11.88, thick: 16.04 },
@@ -3767,17 +3597,6 @@ function fillBidFromCustomer(id) {
   document.getElementById('customerPhone').value = c.phone   || '';
   document.getElementById('customerEmail').value = c.email   || '';
   document.getElementById('jobLocation').value   = c.address || '';
-  // Also sync to invoice side if empty
-  syncJobInfo();
-  // Sync company and address to invoice Bill To if empty
-  if (c.company && !document.getElementById('invCompany').value)
-    document.getElementById('invCompany').value = c.company;
-  if (c.address && !document.getElementById('invAddress').value)
-    document.getElementById('invAddress').value = c.address;
-  if (c.email && !document.getElementById('invEmail').value)
-    document.getElementById('invEmail').value = c.email;
-  if (c.phone && !document.getElementById('invContact').value)
-    document.getElementById('invContact').value = c.phone;
   closeCustPicker();
   switchTab('bid');
   showToast('✓ Customer loaded!');
@@ -4093,35 +3912,11 @@ function openJob(id) {
     document.getElementById('bidSaveStatus').textContent = '✓ Loaded — click to update';
     switchTab('bid');
   } else {
-    // Restore invoice state
-    invItems  = job.invItems  || [];
-    payments  = job.payments  || [];
-    invStatus = job.status    || 'draft';
-    invTaxExemptActive = job.taxExempt || false;
-    const iBtn = document.getElementById('invTaxExemptBtn');
-    iBtn.textContent = job.taxExempt ? '✓ Tax Exempt' : '○ Not Exempt';
-    cardFeeActive = job.cardFeeActive || false;
-    const cardBtn = document.getElementById('cardToggleBtn');
-    const cardLabel = document.getElementById('cardFeeLabel');
-    if (cardBtn && cardLabel) {
-      if (cardFeeActive) {
-        cardBtn.style.background = 'rgba(232,194,122,0.15)'; cardBtn.style.borderColor = 'var(--invoice-accent)'; cardBtn.style.color = 'var(--invoice-accent)';
-        cardLabel.textContent = '3% processing fee added'; cardLabel.style.color = 'var(--invoice-accent)';
-      } else {
-        cardBtn.style.background = 'var(--surface2)'; cardBtn.style.borderColor = 'var(--border)'; cardBtn.style.color = 'var(--muted)';
-        cardLabel.textContent = 'No processing fee'; cardLabel.style.color = 'var(--muted)';
-      }
-    }
-    const fields = {invCustomer:'customer',invJobDesc:'jobDesc',invJobAddress:'location',invNotes:'notes',invNumber:'invNumber',invEmail:'invEmail',invContact:'invPhone'};
-    Object.entries(fields).forEach(([elId, key]) => {
-      const el = document.getElementById(elId); if(el) el.value = job[key]||'';
-    });
-    if (job.date)    document.getElementById('invDate').value    = job.date;
-    if (job.dueDate) document.getElementById('invDueDate').value = job.dueDate;
-    setInvStatus(invStatus);
-    renderInvItems(); renderPayments(); calcInvoice();
-    document.getElementById('invSaveStatus').textContent = '✓ Loaded — click to update';
-    switchTab('invoice');
+    // The Invoice tab has been removed — invoicing is now handled directly in Zoho.
+    // Old saved invoice records still show on the dashboard for history, but there's
+    // no in-app view to open them into anymore.
+    showToast('This is an old invoice record — invoices are now created in Zoho Books', 'error');
+    return;
   }
   showToast('✓ Job loaded!');
 }
@@ -4180,14 +3975,7 @@ setTimeout(() => { if (window.loadJobs && window._db) window.loadJobs(); }, 1000
 
 // ─────────────────────────────────────────────────
 calculate();
-calcInvoice();
 document.getElementById('bidDate').valueAsDate  = new Date();
-document.getElementById('invDate').valueAsDate  = new Date();
-(function(){
-  const d=new Date(); d.setDate(d.getDate()+30);
-  document.getElementById('invDueDate').valueAsDate=d;
-})();
-document.getElementById('invNumber').value = 'INV-' + String(Math.floor(Math.random()*9000)+1000);
 
 // Event delegation for fabrication buttons (avoids string escaping issues)
 document.getElementById('piecesList').addEventListener('click', function(e) {
