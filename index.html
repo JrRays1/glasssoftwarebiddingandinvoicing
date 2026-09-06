@@ -2894,6 +2894,8 @@ function pdfHeader(doc, title, subtitle, date) {
   doc.setTextColor(160,160,160);
   doc.text(subtitle, 100, 52);
   doc.text(date, pageW-50, 52, {align:'right'});
+  doc.setFontSize(7.5);
+  doc.text('Licensed  •  Bonded  •  Insured    ROC: 365507', 100, 66);
   return 90;
 }
 
@@ -3067,7 +3069,7 @@ function saveBidPDF() {
     doc.line(M, y+8, R, y+8);
     y+=18;
     doc.setFontSize(8);doc.setFont('helvetica','normal');gray(100);
-    const acceptText = 'By signing below, I authorize American Legacy Glass to proceed with the work described in this estimate at the price quoted. I understand that a 50% deposit is required before work begins.';
+    const acceptText = 'By signing below, I authorize American Legacy Glass to proceed with the work described in this estimate at the price quoted.' + (depositRequired ? ' I understand that a 50% deposit is required before work begins.' : '');
     const acceptLines = doc.splitTextToSize(acceptText, R-M);
     doc.text(acceptLines, M, y);
     y+=acceptLines.length*11+14;
