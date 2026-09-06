@@ -3085,7 +3085,9 @@ function saveBidPDF() {
     doc.line(col1X, y, col1X+lineW, y);
     doc.setFontSize(7);doc.setFont('helvetica','normal');gray(130);
     doc.text('Printed Name', col1X, y+10);
-    doc.line(col2X, y, col2X+lineW, y);
+    doc.setFontSize(9);doc.setFont('helvetica','bold');gray(30);
+    doc.text('Chris Couto', col2X, y-3);
+    doc.setFontSize(7);doc.setFont('helvetica','normal');gray(130);
     doc.text('American Legacy Glass Representative', col2X, y+10);
     y+=30;
     doc.setFontSize(7.5);doc.setFont('helvetica','normal');gray(170);
