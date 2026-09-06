@@ -1172,6 +1172,7 @@ onAuthStateChanged(auth, user => {
       <input type="text" id="dashSearch" placeholder="Search customer or job…" oninput="renderDashboard()"
         style="margin-left:auto;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:0.82rem;padding:0.32rem 0.75rem;outline:none;transition:border-color 0.2s;width:200px;"
         onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'">
+      <button onclick="exportAllData()" title="Download every job and customer as a backup file" style="background:none;border:1px solid var(--border);border-radius:6px;color:var(--muted);cursor:pointer;font-family:'DM Mono',monospace;font-size:0.72rem;padding:0.32rem 0.7rem;white-space:nowrap;">⬇ Backup</button>
     </div>
 
     <!-- Job list -->
@@ -1509,7 +1510,31 @@ function fmt(n) { const safe = isNaN(n) ? 0 : n; return '$' + safe.toFixed(2).re
 // ─────────────────────────────────────────────────
 // TAB SWITCHING
 // ─────────────────────────────────────────────────
+let _lastSavedBidSnapshot = null;
+
+function bidSnapshotForCompare() {
+  const s = getBidSnapshot();
+  delete s.savedAt; // always differs by design — excluded so it doesn't trigger a false "unsaved" warning
+  return JSON.stringify(s);
+}
+
 function switchTab(tab) {
+  // Warn before leaving an in-progress bid with real, unsaved changes — but only when
+  // actually navigating away from Bid (to Dashboard/Customers), not when swapping into
+  // Quick Price, which just parks the same data and comes right back untouched.
+  if (activeDataContext === 'bid' && tab !== 'bid' && tab !== 'quickprice') {
+    const hasContent = pieces.some(p => getPieceW(p) && getPieceH(p));
+    if (hasContent) {
+      const current = bidSnapshotForCompare();
+      if (_lastSavedBidSnapshot !== null && current !== _lastSavedBidSnapshot) {
+        if (!confirm('You have unsaved changes on this bid. Leave without saving?')) return;
+      } else if (_lastSavedBidSnapshot === null) {
+        // Never saved at all, but has real content typed in
+        if (!confirm('This bid hasn\'t been saved yet. Leave without saving?')) return;
+      }
+    }
+  }
+
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
   // Quick Price reuses the same underlying panel/pricing engine as Bid, but keeps
   // fully independent data — switching between them swaps which set is loaded in.
@@ -2514,6 +2539,7 @@ function calculate() {
     <div class="line-item total-glass" style="margin-top:0.25rem;border-top:1px solid rgba(255,255,255,0.08);padding-top:0.4rem;">
       <span>Glass Total</span><span>${fmt(glassTotal * mkup)}</span>
     </div>
+    ${!taxExempt ? `<div style="font-size:0.68rem;color:var(--muted);font-style:italic;margin:-0.1rem 0 0.3rem 0;">Includes ${fmt(taxAmt)} (9.1% AZ MRRA tax) built into pricing — not charged separately per AZ MRRA</div>` : ''}
     ${edgeLines}
     <div class="line-item"><span>Hardware</span><span>${fmt(hwTotal * hwMkup)}</span></div>
     ${fabTotal > 0 ? `<div class="line-item"><span>Fabrication</span><span>${fmt(fabTotal * mkup)}</span></div>` : ''}
@@ -2875,6 +2901,7 @@ function resetBid() {
   }
   renderHardware(); renderLabor(); renderExtras();
   addPiece(); calculate();
+  if (!isQP) _lastSavedBidSnapshot = bidSnapshotForCompare(); // fresh reset counts as a clean baseline
 }
 
 // ─────────────────────────────────────────────────
@@ -2967,19 +2994,43 @@ function saveBidPDF() {
     function gray(v){doc.setTextColor(v,v,v);}
     function drawColor(v){doc.setDrawColor(v,v,v);}
     function fillColor(v){doc.setFillColor(v,v,v);}
+    const pageH = doc.internal.pageSize.getHeight();
+    const BOTTOM_MARGIN = 90; // leaves room for the footer stamp on every page
+    // If the next chunk of content would run past the bottom margin, start a fresh
+    // page instead of letting it clip or spill awkwardly — keeps every page clean.
+    function checkPageBreak(neededHeight){
+      neededHeight = neededHeight || 20;
+      if (y + neededHeight > pageH - BOTTOM_MARGIN) {
+        doc.addPage();
+        y = 50;
+      }
+    }
     function sectionLabel(text){
+      checkPageBreak(30);
       doc.setFontSize(7);doc.setFont('helvetica','bold');gray(130);
       doc.text(text.toUpperCase(),M,y);
       drawColor(200);doc.setLineWidth(0.5);doc.line(M,y+3,R,y+3);y+=16;
     }
     function row(left,right,size,weight){
       size=size||10;weight=weight||'normal';
+      checkPageBreak(size*1.8+6);
       doc.setFontSize(size);doc.setFont('helvetica',weight);
       gray(80);doc.text(left,M,y);
       gray(20);doc.setFont('helvetica',weight);doc.text(right,R,y,{align:'right'});
       y+=size*1.8;
     }
     function divider(){drawColor(180);doc.setLineWidth(0.75);doc.line(M,y,R,y);y+=14;}
+    // Stamps a simple footer with the page number on every page — run once at the
+    // very end, after all content (including any additional pages) has been drawn.
+    function addFooterToAllPages(){
+      const pageCount = doc.internal.getNumberOfPages();
+      for (let i=1;i<=pageCount;i++){
+        doc.setPage(i);
+        doc.setFontSize(7);doc.setFont('helvetica','normal');gray(160);
+        doc.text('American Legacy Glass', M, pageH-30);
+        doc.text('Page '+i+' of '+pageCount, R, pageH-30, {align:'right'});
+      }
+    }
 
     sectionLabel('Glass & Fabrication');
     pieces.filter(p=>getPieceW(p)&&getPieceH(p)).forEach(p=>{
@@ -3074,6 +3125,7 @@ function saveBidPDF() {
     // 102 covers the label, divider, gaps, and both signature/printed-name rows; the rest
     // scales with however many lines the acceptance and payment paragraphs actually take.
     const boxContentH = 102 + acceptLines.length*11 + paymentLines.length*11;
+    checkPageBreak(boxContentH + 20); // keep the whole acceptance/signature block on one page
     doc.setFillColor(250,250,250);
     doc.setDrawColor(210,210,210);
     doc.setLineWidth(0.5);
@@ -3114,6 +3166,7 @@ function saveBidPDF() {
     y+=30;
     doc.setFontSize(7.5);doc.setFont('helvetica','normal');gray(170);
     doc.text('American Legacy Glass  •  americanlegacyglass.com  •  Serving Arizona Since 1988',pageW/2,y,{align:'center'});
+    addFooterToAllPages();
     const blob=doc.output('blob');
     window.open(URL.createObjectURL(blob),'_blank');
   } catch(err){alert('PDF error: '+err.message);}
@@ -4006,8 +4059,15 @@ async function saveJobToFirebase(type) {
       currentJobId = ref.id;
       window._currentJobType = type;
       showToast('✓ Job saved to dashboard!');
+      // A brand-new bid was just saved — return focus to the customer name field so
+      // the next bid can start right away without clicking back into the form.
+      if (type === 'bid') {
+        const nameField = document.getElementById('customerName');
+        if (nameField) nameField.focus();
+      }
     }
     statusEl.textContent = '✓ Saved — ' + new Date().toLocaleTimeString();
+    if (type === 'bid') _lastSavedBidSnapshot = JSON.stringify({...data, savedAt: undefined});
     await loadJobs();
   } catch(e) {
     showToast('Save failed: ' + e.message, 'error');
@@ -4035,6 +4095,30 @@ window.loadJobs = async function() {
     console.error('Load error:', e);
   }
 };
+
+async function exportAllData() {
+  const db = window._db;
+  if (!db) { showToast('Firebase not ready', 'error'); return; }
+  try {
+    showToast('Preparing backup…');
+    const jobsSnap = await window._getDocs(window._collection(db, 'jobs'));
+    const customersSnap = await window._getDocs(window._collection(db, 'customers'));
+    const backup = {
+      exportedAt: new Date().toISOString(),
+      jobs: jobsSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+      customers: customersSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+    };
+    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+    const link = document.createElement('a');
+    link.download = 'alg-backup-' + new Date().toISOString().split('T')[0] + '.json';
+    link.href = URL.createObjectURL(blob);
+    link.click();
+    showToast('✓ Backup downloaded — ' + backup.jobs.length + ' jobs, ' + backup.customers.length + ' customers');
+  } catch (err) {
+    console.error('Backup failed:', err);
+    showToast('Backup failed — try again', 'error');
+  }
+}
 
 function renderDashboard() {
   const bids        = allJobs.filter(j => j.type === 'bid');
@@ -4167,6 +4251,7 @@ function openJob(id) {
     // as already 'bid' so switchTab doesn't try to swap in old bidState over it.
     activeDataContext = 'bid';
     bidState = null;
+    _lastSavedBidSnapshot = bidSnapshotForCompare(); // freshly loaded from the dashboard — nothing "unsaved" yet
     switchTab('bid');
   } else {
     // The Invoice tab has been removed — invoicing is now handled directly in Zoho.
