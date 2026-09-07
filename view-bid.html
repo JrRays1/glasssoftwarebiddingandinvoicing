@@ -6,8 +6,7 @@
 <title>American Legacy Glass — Bid Approval</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Bebas+Neue&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
-<!-- EmailJS — sends the acceptance notification email from the browser, no backend needed -->
-<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+<!-- Web3Forms sends the acceptance notification email — no library needed, just a direct request -->
 <style>
   :root {
     --bg: #0f0f0f;
@@ -80,17 +79,10 @@
   const app = initializeApp(firebaseConfig);
   const db = getFirestore(app);
 
-  // ── EmailJS setup — fill these in once you've created a free account ──
-  // 1. Sign up free at https://www.emailjs.com
-  // 2. Add an Email Service (Gmail is easiest) — copy its Service ID below
-  // 3. Create an Email Template — copy its Template ID below
-  // 4. Copy your Public Key from Account > General
-  const EMAILJS_PUBLIC_KEY = '6rx6RRas7kdE5Wj2q';
-  const EMAILJS_SERVICE_ID = 'service_7l8vrxr';
-  const EMAILJS_TEMPLATE_ID = 'template_5uic29f';
-  if (window.emailjs && EMAILJS_PUBLIC_KEY !== 'YOUR_PUBLIC_KEY') {
-    emailjs.init({ publicKey: EMAILJS_PUBLIC_KEY });
-  }
+  // ── Web3Forms setup — sign up free at https://web3forms.com (just verify an
+  // email, no login needed) and paste your Access Key below. Unlike EmailJS, the
+  // free plan has no domain-restriction paywall.
+  const WEB3FORMS_ACCESS_KEY = 'YOUR_ACCESS_KEY';
 
   const params = new URLSearchParams(window.location.search);
   const bidId = params.get('id');
@@ -178,26 +170,35 @@
         acceptedAt: new Date().toISOString(),
       });
 
-      // Notify the shop by email — fires only if EmailJS has been configured above
-      if (window.emailjs && EMAILJS_PUBLIC_KEY !== 'YOUR_PUBLIC_KEY') {
+      // Notify the shop by email via Web3Forms — a simple POST request, no library needed
+      console.log('About to attempt email send. Web3Forms configured?', WEB3FORMS_ACCESS_KEY !== 'YOUR_ACCESS_KEY');
+      if (WEB3FORMS_ACCESS_KEY !== 'YOUR_ACCESS_KEY') {
         try {
-          const result = await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
-            to_email: 'americanlegacyglass@gmail.com',
-            customer_name: job.customer || 'Unknown',
-            job_desc: job.jobDesc || '',
-            total: fmt(job.total || 0),
-            bid_id: bidId,
+          const emailRes = await fetch('https://api.web3forms.com/submit', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              access_key: WEB3FORMS_ACCESS_KEY,
+              subject: '✓ Bid Approved — ' + (job.customer || 'Unknown') + ' (' + fmt(job.total || 0) + ')',
+              email: 'americanlegacyglass@gmail.com', // "from" shown in the notification, not the recipient
+              message: 'A customer just approved a bid through the online link.\n\n' +
+                'Customer: ' + (job.customer || 'Unknown') + '\n' +
+                'Job: ' + (job.jobDesc || '') + '\n' +
+                'Total: ' + fmt(job.total || 0) + '\n' +
+                'Bid ID: ' + bidId + '\n\n' +
+                'Reach out to schedule the work.',
+            }),
           });
-          console.log('Email sent successfully:', result.status, result.text);
+          const emailResult = await emailRes.json();
+          console.log('Web3Forms response:', emailResult);
+          if (!emailResult.success) console.error('Web3Forms reported failure:', emailResult.message);
         } catch (emailErr) {
           // The approval itself already succeeded (see above) — this only means the
-          // notification email failed. Logged in detail here so it's easy to diagnose
-          // via the browser console (right-click → Inspect → Console) without guessing.
+          // notification email failed. Logged here for diagnosis, doesn't block approval.
           console.error('Email notification FAILED. Full error below:', emailErr);
-          console.error('Status:', emailErr.status, '| Text:', emailErr.text);
         }
       } else {
-        console.warn('EmailJS not configured — skipping notification email');
+        console.warn('Web3Forms not configured — skipping notification email');
       }
 
       showApproved(job);
