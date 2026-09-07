@@ -1172,6 +1172,7 @@ onAuthStateChanged(auth, user => {
       <input type="text" id="dashSearch" placeholder="Search customer or job…" oninput="renderDashboard()"
         style="margin-left:auto;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:0.82rem;padding:0.32rem 0.75rem;outline:none;transition:border-color 0.2s;width:200px;"
         onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'">
+      <button onclick="loadJobs()" title="Refresh — picks up any bid a customer just approved online" style="background:none;border:1px solid var(--border);border-radius:6px;color:var(--muted);cursor:pointer;font-family:'DM Mono',monospace;font-size:0.72rem;padding:0.32rem 0.7rem;white-space:nowrap;">🔄 Refresh</button>
       <button onclick="exportAllData()" title="Download every job and customer as a backup file" style="background:none;border:1px solid var(--border);border-radius:6px;color:var(--muted);cursor:pointer;font-family:'DM Mono',monospace;font-size:0.72rem;padding:0.32rem 0.7rem;white-space:nowrap;">⬇ Backup</button>
     </div>
 
@@ -4209,8 +4210,9 @@ function renderDashboard() {
     const row = document.createElement('div');
     row.className = 'job-row';
     const dateStr = job.date ? new Date(job.date+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '—';
-    const statusLabel = job.type === 'bid' ? 'Bid' : (job.status||'draft');
-    const amountColor = job.type==='invoice'&&job.status==='paid' ? 'var(--green)' : job.type==='invoice'&&job.status==='overdue' ? '#e06060' : job.type==='invoice' ? 'var(--invoice-accent)' : 'var(--text)';
+    const isAcceptedBid = job.type === 'bid' && job.status === 'accepted';
+    const statusLabel = isAcceptedBid ? '✓ Accepted' : job.type === 'bid' ? 'Bid' : (job.status||'draft');
+    const amountColor = isAcceptedBid ? 'var(--green)' : job.type==='invoice'&&job.status==='paid' ? 'var(--green)' : job.type==='invoice'&&job.status==='overdue' ? '#e06060' : job.type==='invoice' ? 'var(--invoice-accent)' : 'var(--text)';
     const typeIcon = job.type === 'bid' ? '📋' : '🧾';
     const desc = job.jobDesc || job.invNumber || '';
     row.innerHTML = `
@@ -4224,7 +4226,7 @@ function renderDashboard() {
       </div>
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:0.25rem;flex-shrink:0;">
         <div class="job-amount" style="color:${amountColor};">${fmt(job.total||0)}</div>
-        <span class="job-status-badge ${job.type==='bid'?'bid':job.status||'draft'}">${statusLabel}</span>
+        <span class="job-status-badge ${isAcceptedBid ? 'paid' : job.type==='bid'?'bid':job.status||'draft'}">${statusLabel}</span>
       </div>
       <div class="job-actions">
         <button class="btn-job-open" onclick="openJob('${job.id}')">Open</button>
