@@ -1334,6 +1334,7 @@ onAuthStateChanged(auth, user => {
             <div class="save-bar-text" id="bidSaveStatus">💾 Save this bid to the dashboard</div>
             <button class="btn-save-job" id="btnSaveBid" onclick="saveJobToFirebase('bid')">Save Bid</button>
           </div>
+          <button id="btnCopyBidLink" onclick="copyBidLink()" style="width:100%;margin-top:0.6rem;background:rgba(126,212,160,0.12);border:1px solid rgba(126,212,160,0.35);border-radius:8px;color:#7ed4a0;cursor:pointer;font-family:'DM Mono',monospace;font-size:0.78rem;padding:0.65rem;transition:all 0.15s;" disabled title="Save the bid first to generate its link">🔗 Copy Approval Link</button>
         </div>
         <div id="quickPriceNote" style="display:none;text-align:center;font-family:'DM Mono',monospace;font-size:0.72rem;color:var(--muted);padding:0.5rem;">⚡ Quick Price mode — nothing is saved</div>
       </div>
@@ -2901,7 +2902,7 @@ function resetBid() {
   }
   renderHardware(); renderLabor(); renderExtras();
   addPiece(); calculate();
-  if (!isQP) _lastSavedBidSnapshot = bidSnapshotForCompare(); // fresh reset counts as a clean baseline
+  if (!isQP) { _lastSavedBidSnapshot = bidSnapshotForCompare(); updateCopyLinkButtonState(); } // fresh reset counts as a clean baseline
 }
 
 // ─────────────────────────────────────────────────
@@ -4068,6 +4069,7 @@ async function saveJobToFirebase(type) {
     }
     statusEl.textContent = '✓ Saved — ' + new Date().toLocaleTimeString();
     if (type === 'bid') _lastSavedBidSnapshot = JSON.stringify({...data, savedAt: undefined});
+    if (type === 'bid') updateCopyLinkButtonState();
     await loadJobs();
   } catch(e) {
     showToast('Save failed: ' + e.message, 'error');
@@ -4075,6 +4077,30 @@ async function saveJobToFirebase(type) {
   }
   btn.disabled = false;
   btn.textContent = type === 'bid' ? 'Save Bid' : 'Save Invoice';
+}
+
+// ─────────────────────────────────────────────────
+// CUSTOMER-FACING BID APPROVAL LINK
+// ─────────────────────────────────────────────────
+function updateCopyLinkButtonState() {
+  const btn = document.getElementById('btnCopyBidLink');
+  if (!btn) return;
+  const enabled = !!currentJobId;
+  btn.disabled = !enabled;
+  btn.title = enabled ? 'Copy a link the customer can use to view and approve this bid' : 'Save the bid first to generate its link';
+  btn.style.opacity = enabled ? '1' : '0.5';
+}
+
+function copyBidLink() {
+  if (!currentJobId) { showToast('Save the bid first', 'error'); return; }
+  // Assumes view-bid.html is uploaded alongside this app in the same folder/repo
+  const base = window.location.href.substring(0, window.location.href.lastIndexOf('/') + 1);
+  const link = base + 'view-bid.html?id=' + currentJobId;
+  navigator.clipboard.writeText(link).then(() => {
+    showToast('✓ Link copied — text or email it to the customer');
+  }).catch(() => {
+    prompt('Copy this link:', link);
+  });
 }
 
 // ─────────────────────────────────────────────────
@@ -4252,6 +4278,7 @@ function openJob(id) {
     activeDataContext = 'bid';
     bidState = null;
     _lastSavedBidSnapshot = bidSnapshotForCompare(); // freshly loaded from the dashboard — nothing "unsaved" yet
+    updateCopyLinkButtonState();
     switchTab('bid');
   } else {
     // The Invoice tab has been removed — invoicing is now handled directly in Zoho.
