@@ -227,6 +227,24 @@
         console.warn('Web3Forms not configured — skipping notification email');
       }
 
+      // Automatically create the Xero invoice. Wrapped separately from the
+      // approval itself — the customer's approval already succeeded and is
+      // the thing that matters to them; if Xero invoicing fails here, ALG
+      // gets alerted by the Worker itself, but the customer still just sees
+      // a normal successful approval rather than an error about bookkeeping
+      // they have no part in.
+      try {
+        const invRes = await fetch('https://morning-frost-ce94.rdenmyers1201.workers.dev/create-xero-invoice', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ jobId: bidId }),
+        });
+        const invData = await invRes.json();
+        console.log('Xero invoice creation:', invData);
+      } catch (invErr) {
+        console.error('Xero invoice creation FAILED. Full error below:', invErr);
+      }
+
       showApproved(job);
     } catch (err) {
       console.error(err);
