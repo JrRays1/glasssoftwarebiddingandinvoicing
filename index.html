@@ -3123,9 +3123,14 @@ function saveBidPDF() {
     const paymentLines = paymentText ? doc.splitTextToSize(paymentText, R-M) : [];
 
     // Box height grows dynamically to fit the text AND the two signature rows below it —
+    // Only show the "approve online" link if this bid has actually been saved —
+    // there's no valid link to a bid that doesn't have an ID yet.
+    const hasOnlineLink = !!currentJobId;
+    const linkLineH = hasOnlineLink ? 20 : 0;
+
     // 102 covers the label, divider, gaps, and both signature/printed-name rows; the rest
     // scales with however many lines the acceptance and payment paragraphs actually take.
-    const boxContentH = 102 + acceptLines.length*11 + paymentLines.length*11;
+    const boxContentH = 102 + acceptLines.length*11 + paymentLines.length*11 + linkLineH;
     checkPageBreak(boxContentH + 20); // keep the whole acceptance/signature block on one page
     doc.setFillColor(250,250,250);
     doc.setDrawColor(210,210,210);
@@ -3143,6 +3148,19 @@ function saveBidPDF() {
       doc.setFont('helvetica','bold');gray(80);
       doc.text(paymentLines, M, y);
       y+=paymentLines.length*11;
+    }
+    if (hasOnlineLink) {
+      // Real clickable link area, built from wherever this app is hosted — opens
+      // view-bid.html with this bid's ID so the customer can approve it from their phone.
+      const base = window.location.href.substring(0, window.location.href.lastIndexOf('/') + 1);
+      const approvalUrl = base + 'view-bid.html?id=' + currentJobId;
+      doc.setFontSize(8.5);doc.setFont('helvetica','bold');
+      doc.setTextColor(30,100,180);
+      const linkLabel = 'Or approve this bid online — tap here';
+      doc.textWithLink(linkLabel, M, y+8, { url: approvalUrl });
+      doc.setDrawColor(30,100,180);doc.setLineWidth(0.5);
+      doc.line(M, y+9.5, M+doc.getTextWidth(linkLabel), y+9.5);
+      y+=20;
     }
     y+=14;
     const col1X = M;
