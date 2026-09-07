@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>American Legacy Glass — Bid Approval</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Bebas+Neue&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<!-- EmailJS — sends the acceptance notification email from the browser, no backend needed -->
+<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+<style>
+  :root {
+    --bg: #0f0f0f;
+    --surface: #171717;
+    --surface2: #1e1e1e;
+    --border: #2a2a2a;
+    --text: #f0f0f0;
+    --muted: #888;
+    --accent: #ffffff;
+    --green: #7ed4a0;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 2rem 1rem;
+  }
+  .wrap { width: 100%; max-width: 600px; }
+  .logo-title { font-family: 'Bebas Neue', sans-serif; font-size: 2rem; letter-spacing: 0.05em; text-align: center; margin-bottom: 0.25rem; }
+  .logo-sub { text-align: center; color: var(--muted); font-size: 0.85rem; margin-bottom: 2rem; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 1.5rem; margin-bottom: 1.25rem; }
+  .card-label { font-family: 'DM Mono', monospace; font-size: 0.68rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); margin-bottom: 0.75rem; }
+  .row { display: flex; justify-content: space-between; padding: 0.4rem 0; font-size: 0.9rem; }
+  .row.total { border-top: 1px solid var(--border); margin-top: 0.5rem; padding-top: 0.75rem; font-family: 'Bebas Neue', sans-serif; font-size: 1.5rem; }
+  .piece-line { display: flex; justify-content: space-between; padding: 0.35rem 0; font-size: 0.85rem; color: var(--muted); border-bottom: 1px solid rgba(255,255,255,0.04); }
+  .piece-line span:first-child { color: var(--text); }
+  .btn-approve {
+    width: 100%; background: var(--green); border: none; border-radius: 10px; color: #0a1f14;
+    cursor: pointer; font-family: 'Bebas Neue', sans-serif; font-size: 1.3rem; letter-spacing: 0.05em;
+    padding: 1rem; transition: all 0.15s;
+  }
+  .btn-approve:hover { background: #8fe0b3; }
+  .btn-approve:disabled { background: var(--border); color: var(--muted); cursor: not-allowed; }
+  .status-msg { text-align: center; padding: 2rem 1rem; }
+  .status-msg .icon { font-size: 3rem; margin-bottom: 0.75rem; }
+  .status-msg .title { font-family: 'Bebas Neue', sans-serif; font-size: 1.5rem; margin-bottom: 0.5rem; }
+  .status-msg .sub { color: var(--muted); font-size: 0.9rem; }
+  .loading { text-align: center; padding: 3rem 1rem; color: var(--muted); }
+  .fine-print { text-align: center; font-size: 0.72rem; color: var(--muted); margin-top: 1rem; line-height: 1.5; }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <div class="logo-title">AMERICAN LEGACY <span style="color:var(--green)">GLASS</span></div>
+  <div class="logo-sub">Bid Approval</div>
+
+  <div id="content">
+    <div class="loading">Loading your bid…</div>
+  </div>
+</div>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.12.1/firebase-app.js";
+  import { getFirestore, doc, getDoc, updateDoc } from "https://www.gstatic.com/firebasejs/12.12.1/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyCA4Fk7aLGnrd5U2T0-dmbrr6BimVC1TK8",
+    authDomain: "glass-bidding-and-invoicing.firebaseapp.com",
+    projectId: "glass-bidding-and-invoicing",
+    storageBucket: "glass-bidding-and-invoicing.firebasestorage.app",
+    messagingSenderId: "849136314530",
+    appId: "1:849136314530:web:91f69219a4096a61428ffb"
+  };
+  const app = initializeApp(firebaseConfig);
+  const db = getDb();
+  function getDb() { return getFirestore(app); }
+
+  // ── EmailJS setup — fill these in once you've created a free account ──
+  // 1. Sign up free at https://www.emailjs.com
+  // 2. Add an Email Service (Gmail is easiest) — copy its Service ID below
+  // 3. Create an Email Template — copy its Template ID below
+  // 4. Copy your Public Key from Account > General
+  const EMAILJS_PUBLIC_KEY = '6rx6RRas7kdE5Wj2q';
+  const EMAILJS_SERVICE_ID = 'service_7l8vrxr';
+  const EMAILJS_TEMPLATE_ID = 'template_5uic29f';
+  if (window.emailjs && EMAILJS_PUBLIC_KEY !== 'YOUR_PUBLIC_KEY') {
+    emailjs.init({ publicKey: EMAILJS_PUBLIC_KEY });
+  }
+
+  const params = new URLSearchParams(window.location.search);
+  const bidId = params.get('id');
+  const content = document.getElementById('content');
+
+  function fmt(n) {
+    const safe = isNaN(n) ? 0 : n;
+    return '$' + safe.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  }
+
+  function showError(msg) {
+    content.innerHTML = `<div class="status-msg"><div class="icon">⚠️</div><div class="title">${msg}</div></div>`;
+  }
+
+  function showApproved(job) {
+    content.innerHTML = `
+      <div class="status-msg">
+        <div class="icon">✓</div>
+        <div class="title" style="color:var(--green);">Bid Approved</div>
+        <div class="sub">Thanks${job.customer ? ', ' + job.customer : ''}! We'll be in touch shortly to schedule the work.</div>
+      </div>`;
+  }
+
+  async function loadBid() {
+    if (!bidId) { showError('No bid specified'); return; }
+    try {
+      const snap = await getDoc(doc(db, 'jobs', bidId));
+      if (!snap.exists()) { showError('Bid not found'); return; }
+      const job = snap.data();
+
+      if (job.status === 'accepted') {
+        showApproved(job);
+        return;
+      }
+
+      const pieces = job.pieces || [];
+      const pieceLines = pieces
+        .filter(p => p.wWhole || p.hWhole)
+        .map(p => {
+          const w = (parseFloat(p.wWhole)||0) + (parseFloat(p.wFrac)||0);
+          const h = (parseFloat(p.hWhole)||0) + (parseFloat(p.hFrac)||0);
+          const qty = parseFloat(p.qty) || 1;
+          const label = [p.thickness, p.glassTypeName].filter(Boolean).join(' · ');
+          return `<div class="piece-line"><span>${w}" × ${h}"${qty>1?' ×'+qty:''}${label?' · '+label:''}</span></div>`;
+        }).join('');
+
+      content.innerHTML = `
+        <div class="card">
+          <div class="card-label">Prepared For</div>
+          <div style="font-size:1.1rem;font-weight:600;">${job.customer || 'Customer'}</div>
+          ${job.jobDesc ? `<div style="color:var(--muted);font-size:0.85rem;margin-top:0.25rem;">${job.jobDesc}</div>` : ''}
+        </div>
+        <div class="card">
+          <div class="card-label">Glass Pieces</div>
+          ${pieceLines || '<div style="color:var(--muted);font-size:0.85rem;">No pieces listed</div>'}
+        </div>
+        <div class="card">
+          <div class="row total"><span>Total</span><span>${fmt(job.total || 0)}</span></div>
+          ${job.depositRequired !== false ? `<div class="row" style="color:var(--muted);font-size:0.8rem;">50% deposit required to begin production</div>` : ''}
+        </div>
+        <button class="btn-approve" id="approveBtn">✓ Approve Bid Now</button>
+        <div class="fine-print">By approving, you authorize American Legacy Glass to proceed with the work described above at the price quoted.</div>
+      `;
+
+      document.getElementById('approveBtn').addEventListener('click', () => approveBid(job));
+    } catch (err) {
+      console.error(err);
+      showError('Could not load this bid');
+    }
+  }
+
+  async function approveBid(job) {
+    const btn = document.getElementById('approveBtn');
+    btn.disabled = true;
+    btn.textContent = 'Approving…';
+    try {
+      await updateDoc(doc(db, 'jobs', bidId), {
+        status: 'accepted',
+        acceptedAt: new Date().toISOString(),
+      });
+
+      // Notify the shop by email — fires only if EmailJS has been configured above
+      if (window.emailjs && EMAILJS_PUBLIC_KEY !== 'YOUR_PUBLIC_KEY') {
+        try {
+          await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
+            to_email: 'americanlegacyglass@gmail.com',
+            customer_name: job.customer || 'Unknown',
+            job_desc: job.jobDesc || '',
+            total: fmt(job.total || 0),
+            bid_id: bidId,
+          });
+        } catch (emailErr) {
+          console.error('Email notification failed (bid was still approved):', emailErr);
+        }
+      }
+
+      showApproved(job);
+    } catch (err) {
+      console.error(err);
+      btn.disabled = false;
+      btn.textContent = '✓ Approve Bid Now';
+      alert('Something went wrong approving this bid. Please try again or call us directly.');
+    }
+  }
+
+  loadBid();
+</script>
+</body>
+</html>
