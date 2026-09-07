@@ -3905,7 +3905,22 @@ function toggleCustPicker() {
   if (custPickerOpen) { closeCustPicker(); return; }
   custPickerOpen = true;
   picker.style.display = '';
-  renderCustPicker('');
+  // Build the search box ONCE — it stays in place across re-renders so typing
+  // never gets interrupted. Only the results list below it gets rebuilt per keystroke.
+  picker.innerHTML = '';
+  const searchWrap = document.createElement('div');
+  searchWrap.style.cssText = 'padding:0.5rem;border-bottom:1px solid var(--border);';
+  searchWrap.innerHTML = '<input id="pickerSearch" type="text" placeholder="Search customers..." autocomplete="off" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:DM Sans,sans-serif;font-size:0.85rem;padding:0.45rem 0.7rem;outline:none;">';
+  picker.appendChild(searchWrap);
+  const itemsWrap = document.createElement('div');
+  itemsWrap.id = 'pickerItemsWrap';
+  picker.appendChild(itemsWrap);
+
+  const si = document.getElementById('pickerSearch');
+  si.addEventListener('input', () => renderCustPickerItems(si.value));
+  renderCustPickerItems('');
+  si.focus();
+
   // Close on outside click
   setTimeout(() => document.addEventListener('click', closeCustPickerOutside), 0);
 }
@@ -3923,8 +3938,11 @@ function closeCustPickerOutside(e) {
   if (picker && !picker.contains(e.target) && e.target !== btn) closeCustPicker();
 }
 
-function renderCustPicker(q) {
-  const picker = document.getElementById('custPicker');
+// Rebuilds only the results list — the search input itself is never touched,
+// so it keeps focus and its typed value naturally on every keystroke.
+function renderCustPickerItems(q) {
+  const itemsWrap = document.getElementById('pickerItemsWrap');
+  if (!itemsWrap) return;
   const filtered = allCustomers.filter(c =>
     !q ||
     (c.name  || '').toLowerCase().includes(q.toLowerCase()) ||
@@ -3932,16 +3950,10 @@ function renderCustPicker(q) {
     (c.email || '').toLowerCase().includes(q.toLowerCase())
   );
   if (!filtered.length) {
-    picker.innerHTML = '<div class="cust-picker-empty">No customers found — add one in the Customers tab.</div>';
+    itemsWrap.innerHTML = '<div class="cust-picker-empty">No customers found — add one in the Customers tab.</div>';
     return;
   }
-  picker.innerHTML = '';
-  // Search box inside picker
-  const searchWrap = document.createElement('div');
-  searchWrap.style.cssText = 'padding:0.5rem;border-bottom:1px solid var(--border);';
-  searchWrap.innerHTML = '<input id="pickerSearch" type="text" placeholder="Search customers..." style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:DM Sans,sans-serif;font-size:0.85rem;padding:0.45rem 0.7rem;outline:none;">';
-  picker.appendChild(searchWrap);
-  const itemsWrap = document.createElement('div');
+  itemsWrap.innerHTML = '';
   filtered.forEach(c => {
     const item = document.createElement('div');
     item.className = 'cust-picker-item';
@@ -3950,12 +3962,6 @@ function renderCustPicker(q) {
     item.onclick = () => fillBidFromCustomer(c.id);
     itemsWrap.appendChild(item);
   });
-  picker.appendChild(itemsWrap);
-  // Wire up search inside picker
-  setTimeout(() => {
-    const si = document.getElementById('pickerSearch');
-    if (si) { si.focus(); si.addEventListener('input', () => renderCustPicker(si.value)); }
-  }, 50);
 }
 window.loadCustomers = window.loadCustomers;
 
