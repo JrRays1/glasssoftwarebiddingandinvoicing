@@ -181,16 +181,23 @@
       // Notify the shop by email — fires only if EmailJS has been configured above
       if (window.emailjs && EMAILJS_PUBLIC_KEY !== 'YOUR_PUBLIC_KEY') {
         try {
-          await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
+          const result = await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
             to_email: 'americanlegacyglass@gmail.com',
             customer_name: job.customer || 'Unknown',
             job_desc: job.jobDesc || '',
             total: fmt(job.total || 0),
             bid_id: bidId,
           });
+          console.log('Email sent successfully:', result.status, result.text);
         } catch (emailErr) {
-          console.error('Email notification failed (bid was still approved):', emailErr);
+          // The approval itself already succeeded (see above) — this only means the
+          // notification email failed. Logged in detail here so it's easy to diagnose
+          // via the browser console (right-click → Inspect → Console) without guessing.
+          console.error('Email notification FAILED. Full error below:', emailErr);
+          console.error('Status:', emailErr.status, '| Text:', emailErr.text);
         }
+      } else {
+        console.warn('EmailJS not configured — skipping notification email');
       }
 
       showApproved(job);
