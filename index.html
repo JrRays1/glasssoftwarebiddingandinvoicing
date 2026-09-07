@@ -1856,7 +1856,9 @@ function getPieceDisplay(p) {
 // 2" Hole" instead of forcing the reader to reconstruct it from raw fields.
 function getPieceLineDescription(p) {
   const parts = [getPieceDisplay(p)];
-  const glassLabel = [p.thickness ? p.thickness + '"' : '', p.glassType].filter(Boolean).join(' · ');
+  // p.thickness already includes its own inch mark (e.g. '1/8"'), so it's
+  // used as-is here — appending another '"' would double it up.
+  const glassLabel = [p.thickness || '', p.glassType].filter(Boolean).join(' · ');
   if (glassLabel) parts.push(glassLabel);
   if (p.edgeName && getPieceEdgeTotal(p) > 0) parts.push(p.edgeName + ' edges');
   const fabNames = Object.keys(p.fabrications || {});
