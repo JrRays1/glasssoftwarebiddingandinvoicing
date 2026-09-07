@@ -1257,6 +1257,9 @@ onAuthStateChanged(auth, user => {
           <span class="collapse-arrow">▼</span>
         </div>
         <div class="collapsible-body" id="hw-body">
+          <div class="fab-group-label" style="margin-top:0;">CRL Catalog — tap to add</div>
+          <div id="hwCatalogPanel"></div>
+          <div class="fab-group-label">Custom / Other</div>
           <div id="hwList"></div>
           <button class="btn-add" onclick="addHardware()">+ Add Hardware Item</button>
         </div>
@@ -2413,7 +2416,28 @@ function renderLabor() {
 function totalLabor() { return labor.reduce((s,l) => s+(parseFloat(l.cost)||0), 0); }
 
 // ─────────────────────────────────────────────────
+// HARDWARE CATALOG (CRL — C.R. Laurence)
+// PLACEHOLDER DATA — replace items below with your real CRL items/SKUs/prices,
+// following the same { group, items:[{name, sku, price}] } shape as FABRICATION_TYPES.
+// ─────────────────────────────────────────────────
+const HARDWARE_TYPES = [
+  { group: 'Hinges',
+    items: [
+      { name: 'Sample Wall Mount Hinge — REPLACE ME', sku: 'SKU000', price: 0 },
+    ]
+  },
+  { group: 'Handles',
+    items: [
+      { name: 'Sample Pull Handle — REPLACE ME', sku: 'SKU000', price: 0 },
+    ]
+  },
+];
+
+// ─────────────────────────────────────────────────
 // BID — HARDWARE
+// Catalog-added rows carry catalogName/unitPrice/qty so tapping +/- can find
+// and update them; manual rows (via "+ Add Hardware Item") have none of that
+// and are edited by hand as before.
 // ─────────────────────────────────────────────────
 function addHardware() { hardware.push({ id: uid(), name: '', cost: '' }); renderHardware(); }
 function removeHardware(id) { hardware = hardware.filter(h => h.id !== id); renderHardware(); calculate(); }
@@ -2421,6 +2445,7 @@ function renderHardware() {
   const list = document.getElementById('hwList');
   list.innerHTML = '';
   hardware.forEach((h, i) => {
+    if (h.catalogName) return; // catalog-added rows are shown/edited via the catalog chips, not this list
     const row = document.createElement('div');
     row.className = 'hw-row';
     row.innerHTML = `
@@ -2430,8 +2455,60 @@ function renderHardware() {
       <button class="btn-remove" onclick="removeHardware('${h.id}')">✕</button>`;
     list.appendChild(row);
   });
+  renderHardwareCatalog();
 }
 function totalHardware() { return hardware.reduce((s,h) => s+(parseFloat(h.cost)||0), 0); }
+
+function getHardwareCatalogQty(itemName) {
+  const row = hardware.find(h => h.catalogName === itemName);
+  return row ? (row.qty || 0) : 0;
+}
+
+function setHardwareCatalogQty(itemName, price, sku, qty) {
+  qty = Math.max(0, qty);
+  const row = hardware.find(h => h.catalogName === itemName);
+  if (qty <= 0) {
+    if (row) hardware = hardware.filter(h => h !== row);
+  } else if (row) {
+    row.qty = qty;
+    row.cost = (price * qty).toFixed(2);
+  } else {
+    hardware.push({
+      id: uid(), name: itemName, catalogName: itemName, sku: sku || '',
+      unitPrice: price, qty: qty, cost: (price * qty).toFixed(2)
+    });
+  }
+  renderHardware();
+  calculate();
+}
+
+function adjustHardwareCatalogQty(itemName, price, sku, delta) {
+  setHardwareCatalogQty(itemName, price, sku, getHardwareCatalogQty(itemName) + delta);
+}
+
+function renderHardwareCatalog() {
+  const el = document.getElementById('hwCatalogPanel');
+  if (!el) return;
+  el.innerHTML = HARDWARE_TYPES.map(g => {
+    return `<div class="fab-group-label">${g.group}</div>` +
+      g.items.map(item => {
+        const qty = getHardwareCatalogQty(item.name);
+        const active = qty > 0;
+        const encodedName = encodeURIComponent(item.name);
+        const encodedSku = encodeURIComponent(item.sku || '');
+        return `<div class="fab-chip ${active?'active':''}" style="padding:0.25rem 0.4rem 0.25rem 0.6rem;display:flex;align-items:center;gap:0.4rem;">
+          <span style="flex:1;font-size:0.75rem;">${item.name}${item.sku ? ` <span style="color:var(--muted);font-size:0.65rem;">(${item.sku})</span>` : ''}</span>
+          <span class="fab-chip-price">$${item.price.toFixed(2)} ea</span>
+          <div style="display:flex;align-items:center;border:1px solid ${active?'rgba(255,255,255,0.3)':'var(--border)'};border-radius:5px;overflow:hidden;flex-shrink:0;">
+            <button class="hw-qty-btn" data-name="${encodedName}" data-sku="${encodedSku}" data-price="${item.price}" data-delta="-1" style="background:rgba(255,255,255,0.06);border:none;color:var(--text);cursor:pointer;font-size:0.9rem;width:24px;height:24px;display:flex;align-items:center;justify-content:center;">−</button>
+            <span style="font-family:'DM Mono',monospace;font-size:0.8rem;min-width:20px;text-align:center;color:${active?'var(--accent)':'var(--muted)'};">${qty}</span>
+            <button class="hw-qty-btn" data-name="${encodedName}" data-sku="${encodedSku}" data-price="${item.price}" data-delta="1" style="background:rgba(255,255,255,0.06);border:none;color:var(--text);cursor:pointer;font-size:0.9rem;width:24px;height:24px;display:flex;align-items:center;justify-content:center;">+</button>
+          </div>
+          ${active ? `<span style="font-family:'DM Mono',monospace;font-size:0.72rem;color:var(--accent);flex-shrink:0;">${fmt(item.price*qty)}</span>` : ''}
+        </div>`;
+      }).join('');
+  }).join('');
+}
 
 // ─────────────────────────────────────────────────
 // BID — EXTRAS
@@ -4404,6 +4481,18 @@ document.getElementById('piecesList').addEventListener('click', function(e) {
     const name = decodeURIComponent(addonChip.dataset.addon);
     toggleInlineAddon(pi, name);
   }
+});
+
+// Event delegation for hardware catalog qty buttons
+document.getElementById('hwCatalogPanel').addEventListener('click', function(e) {
+  const btn = e.target.closest('.hw-qty-btn');
+  if (!btn) return;
+  e.stopPropagation();
+  const name  = decodeURIComponent(btn.dataset.name);
+  const sku   = decodeURIComponent(btn.dataset.sku);
+  const price = parseFloat(btn.dataset.price);
+  const delta = parseInt(btn.dataset.delta);
+  adjustHardwareCatalogQty(name, price, sku, delta);
 });
 
 // Event delegation for glass selection dropdowns
