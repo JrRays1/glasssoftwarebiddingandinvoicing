@@ -1213,10 +1213,6 @@ onAuthStateChanged(auth, user => {
             <label>Date</label>
             <input type="date" id="bidDate">
           </div>
-          <div class="field" style="width:140px;margin-bottom:0;display:flex;flex-direction:column;justify-content:flex-end;">
-            <label>Tax Exempt</label>
-            <button id="taxExemptBtn" onclick="toggleTaxExempt()" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--muted);cursor:pointer;font-family:'DM Mono',monospace;font-size:0.8rem;padding:0.6rem 0.85rem;text-align:left;transition:all 0.2s;">○ Not Exempt</button>
-          </div>
           <div class="field" style="margin-bottom:0;display:flex;flex-direction:column;justify-content:flex-end;">
             <label>Pricing Person</label>
             <div style="display:flex;gap:0.4rem;">
@@ -1452,7 +1448,6 @@ let extras   = [];
 let invItems = [];
 let payments = [];
 let invStatus = 'draft';
-let invTaxExemptActive = false;
 
 let activeDataContext = 'bid'; // 'bid' | 'quickprice'
 let bidState = null; // holds Bid tab's data while Quick Price is active
@@ -1463,7 +1458,6 @@ function captureCurrentState() {
     pieces: pieces, hardware: hardware, labor: labor, extras: extras,
     margin: document.getElementById('bidMargin')?.value || '',
     surcharge: document.getElementById('bidSurcharge')?.value || '',
-    taxExempt: window.taxExemptActive || false,
     depositRequired: depositRequired,
     person: activePerson,
   };
@@ -1475,15 +1469,6 @@ function applyState(state) {
   const surchargeEl = document.getElementById('bidSurcharge');
   if (marginEl) marginEl.value = state.margin || '';
   if (surchargeEl) surchargeEl.value = state.surcharge || '';
-
-  window.taxExemptActive = state.taxExempt || false;
-  const texBtn = document.getElementById('taxExemptBtn');
-  if (texBtn) {
-    texBtn.textContent = state.taxExempt ? '✓ Tax Exempt' : '○ Not Exempt';
-    texBtn.style.cssText = state.taxExempt
-      ? 'background:rgba(255,255,255,0.1);border:1px solid var(--accent);border-radius:8px;color:var(--accent);cursor:pointer;font-family:DM Mono,monospace;font-size:0.8rem;padding:0.6rem 0.85rem;text-align:left;'
-      : 'background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--muted);cursor:pointer;font-family:DM Mono,monospace;font-size:0.8rem;padding:0.6rem 0.85rem;text-align:left;';
-  }
 
   depositRequired = state.depositRequired !== undefined ? state.depositRequired : true;
   const depBtn = document.getElementById('depositToggleBtn');
@@ -1578,9 +1563,6 @@ function switchTab(tab) {
         pieces = []; hardware = []; labor = []; extras = [];
         const marginEl = document.getElementById('bidMargin'); if (marginEl) marginEl.value = '';
         const surchargeEl = document.getElementById('bidSurcharge'); if (surchargeEl) surchargeEl.value = '';
-        window.taxExemptActive = false;
-        const texBtn = document.getElementById('taxExemptBtn');
-        if (texBtn) { texBtn.textContent = '○ Not Exempt'; texBtn.style.cssText='background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--muted);cursor:pointer;font-family:DM Mono,monospace;font-size:0.8rem;padding:0.6rem 0.85rem;text-align:left;'; }
         depositRequired = true;
         const depBtn = document.getElementById('depositToggleBtn');
         const depLabel = document.getElementById('depositLabel');
@@ -2563,8 +2545,7 @@ function toggleDepositRequired() {
 }
 
 function calculate() {
-  const taxExempt  = window.taxExemptActive || false;
-  const taxRate    = taxExempt ? 0 : 9.1;
+  const taxRate    = 0; // AZ MRRA — tax paid to suppliers on materials, not charged separately on the invoice
   const glassTotal = totalGlass();
   const hwTotal    = totalHardware();
   const edgeTotal  = totalEdging();
@@ -2624,7 +2605,6 @@ function calculate() {
     <div class="line-item total-glass" style="margin-top:0.25rem;border-top:1px solid rgba(255,255,255,0.08);padding-top:0.4rem;">
       <span>Glass Total</span><span>${fmt(glassTotal * mkup)}</span>
     </div>
-    ${!taxExempt ? `<div style="font-size:0.68rem;color:var(--muted);font-style:italic;margin:-0.1rem 0 0.3rem 0;">Includes ${fmt(taxAmt)} (9.1% AZ MRRA tax) built into pricing — not charged separately per AZ MRRA</div>` : ''}
     ${edgeLines}
     <div class="line-item"><span>Hardware</span><span>${fmt(hwTotal * hwMkup)}</span></div>
     ${fabTotal > 0 ? `<div class="line-item"><span>Fabrication</span><span>${fmt(fabTotal * mkup)}</span></div>` : ''}
@@ -2639,19 +2619,6 @@ function calculate() {
   gv.classList.remove('updated');
   void gv.offsetWidth;
   gv.classList.add('updated');
-}
-
-function toggleTaxExempt() {
-  window.taxExemptActive = !window.taxExemptActive;
-  const btn = document.getElementById('taxExemptBtn');
-  if (window.taxExemptActive) {
-    btn.textContent = '✓ Tax Exempt';
-    btn.style.cssText += 'background:rgba(255,255,255,0.1);border-color:var(--accent);color:var(--accent);';
-  } else {
-    btn.textContent = '○ Not Exempt';
-    btn.style.cssText += 'background:var(--surface2);border-color:var(--border);color:var(--muted);';
-  }
-  calculate();
 }
 
 // ─────────────────────────────────────────────────
@@ -2730,19 +2697,6 @@ function setInvStatus(status) {
 // ─────────────────────────────────────────────────
 // INVOICE — TAX EXEMPT
 // ─────────────────────────────────────────────────
-function toggleInvTaxExempt() {
-  invTaxExemptActive = !invTaxExemptActive;
-  const btn = document.getElementById('invTaxExemptBtn');
-  if (invTaxExemptActive) {
-    btn.textContent = '✓ Tax Exempt';
-    btn.style.cssText += 'background:rgba(232,194,122,0.1);border-color:var(--invoice-accent);color:var(--invoice-accent);';
-  } else {
-    btn.textContent = '○ Not Exempt';
-    btn.style.cssText += 'background:var(--surface2);border-color:var(--border);color:var(--muted);';
-  }
-  calcInvoice();
-}
-
 // ─────────────────────────────────────────────────
 // INVOICE — IMPORT FROM BID
 // ─────────────────────────────────────────────────
@@ -2760,7 +2714,7 @@ function importFromBid() {
   const edgeTotal  = totalEdging();
   const fabTotal   = totalFabrication();
   const laborTotal = totalLabor();
-  const taxRate    = (window.taxExemptActive||false) ? 0 : 9.1;
+  const taxRate    = 0; // AZ MRRA — always exempt on the invoice, tax paid to suppliers on materials
   const taxableBase  = glassTotal + hwTotal + edgeTotal + fabTotal;
   const extTotal     = totalExtras(taxableBase);
   const baseSubtotal = taxableBase + extTotal;
@@ -2799,12 +2753,12 @@ function importFromBid() {
       }
     });
   });
-  hardware.forEach(h => {
-    if (parseFloat(h.cost)>0) {
-      const base = parseFloat(h.cost)||0;
-      invItems.push({ id: uid(), desc: h.name||'Hardware', qty: 1, price: base * hwMkup, basePrice: base });
-    }
-  });
+  const hwLineItems = hardware.filter(h => parseFloat(h.cost) > 0);
+  if (hwLineItems.length) {
+    const desc = hwLineItems.map(h => (h.name || 'Hardware') + (h.qty > 1 ? ' ×' + h.qty : '')).join(', ');
+    const base = hwLineItems.reduce((s, h) => s + (parseFloat(h.cost) || 0), 0);
+    invItems.push({ id: uid(), desc, qty: 1, price: base * hwMkup, basePrice: base });
+  }
   extras.forEach(e => {
     const v=parseFloat(e.value)||0;
     const base=e.type==='%'?taxableBase*(v/100):v;
@@ -2845,12 +2799,6 @@ function importFromBid() {
   if (jloc)   document.getElementById('invAddress').value    = jloc;
   if (cphone) document.getElementById('invContact').value    = cphone;
   if (cemail) document.getElementById('invEmail').value      = cemail;
-  invTaxExemptActive = window.taxExemptActive || false;
-  const btn = document.getElementById('invTaxExemptBtn');
-  if (invTaxExemptActive) {
-    btn.textContent = '✓ Tax Exempt';
-    btn.style.cssText += 'background:rgba(232,194,122,0.1);border-color:var(--invoice-accent);color:var(--invoice-accent);';
-  }
   renderInvItems();
   calcInvoice();
 }
@@ -2881,7 +2829,7 @@ function toggleCardFee() {
 }
 
 function calcInvoice() {
-  const taxRate  = invTaxExemptActive ? 0 : 9.1;
+  const taxRate  = 0; // AZ MRRA — always exempt, tax paid to suppliers on materials
 
   // Split items into taxable and tax-free (labor)
   const taxableItems  = invItems.filter(i => !i.taxFree);
@@ -2973,9 +2921,6 @@ function resetBid() {
 
   const marginEl = document.getElementById('bidMargin'); if (marginEl) marginEl.value='';
   const surchargeEl = document.getElementById('bidSurcharge'); if (surchargeEl) surchargeEl.value='';
-  window.taxExemptActive = false;
-  document.getElementById('taxExemptBtn').textContent = '○ Not Exempt';
-  document.getElementById('taxExemptBtn').style.cssText='background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--muted);cursor:pointer;font-family:DM Mono,monospace;font-size:0.8rem;padding:0.6rem 0.85rem;text-align:left;';
   depositRequired = true;
   const depBtn = document.getElementById('depositToggleBtn');
   const depLabel = document.getElementById('depositLabel');
@@ -3020,7 +2965,7 @@ function saveBidPDF() {
   try {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF({ unit:'pt', format:'letter' });
-    const taxExempt=window.taxExemptActive||false, taxRate=taxExempt?0:9.1;
+    const taxRate=0; // AZ MRRA — always exempt, tax paid to suppliers on materials
     const glassTotal=totalGlass();
     const hwTotal=totalHardware(), edgeTotal=totalEdging(), laborTotal=totalLabor(), fabTotal=totalFabrication();
     const taxableBase=glassTotal+hwTotal+edgeTotal+fabTotal;
@@ -3289,7 +3234,7 @@ function saveInvoicePDF() {
     const taxableSubtotal= taxableItems.reduce((s,item)=>s+(parseFloat(item.qty)||0)*(parseFloat(item.price)||0),0);
     const taxFreeSubtotal= taxFreeItems.reduce((s,item)=>s+(parseFloat(item.qty)||0)*(parseFloat(item.price)||0),0);
     const subtotal       = taxableSubtotal + taxFreeSubtotal;
-    const taxRate=invTaxExemptActive?0:9.1;
+    const taxRate=0; // AZ MRRA — always exempt, tax paid to suppliers on materials
     // Tax on pre-markup base (matches bid calculation)
     const taxableBase=taxableItems.reduce((s,item)=>{
       const qty=parseFloat(item.qty)||0;
@@ -4071,8 +4016,7 @@ function showToast(msg, type='success') {
 let currentJobId = null; // track if we're editing an existing job
 
 function getBidSnapshot() {
-  const taxExempt = window.taxExemptActive || false;
-  const taxRate   = taxExempt ? 0 : 9.1;
+  const taxRate   = 0; // AZ MRRA — always exempt, tax paid to suppliers on materials
   const glassT    = totalGlass(), hwT = totalHardware(), edgeT = totalEdging(), laborT = totalLabor(), fabT = totalFabrication();
   const taxBase   = glassT + hwT + edgeT + fabT;
   const extT      = totalExtras(taxBase);
@@ -4100,7 +4044,6 @@ function getBidSnapshot() {
     notes:    document.getElementById('bidNotes').value.trim(),
     margin:   parseFloat(document.getElementById('bidMargin')?.value) || 0,
     surcharge:parseFloat(document.getElementById('bidSurcharge')?.value) || 0,
-    taxExempt,
     depositRequired,
     person:   activePerson,
     pieces:   JSON.parse(JSON.stringify(pieces)),
@@ -4116,7 +4059,7 @@ function getInvoiceSnapshot() {
   const taxFreeItems    = invItems.filter(i => i.taxFree);
   const taxableSubtotal = taxableItems.reduce((s,i)=>s+(parseFloat(i.qty)||0)*(parseFloat(i.price)||0),0);
   const taxFreeSubtotal = taxFreeItems.reduce((s,i)=>s+(parseFloat(i.qty)||0)*(parseFloat(i.price)||0),0);
-  const taxRate  = invTaxExemptActive ? 0 : 9.1;
+  const taxRate  = 0; // AZ MRRA — always exempt, tax paid to suppliers on materials
   const tax      = Math.round(Math.round(taxableSubtotal*100)/100*(taxRate/100)*100)/100;
   const subtotal = taxableSubtotal + taxFreeSubtotal;
   // Card processing fee was previously missing here — must match calcInvoice() exactly
@@ -4139,7 +4082,6 @@ function getInvoiceSnapshot() {
     balance:  Math.max(0, grand - paid),
     status:   invStatus,
     notes:    document.getElementById('invNotes').value.trim(),
-    taxExempt: invTaxExemptActive,
     cardFeeActive,
     invItems:  JSON.parse(JSON.stringify(invItems)),
     payments:  JSON.parse(JSON.stringify(payments)),
@@ -4354,12 +4296,6 @@ function openJob(id) {
     hardware = job.hardware || [];
     labor    = job.labor    || [];
     extras   = job.extras   || [];
-    window.taxExemptActive = job.taxExempt || false;
-    const texBtn = document.getElementById('taxExemptBtn');
-    texBtn.textContent = job.taxExempt ? '✓ Tax Exempt' : '○ Not Exempt';
-    texBtn.style.cssText = job.taxExempt
-      ? 'background:rgba(255,255,255,0.1);border:1px solid var(--accent);border-radius:8px;color:var(--accent);cursor:pointer;font-family:DM Mono,monospace;font-size:0.8rem;padding:0.6rem 0.85rem;text-align:left;'
-      : 'background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--muted);cursor:pointer;font-family:DM Mono,monospace;font-size:0.8rem;padding:0.6rem 0.85rem;text-align:left;';
     depositRequired = job.depositRequired !== undefined ? job.depositRequired : true;
     const depBtn = document.getElementById('depositToggleBtn');
     const depLabel = document.getElementById('depositLabel');
