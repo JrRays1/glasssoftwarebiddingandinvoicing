@@ -1145,19 +1145,15 @@ onAuthStateChanged(auth, user => {
     <div class="dash-stats">
       <div class="stat-card s-bids">
         <div class="stat-val" id="statBids">0</div>
-        <div class="stat-label">Open Bids</div>
-      </div>
-      <div class="stat-card s-invoices">
-        <div class="stat-val" id="statInvoices">0</div>
-        <div class="stat-label">Invoices</div>
+        <div class="stat-label">Total Bids</div>
       </div>
       <div class="stat-card s-paid">
-        <div class="stat-val" id="statPaid" style="color:var(--green);">$0</div>
-        <div class="stat-label">Collected</div>
+        <div class="stat-val" id="statAccepted" style="color:var(--green);">0</div>
+        <div class="stat-label">Accepted</div>
       </div>
       <div class="stat-card s-due">
-        <div class="stat-val" id="statDue" style="color:#e06060;">$0</div>
-        <div class="stat-label">Outstanding</div>
+        <div class="stat-val" id="statValue">$0</div>
+        <div class="stat-label">Total Value</div>
       </div>
     </div>
 
@@ -1165,10 +1161,7 @@ onAuthStateChanged(auth, user => {
     <div class="dash-filters">
       <button class="filter-btn active" onclick="setDashFilter('all', this)">All</button>
       <button class="filter-btn" onclick="setDashFilter('bid', this)">Bids</button>
-      <button class="filter-btn" onclick="setDashFilter('draft', this)">Draft</button>
-      <button class="filter-btn" onclick="setDashFilter('sent', this)">Sent</button>
-      <button class="filter-btn" onclick="setDashFilter('paid', this)">Paid</button>
-      <button class="filter-btn" onclick="setDashFilter('overdue', this)">Overdue</button>
+      <button class="filter-btn" onclick="setDashFilter('accepted', this)">Accepted</button>
       <input type="text" id="dashSearch" placeholder="Search customer or job…" oninput="renderDashboard()"
         style="margin-left:auto;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:0.82rem;padding:0.32rem 0.75rem;outline:none;transition:border-color 0.2s;width:200px;"
         onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'">
@@ -4167,19 +4160,16 @@ async function exportAllData() {
 
 function renderDashboard() {
   const bids        = allJobs.filter(j => j.type === 'bid');
-  const invoices    = allJobs.filter(j => j.type === 'invoice');
-  const collected   = invoices.reduce((s,j) => s + (j.paid||0), 0);
-  const outstanding = invoices.filter(j=>j.status!=='paid').reduce((s,j)=>s+(j.balance||0),0);
+  const accepted    = bids.filter(j => j.status === 'accepted');
+  const totalValue  = bids.reduce((s,j) => s + (j.total||0), 0);
 
   document.getElementById('statBids').textContent     = bids.length;
-  document.getElementById('statInvoices').textContent = invoices.length;
-  document.getElementById('statPaid').textContent     = '$' + collected.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g,',');
-  document.getElementById('statDue').textContent      = '$' + outstanding.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g,',');
+  document.getElementById('statAccepted').textContent = accepted.length;
+  document.getElementById('statValue').textContent    = '$' + totalValue.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g,',');
 
   let filtered = allJobs;
   if (dashFilter === 'bid') filtered = allJobs.filter(j => j.type === 'bid');
-  else if (['draft','sent','paid','overdue'].includes(dashFilter))
-    filtered = allJobs.filter(j => j.status === dashFilter);
+  else if (dashFilter === 'accepted') filtered = allJobs.filter(j => j.status === 'accepted');
 
   const q = (document.getElementById('dashSearch')?.value || '').toLowerCase().trim();
   if (q) {
