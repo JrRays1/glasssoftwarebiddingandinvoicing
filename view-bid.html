@@ -93,6 +93,21 @@
     return '$' + safe.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
   }
 
+  // A network call that never resolves (a stalled connection, a Worker that
+  // hangs) would otherwise leave the customer stuck on "Approving…" forever,
+  // even though their approval already succeeded in Firestore moments
+  // earlier. This forces any background call to give up after a few seconds
+  // so the confirmation screen always eventually shows.
+  async function fetchWithTimeout(url, options, timeoutMs = 8000) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      return await fetch(url, { ...options, signal: controller.signal });
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
   function showError(msg) {
     content.innerHTML = `<div class="status-msg"><div class="icon">⚠️</div><div class="title">${msg}</div></div>`;
   }
@@ -200,7 +215,7 @@
       console.log('About to attempt email send. Web3Forms configured?', WEB3FORMS_ACCESS_KEY !== 'YOUR_ACCESS_KEY');
       if (WEB3FORMS_ACCESS_KEY !== 'YOUR_ACCESS_KEY') {
         try {
-          const emailRes = await fetch('https://api.web3forms.com/submit', {
+          const emailRes = await fetchWithTimeout('https://api.web3forms.com/submit', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -234,7 +249,7 @@
       // a normal successful approval rather than an error about bookkeeping
       // they have no part in.
       try {
-        const invRes = await fetch('https://morning-frost-ce94.rdenmyers1201.workers.dev/create-xero-invoice', {
+        const invRes = await fetchWithTimeout('https://morning-frost-ce94.rdenmyers1201.workers.dev/create-xero-invoice', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ jobId: bidId }),
