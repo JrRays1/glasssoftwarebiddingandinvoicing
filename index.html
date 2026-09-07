@@ -8,7 +8,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.12.1/firebase-app.js";
-import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, getDocs, query, orderBy } from "https://www.gstatic.com/firebasejs/12.12.1/firebase-firestore.js";
+import { getFirestore, collection, addDoc, setDoc, updateDoc, deleteDoc, doc, getDocs, query, orderBy } from "https://www.gstatic.com/firebasejs/12.12.1/firebase-firestore.js";
 import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.12.1/firebase-auth.js";
 
 const firebaseConfig = {
@@ -29,6 +29,7 @@ window._db         = db;
 window._auth       = auth;
 window._collection = collection;
 window._addDoc     = addDoc;
+window._setDoc     = setDoc;
 window._updateDoc  = updateDoc;
 window._deleteDoc  = deleteDoc;
 window._doc        = doc;
@@ -1501,6 +1502,17 @@ function applyState(state) {
 }
 
 function uid() { return Math.random().toString(36).slice(2,7); }
+
+// Short, link-friendly ID for bid documents — avoids visually-confusing characters
+// (0/O, 1/l/I) since this ends up in a URL someone might read off a screen or,
+// rarely, type by hand. 8 characters from a 32-symbol set is ~1 trillion combinations,
+// more than enough to avoid collisions at any realistic bid volume for this business.
+function generateShortId() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let id = '';
+  for (let i = 0; i < 8; i++) id += chars[Math.floor(Math.random() * chars.length)];
+  return id;
+}
 function fmt(n) { const safe = isNaN(n) ? 0 : n; return '$' + safe.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
 
 // ─────────────────────────────────────────────────
@@ -4074,9 +4086,17 @@ async function saveJobToFirebase(type) {
       await window._updateDoc(window._doc(db, 'jobs', currentJobId), data);
       showToast('✓ Job updated!');
     } else {
-      // New record
-      const ref = await window._addDoc(window._collection(db, 'jobs'), data);
-      currentJobId = ref.id;
+      // New record — bids get a short, random 8-character ID instead of Firestore's
+      // long auto-generated one, so the customer approval link stays short and clean
+      // enough to text or read aloud. Invoices (unused now) keep the old behavior.
+      if (type === 'bid') {
+        const shortId = generateShortId();
+        await window._setDoc(window._doc(db, 'jobs', shortId), data);
+        currentJobId = shortId;
+      } else {
+        const ref = await window._addDoc(window._collection(db, 'jobs'), data);
+        currentJobId = ref.id;
+      }
       window._currentJobType = type;
       showToast('✓ Job saved to dashboard!');
       // A brand-new bid was just saved — return focus to the customer name field so
