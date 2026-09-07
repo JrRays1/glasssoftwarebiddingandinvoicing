@@ -1850,6 +1850,19 @@ function getPieceDisplay(p) {
   const hStr = dimDisplay(p.hWhole, p.hFrac);
   return (qty > 1 ? qty + '× ' : '') + wStr + ' × ' + hStr;
 }
+// One combined, natural description per piece for invoice line items — pulls
+// in dimensions, thickness/type, edge treatment, and fabrications so the
+// invoice line reads like "22 × 22, 1/4" · Clear · Tempered, Polished edges,
+// 2" Hole" instead of forcing the reader to reconstruct it from raw fields.
+function getPieceLineDescription(p) {
+  const parts = [getPieceDisplay(p)];
+  const glassLabel = [p.thickness ? p.thickness + '"' : '', p.glassType].filter(Boolean).join(' · ');
+  if (glassLabel) parts.push(glassLabel);
+  if (p.edgeName && getPieceEdgeTotal(p) > 0) parts.push(p.edgeName + ' edges');
+  const fabNames = Object.keys(p.fabrications || {});
+  if (fabNames.length) parts.push(fabNames.join(', '));
+  return parts.join(', ');
+}
 function getPiecePerimFt(p) {
   const w = getPieceW(p), h = getPieceH(p), qty = parseFloat(p.qty)||1;
   return (w && h) ? 2*(w+h)*qty : 0;
@@ -3066,6 +3079,33 @@ function getBidSnapshot() {
   const glassBase     = glassT + edgeT + fabT + extT;
   const markupAmt     = glassBase * (glassMkup - 1) + hwT * (hwMkup - 1);
   const grand     = taxable + tax + markupAmt + laborT;
+
+  // Resolved, ready-to-invoice line items — computed once, here, using the
+  // exact same pricing functions the Bid tab itself uses. Anything that reads
+  // this later (the Xero integration) uses these numbers verbatim instead of
+  // recomputing prices from raw piece/hardware data in a second place, so an
+  // invoice can never drift from what the customer actually saw and approved.
+  const lineItems = [];
+  pieces.filter(p => getPieceW(p) && getPieceH(p)).forEach(p => {
+    const pieceTotal = (getPieceGlassTotal(p) + getPieceEdgeTotal(p) + getPieceFabTotal(p)) * glassMkup;
+    if (pieceTotal > 0) {
+      lineItems.push({ description: getPieceLineDescription(p), amount: Math.round(pieceTotal * 100) / 100 });
+    }
+  });
+  const hwLineItems = hardware.filter(h => parseFloat(h.cost) > 0);
+  if (hwLineItems.length) {
+    const hwDesc = hwLineItems.map(h => (h.name || 'Hardware') + (h.qty > 1 ? ' ×' + h.qty : '')).join(', ');
+    lineItems.push({ description: hwDesc, amount: Math.round(hwT * hwMkup * 100) / 100 });
+  }
+  labor.filter(l => parseFloat(l.cost) > 0).forEach(l => {
+    lineItems.push({ description: l.name || 'Labor', amount: Math.round((parseFloat(l.cost) || 0) * 100) / 100 });
+  });
+  extras.filter(e => (parseFloat(e.value) || 0) > 0).forEach(e => {
+    const v = parseFloat(e.value) || 0;
+    const base = e.type === '%' ? taxBase * (v / 100) : v;
+    lineItems.push({ description: e.name || 'Additional Cost', amount: Math.round(base * glassMkup * 100) / 100 });
+  });
+
   return {
     type: 'bid',
     customer: document.getElementById('customerName').value.trim() || 'Unnamed',
@@ -3075,6 +3115,7 @@ function getBidSnapshot() {
     location: document.getElementById('jobLocation').value.trim(),
     date:     document.getElementById('bidDate').value,
     total:    grand,
+    lineItems,
     status:   'bid',
     notes:    document.getElementById('bidNotes').value.trim(),
     margin:   parseFloat(document.getElementById('bidMargin')?.value) || 0,
