@@ -78,8 +78,7 @@
     appId: "1:849136314530:web:91f69219a4096a61428ffb"
   };
   const app = initializeApp(firebaseConfig);
-  const db = getDb();
-  function getDb() { return getFirestore(app); }
+  const db = getFirestore(app);
 
   // ── EmailJS setup — fill these in once you've created a free account ──
   // 1. Sign up free at https://www.emailjs.com
@@ -158,8 +157,14 @@
 
       document.getElementById('approveBtn').addEventListener('click', () => approveBid(job));
     } catch (err) {
-      console.error(err);
-      showError('Could not load this bid');
+      console.error('Bid load error:', err);
+      // Show the real reason on screen (not just in the console) so it's easy to
+      // diagnose without needing dev tools — usually a Firestore permissions issue
+      // if the rules haven't been published yet, since that's the most common cause.
+      const isPermissionError = err.code === 'permission-denied' || /permission/i.test(err.message||'');
+      showError(isPermissionError
+        ? 'Access denied — the Firestore rules update may not be published yet'
+        : 'Could not load this bid (' + (err.message || 'unknown error') + ')');
     }
   }
 
