@@ -98,11 +98,15 @@
   }
 
   function showApproved(job) {
+    const depositRequired = job.depositRequired !== false; // matches the main app's default (ON unless explicitly turned off)
+    const depositLines = depositRequired
+      ? 'An invoice will follow shortly for the deposit. Production begins as soon as deposit is received. '
+      : '';
     content.innerHTML = `
       <div class="status-msg">
         <div class="icon">✓</div>
         <div class="title" style="color:var(--green);">Bid Approved</div>
-        <div class="sub">Thanks${job.customer ? ', ' + job.customer : ''}! We'll be in touch shortly to schedule the work.</div>
+        <div class="sub">Thanks${job.customer ? ', ' + job.customer : ''}! ${depositLines}Once fabrication is complete our office will contact you to schedule installation.</div>
       </div>`;
   }
 
