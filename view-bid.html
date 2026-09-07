@@ -66,7 +66,7 @@
 
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/12.12.1/firebase-app.js";
-  import { getFirestore, doc, getDoc, updateDoc } from "https://www.gstatic.com/firebasejs/12.12.1/firebase-firestore.js";
+  import { getFirestore, doc, getDoc, updateDoc, runTransaction } from "https://www.gstatic.com/firebasejs/12.12.1/firebase-firestore.js";
 
   const firebaseConfig = {
     apiKey: "AIzaSyCA4Fk7aLGnrd5U2T0-dmbrr6BimVC1TK8",
@@ -169,10 +169,32 @@
     btn.disabled = true;
     btn.textContent = 'Approving…';
     try {
-      await updateDoc(doc(db, 'jobs', bidId), {
-        status: 'accepted',
-        acceptedAt: new Date().toISOString(),
+      // Atomic check-and-set: guards against two tabs/devices (or a double-tap
+      // that beats the disabled-button state) both racing to approve the same
+      // bid before either write lands. Only the request that actually flips
+      // status away from 'accepted' sends the notification email below —
+      // a request that discovers it was already accepted just shows the
+      // approved screen and stops, no duplicate email.
+      const jobRef = doc(db, 'jobs', bidId);
+      const result = await runTransaction(db, async (transaction) => {
+        const snap = await transaction.get(jobRef);
+        if (!snap.exists()) throw new Error('Bid not found');
+        const current = snap.data();
+        if (current.status === 'accepted') {
+          return { alreadyAccepted: true, job: current };
+        }
+        transaction.update(jobRef, {
+          status: 'accepted',
+          acceptedAt: new Date().toISOString(),
+        });
+        return { alreadyAccepted: false, job: current };
       });
+
+      if (result.alreadyAccepted) {
+        showApproved(result.job);
+        return;
+      }
+      job = result.job;
 
       // Notify the shop by email via Web3Forms — a simple POST request, no library needed
       console.log('About to attempt email send. Web3Forms configured?', WEB3FORMS_ACCESS_KEY !== 'YOUR_ACCESS_KEY');
