@@ -144,7 +144,7 @@
           const w = (parseFloat(p.wWhole)||0) + (parseFloat(p.wFrac)||0);
           const h = (parseFloat(p.hWhole)||0) + (parseFloat(p.hFrac)||0);
           const qty = parseFloat(p.qty) || 1;
-          const label = [p.thickness, p.glassTypeName].filter(Boolean).join(' · ');
+          const label = [p.thickness, p.glassType].filter(Boolean).join(' · ');
           return `<div class="piece-line"><span>${w}" × ${h}"${qty>1?' ×'+qty:''}${label?' · '+label:''}</span></div>`;
         }).join('');
 
