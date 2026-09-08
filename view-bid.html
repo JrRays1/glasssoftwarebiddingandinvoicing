@@ -145,7 +145,12 @@
           const h = (parseFloat(p.hWhole)||0) + (parseFloat(p.hFrac)||0);
           const qty = parseFloat(p.qty) || 1;
           const label = [p.thickness, p.glassType].filter(Boolean).join(' · ');
-          return `<div class="piece-line"><span>${w}" × ${h}"${qty>1?' ×'+qty:''}${label?' · '+label:''}</span></div>`;
+          const dims = `${w}" × ${h}"${qty>1?' ×'+qty:''}`;
+          const parts = [dims + (label ? ' · ' + label : '')];
+          if (p.edgeName) parts.push(p.edgeName + ' edges');
+          const fabNames = Object.keys(p.fabrications || {});
+          if (fabNames.length) parts.push(fabNames.join(', '));
+          return `<div class="piece-line"><span>${parts.join(', ')}</span></div>`;
         }).join('');
 
       content.innerHTML = `
