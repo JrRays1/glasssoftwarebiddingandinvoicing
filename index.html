@@ -2719,11 +2719,16 @@ function saveBidPDF() {
     }
     function row(left,right,size,weight){
       size=size||10;weight=weight||'normal';
-      checkPageBreak(size*1.8+6);
+      // Every call site now passes an empty right value (no per-item pricing
+      // shown anymore), so the left text can safely wrap across the full
+      // width instead of assuming a narrower column reserved for a price —
+      // combined descriptions (piece + edge + fabrication) can get long.
+      const lines = doc.splitTextToSize(left, R-M);
+      checkPageBreak(lines.length*size*1.8+6);
       doc.setFontSize(size);doc.setFont('helvetica',weight);
-      gray(80);doc.text(left,M,y);
-      gray(20);doc.setFont('helvetica',weight);doc.text(right,R,y,{align:'right'});
-      y+=size*1.8;
+      gray(80);doc.text(lines,M,y);
+      if(right){ gray(20);doc.setFont('helvetica',weight);doc.text(right,R,y,{align:'right'}); }
+      y+=lines.length*size*1.8;
     }
     function divider(){drawColor(180);doc.setLineWidth(0.75);doc.line(M,y,R,y);y+=14;}
     // Stamps a simple footer with the page number on every page — run once at the
@@ -2741,26 +2746,16 @@ function saveBidPDF() {
     sectionLabel('Glass & Fabrication');
     pieces.filter(p=>getPieceW(p)&&getPieceH(p)).forEach(p=>{
       const gparts=[p.thickness?p.thickness:''  ,p.glassType].filter(Boolean).join(' · ');
-      const desc=getPieceDisplay(p)+(gparts?' · '+gparts:'');
-      // Chris doesn't want per-item pricing shown to customers — descriptions
-      // only here; the single grand total at the bottom is the only dollar
-      // figure that appears anywhere on this document now.
+      const descParts=[getPieceDisplay(p)+(gparts?' · '+gparts:'')];
+      if(getPieceEdgeTotal(p)>0){ descParts.push((p.edgeName||'Edging')+' edges'); }
+      const fabNames=Object.keys(p.fabrications||{});
+      if(fabNames.length){ descParts.push(fabNames.join(', ')); }
+      const desc=descParts.join(', ');
+      // Chris doesn't want per-item pricing shown to customers — one combined
+      // description line per piece, no separate gray sub-lines for edging or
+      // fabrication anymore; the single grand total at the bottom is the only
+      // dollar figure that appears anywhere on this document now.
       row(desc, '');
-      // Fabrication names — descriptive only, never priced separately
-      if(p.fabrications && Object.keys(p.fabrications).length>0){
-        Object.entries(p.fabrications).forEach(([fabName,fabQty])=>{
-          const totalFabQty=(fabQty||1)*(parseFloat(p.qty)||1);
-          doc.setFontSize(8);doc.setFont('helvetica','normal');gray(140);
-          doc.text('   · '+fabName+(totalFabQty>1?' ×'+totalFabQty:''),M+8,y);
-          y+=8*1.8;
-        });
-      }
-      // Edging — descriptive only
-      if(getPieceEdgeTotal(p)>0){
-        doc.setFontSize(8.5);doc.setFont('helvetica','normal');gray(120);
-        doc.text('   + '+(p.edgeName||'Edging'),M+8,y);
-        y+=8.5*1.8;
-      }
     });
     if(pieces.filter(p=>getPieceW(p)&&getPieceH(p)).length===0) row('No dimensions','');
     y+=6;
