@@ -2667,11 +2667,11 @@ function saveBidPDF() {
     const contactParts = [cphone, cemail].filter(Boolean);
     const contactLine = contactParts.join('  ·  ');
 
-    // Job Location and Billing Address share one line (left/right) when both
-    // are present, rather than each taking a separate line — this needs to be
-    // reflected in the box height calc too, or the info bar ends up too tall.
-    const hasBothAddresses = !!(jloc && billAddr);
-    const addressLineCount = hasBothAddresses ? 1 : ((jloc ? 1 : 0) + (billAddr ? 1 : 0));
+    // Left column: Customer, then Billing Address below it. Right column: Job
+    // description, then Job Location below it — always at the same X as the
+    // description above it, whether or not a billing address is also present,
+    // so "Job:" and the address underneath actually line up.
+    const addressLineCount = (jloc || billAddr) ? 1 : 0;
 
     // Calculate info bar height based on how many lines we need
     const infoLines = [cname||jdesc, contactLine].filter(Boolean).length + addressLineCount;
@@ -2681,17 +2681,13 @@ function saveBidPDF() {
     let infoY = 106;
     doc.setFontSize(9); doc.setFont('helvetica','bold'); doc.setTextColor(40,40,40);
     if(cname) { doc.text('Customer: '+cname, M, infoY); }
-    if(jdesc) { doc.text('Job: '+jdesc, pageW/2, infoY, {align:'center'}); }
+    if(jdesc) { doc.text('Job: '+jdesc, pageW/2, infoY); }
     infoY += 16;
-    if (hasBothAddresses) {
+    if (jloc || billAddr) {
       doc.setFont('helvetica','normal'); doc.setTextColor(80,80,80);
-      doc.text(billAddr, M, infoY);
-      doc.text(jloc, pageW/2, infoY);
+      if (billAddr) doc.text(billAddr, M, infoY);
+      if (jloc) doc.text(jloc, pageW/2, infoY);
       infoY += 16;
-    } else if (jloc) {
-      doc.setFont('helvetica','normal'); doc.setTextColor(80,80,80); doc.text(jloc, M, infoY); infoY += 16;
-    } else if (billAddr) {
-      doc.setFont('helvetica','normal'); doc.setTextColor(80,80,80); doc.text(billAddr, M, infoY); infoY += 16;
     }
     if(contactLine){
       // Phone and email sit right next to each other on one line, left-aligned,
