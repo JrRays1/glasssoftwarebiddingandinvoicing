@@ -2667,8 +2667,14 @@ function saveBidPDF() {
     const contactParts = [cphone, cemail].filter(Boolean);
     const contactLine = contactParts.join('  ·  ');
 
+    // Job Location and Billing Address share one line (left/right) when both
+    // are present, rather than each taking a separate line — this needs to be
+    // reflected in the box height calc too, or the info bar ends up too tall.
+    const hasBothAddresses = !!(jloc && billAddr);
+    const addressLineCount = hasBothAddresses ? 1 : ((jloc ? 1 : 0) + (billAddr ? 1 : 0));
+
     // Calculate info bar height based on how many lines we need
-    const infoLines = [cname||jdesc, jloc, billAddr, contactLine].filter(Boolean).length;
+    const infoLines = [cname||jdesc, contactLine].filter(Boolean).length + addressLineCount;
     const infoBarH = 14 + infoLines * 16;
 
     doc.setFillColor(235,238,242); doc.rect(0,90,pageW,infoBarH,'F');
@@ -2677,8 +2683,16 @@ function saveBidPDF() {
     if(cname) { doc.text('Customer: '+cname, M, infoY); }
     if(jdesc) { doc.text('Job: '+jdesc, pageW/2, infoY, {align:'center'}); }
     infoY += 16;
-    if(jloc){ doc.setFont('helvetica','normal'); doc.setTextColor(80,80,80); doc.text('Location: '+jloc, M, infoY); infoY += 16; }
-    if(billAddr){ doc.setFont('helvetica','normal'); doc.setTextColor(80,80,80); doc.text('Billing: '+billAddr, M, infoY); infoY += 16; }
+    if (hasBothAddresses) {
+      doc.setFont('helvetica','normal'); doc.setTextColor(80,80,80);
+      doc.text('Billing: '+billAddr, M, infoY);
+      doc.text('Job Location: '+jloc, pageW/2, infoY);
+      infoY += 16;
+    } else if (jloc) {
+      doc.setFont('helvetica','normal'); doc.setTextColor(80,80,80); doc.text('Location: '+jloc, M, infoY); infoY += 16;
+    } else if (billAddr) {
+      doc.setFont('helvetica','normal'); doc.setTextColor(80,80,80); doc.text('Billing: '+billAddr, M, infoY); infoY += 16;
+    }
     if(contactLine){
       doc.setFontSize(8.5); doc.setFont('helvetica','normal'); doc.setTextColor(80,80,80);
       if(cphone && cemail) {
