@@ -2557,6 +2557,292 @@ function calculate() {
 }
 
 // ─────────────────────────────────────────────────
+// PDF SHARED HELPERS
+// ─────────────────────────────────────────────────
+const LOGO_B64 = 'logo.png';
+
+function pdfHeader(doc, title, subtitle, date) {
+  const pageW = doc.internal.pageSize.getWidth();
+  doc.setFillColor(20,20,20);
+  doc.rect(0, 0, pageW, 100, 'F');
+  doc.addImage(LOGO_B64, 'PNG', 8, 4, 82, 82);
+  doc.setFontSize(22); doc.setFont('helvetica','bold');
+  doc.setTextColor(255,255,255);
+  doc.text('AMERICAN LEGACY GLASS', 100, 36);
+  doc.setFontSize(8); doc.setFont('helvetica','normal');
+  doc.setTextColor(160,160,160);
+  doc.text(subtitle, 100, 52);
+  doc.text(date, pageW-50, 52, {align:'right'});
+  doc.setFontSize(7.5);
+  doc.text('Licensed  •  Bonded  •  Insured    ROC: 365507', 100, 66);
+  doc.text('americanlegacyglass@gmail.com', pageW-50, 66, {align:'right'});
+  doc.text('14478 E Peak View Rd, Scottsdale, AZ 85262', 100, 78);
+  return 100;
+}
+
+// ─────────────────────────────────────────────────
+// BID PDF
+// ─────────────────────────────────────────────────
+function saveBidPDF() {
+  try {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ unit:'pt', format:'letter' });
+    const taxRate=0; // AZ MRRA — always exempt, tax paid to suppliers on materials
+    const glassTotal=totalGlass();
+    const hwTotal=totalHardware(), edgeTotal=totalEdging(), laborTotal=totalLabor(), fabTotal=totalFabrication();
+    const taxableBase=glassTotal+hwTotal+edgeTotal+fabTotal;
+    const extTotal=totalExtras(taxableBase);
+    const marginPct=parseFloat(document.getElementById('bidMargin')?.value)||0;
+    const surchargePct=parseFloat(document.getElementById('bidSurcharge')?.value)||0;
+    const glassMkup=1+(marginPct+surchargePct)/100;
+    const hwMkup=1+marginPct/100;
+    const mkup=glassMkup;
+    const baseSubtotal=(taxableBase+extTotal);
+    const taxAmt=Math.round(Math.round(baseSubtotal*100)/100*(taxRate/100)*100)/100;
+    const glassBase=glassTotal+edgeTotal+fabTotal+extTotal;
+    const markupAmt=glassBase*(glassMkup-1)+hwTotal*(hwMkup-1);
+    const taxableTotal=baseSubtotal;
+    const grand=baseSubtotal+taxAmt+markupAmt+laborTotal;
+    const pageW=doc.internal.pageSize.getWidth(), M=50, R=pageW-M;
+    const bidDateVal=document.getElementById('bidDate').value;
+    const displayDate=bidDateVal?new Date(bidDateVal+'T00:00:00').toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'}):new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'});
+
+    let y = pdfHeader(doc, 'BID ESTIMATE', 'BID ESTIMATE  —  Serving Arizona Since 1988', displayDate);
+
+    const cname=document.getElementById('customerName').value.trim();
+    const cphone=document.getElementById('customerPhone').value.trim();
+    const cemail=document.getElementById('customerEmail').value.trim();
+    const jdesc=document.getElementById('jobDesc').value.trim();
+    const jloc =document.getElementById('jobLocation').value.trim();
+
+    // Build contact line
+    const contactParts = [cphone, cemail].filter(Boolean);
+    const contactLine = contactParts.join('  ·  ');
+
+    // Calculate info bar height based on how many lines we need
+    const infoLines = [cname||jdesc, jloc, contactLine].filter(Boolean).length;
+    const infoBarH = 14 + infoLines * 16;
+
+    doc.setFillColor(235,238,242); doc.rect(0,90,pageW,infoBarH,'F');
+    let infoY = 106;
+    doc.setFontSize(9); doc.setFont('helvetica','bold'); doc.setTextColor(40,40,40);
+    if(cname) { doc.text('Customer: '+cname, M, infoY); }
+    if(jdesc) { doc.text('Job: '+jdesc, pageW/2, infoY, {align:'center'}); }
+    infoY += 16;
+    if(jloc){ doc.setFont('helvetica','normal'); doc.setTextColor(80,80,80); doc.text('Location: '+jloc, M, infoY); infoY += 16; }
+    if(contactLine){
+      doc.setFontSize(8.5); doc.setFont('helvetica','normal'); doc.setTextColor(80,80,80);
+      if(cphone && cemail) {
+        doc.text('Ph: '+cphone, M, infoY);
+        doc.text('Email: '+cemail, pageW/2, infoY);
+      } else if(cphone) {
+        doc.text('Ph: '+cphone, M, infoY);
+      } else if(cemail) {
+        doc.text('Email: '+cemail, M, infoY);
+      }
+    }
+    y = 90 + infoBarH + 15;
+
+    function gray(v){doc.setTextColor(v,v,v);}
+    function drawColor(v){doc.setDrawColor(v,v,v);}
+    function fillColor(v){doc.setFillColor(v,v,v);}
+    const pageH = doc.internal.pageSize.getHeight();
+    const BOTTOM_MARGIN = 90; // leaves room for the footer stamp on every page
+    // If the next chunk of content would run past the bottom margin, start a fresh
+    // page instead of letting it clip or spill awkwardly — keeps every page clean.
+    function checkPageBreak(neededHeight){
+      neededHeight = neededHeight || 20;
+      if (y + neededHeight > pageH - BOTTOM_MARGIN) {
+        doc.addPage();
+        y = 50;
+      }
+    }
+    function sectionLabel(text){
+      checkPageBreak(30);
+      doc.setFontSize(7);doc.setFont('helvetica','bold');gray(130);
+      doc.text(text.toUpperCase(),M,y);
+      drawColor(200);doc.setLineWidth(0.5);doc.line(M,y+3,R,y+3);y+=16;
+    }
+    function row(left,right,size,weight){
+      size=size||10;weight=weight||'normal';
+      checkPageBreak(size*1.8+6);
+      doc.setFontSize(size);doc.setFont('helvetica',weight);
+      gray(80);doc.text(left,M,y);
+      gray(20);doc.setFont('helvetica',weight);doc.text(right,R,y,{align:'right'});
+      y+=size*1.8;
+    }
+    function divider(){drawColor(180);doc.setLineWidth(0.75);doc.line(M,y,R,y);y+=14;}
+    // Stamps a simple footer with the page number on every page — run once at the
+    // very end, after all content (including any additional pages) has been drawn.
+    function addFooterToAllPages(){
+      const pageCount = doc.internal.getNumberOfPages();
+      for (let i=1;i<=pageCount;i++){
+        doc.setPage(i);
+        doc.setFontSize(7);doc.setFont('helvetica','normal');gray(160);
+        doc.text('American Legacy Glass', M, pageH-30);
+        doc.text('Page '+i+' of '+pageCount, R, pageH-30, {align:'right'});
+      }
+    }
+
+    sectionLabel('Glass & Fabrication');
+    pieces.filter(p=>getPieceW(p)&&getPieceH(p)).forEach(p=>{
+      const rate=parseFloat(p.rate)||0;
+      const gparts=[p.thickness?p.thickness:''  ,p.glassType].filter(Boolean).join(' · ');
+      const desc=getPieceDisplay(p)+(gparts?' · '+gparts:'');
+      // Combine glass + ALL fabrication costs into one unit price per piece
+      const combinedTotal = (getPieceGlassTotal(p) + getPieceFabTotal(p)) * mkup;
+      row(desc, rate?fmt(combinedTotal):'(no rate)');
+      // Fabrication names — no price, just show what's included
+      if(p.fabrications && Object.keys(p.fabrications).length>0){
+        Object.entries(p.fabrications).forEach(([fabName,fabQty])=>{
+          const totalFabQty=(fabQty||1)*(parseFloat(p.qty)||1);
+          doc.setFontSize(8);doc.setFont('helvetica','normal');gray(140);
+          doc.text('   · '+fabName+(totalFabQty>1?' ×'+totalFabQty:''),M+8,y);
+          y+=8*1.8;
+        });
+      }
+      // Edging sub-line (indented) — apply markup
+      if(getPieceEdgeTotal(p)>0){
+        doc.setFontSize(8.5);doc.setFont('helvetica','normal');gray(120);
+        doc.text('   + '+(p.edgeName||'Edging'),M+8,y);
+        gray(60);doc.text(fmt(getPieceEdgeTotal(p)*mkup),R,y,{align:'right'});
+        y+=8.5*1.8;
+      }
+    });
+    if(pieces.filter(p=>getPieceW(p)&&getPieceH(p)).length===0) row('No dimensions',fmt(0));
+    // Glass section total (glass + edge + fab) — apply markup
+    const glassSectionTotal = (glassTotal + edgeTotal + fabTotal) * mkup;
+    doc.setFontSize(9);doc.setFont('helvetica','bold');gray(40);
+    doc.text('Glass & Fabrication Total',M,y);doc.text(fmt(glassSectionTotal),R,y,{align:'right'});y+=9*1.8;
+    y+=6;
+    if(hardware.length>0){
+      sectionLabel('Hardware');
+      hardware.forEach(h=>row(h.name||'Hardware item',fmt((parseFloat(h.cost)||0)*hwMkup)));
+      y+=6;
+    }
+    if(extras.length>0){
+      sectionLabel('Additional Costs');
+      extras.forEach(e=>{
+        const v=parseFloat(e.value)||0,amt=(e.type==='%'?taxableBase*(v/100):v)*mkup;
+        row((e.name||'Additional Cost')+(e.type==='%'?' ('+v+'%)':''),fmt(amt));
+      });y+=6;
+    }
+    divider();
+    // Tax is calculated and included in the grand total automatically; no line printed
+    if(labor.length>0){
+      y+=4;
+      doc.setFontSize(7);doc.setFont('helvetica','bold');doc.setTextColor(122,184,232);
+      doc.text('LABOR (NOT TAXED)',M,y);
+      drawColor(180);doc.setLineWidth(0.5);doc.line(M,y+3,R,y+3);y+=14;
+      labor.forEach(l=>{
+        doc.setFontSize(10);doc.setFont('helvetica','normal');doc.setTextColor(122,184,232);
+        doc.text(l.name||'Labor',M,y);
+        doc.text(fmt(parseFloat(l.cost)||0),R,y,{align:'right'});
+        y+=10*1.8;
+      });
+      doc.setFontSize(9);doc.setFont('helvetica','bold');doc.setTextColor(80,160,220);
+      doc.text('Labor Total',M,y);doc.text(fmt(laborTotal),R,y,{align:'right'});y+=9*1.8;
+    }
+    y+=10;
+    fillColor(20);doc.roundedRect(M-12,y-12,pageW-(M-12)*2,52,5,5,'F');
+    doc.setFontSize(10);doc.setFont('helvetica','bold');gray(160);doc.text('TOTAL BID',M,y+10);
+    doc.setFontSize(22);gray(255);doc.text(fmt(grand),R,y+12,{align:'right'});
+    y+=62;
+    if (depositRequired) {
+      y+=8;
+      const deposit=grand*0.5;
+      doc.setFontSize(9);doc.setFont('helvetica','bold');gray(60);
+      doc.text('Once signed we require a 50% deposit to begin production',M,y);y+=16;
+      doc.text('Deposit Amount:',M,y);
+      gray(20);doc.text(fmt(deposit),R,y,{align:'right'});y+=18;
+    }
+    doc.setDrawColor(180,180,180);doc.setLineWidth(0.5);doc.line(M,y,R,y);y+=10;
+    const bidNotes=document.getElementById('bidNotes').value.trim();
+    if(bidNotes){
+      y+=10;doc.setFontSize(8);doc.setFont('helvetica','bold');gray(80);doc.text('NOTES',M,y);
+      doc.setDrawColor(200,200,200);doc.setLineWidth(0.5);doc.line(M,y+3,R,y+3);y+=14;
+      doc.setFont('helvetica','normal');gray(80);
+      const nl=doc.splitTextToSize(bidNotes,R-M);doc.text(nl,M,y);y+=nl.length*12+10;
+    }
+    y+=20;
+    doc.setFontSize(8);doc.setFont('helvetica','normal');
+    const acceptText = 'By signing below, I authorize American Legacy Glass to proceed with the work described in this estimate at the price quoted.' + (depositRequired ? ' I understand that a 50% deposit is required before work begins.' : '');
+    const acceptLines = doc.splitTextToSize(acceptText, R-M);
+    const paymentText = depositRequired
+      ? 'We accept the following payments: Cash, Check, Zelle (Zelle Tag: 1americanlegacy), Credit Card (a processing fee will be added).'
+      : '';
+    const paymentLines = paymentText ? doc.splitTextToSize(paymentText, R-M) : [];
+
+    // Box height grows dynamically to fit the text AND the two signature rows below it —
+    // Only show the "approve online" link if this bid has actually been saved —
+    // there's no valid link to a bid that doesn't have an ID yet.
+    const hasOnlineLink = !!currentJobId;
+    const linkLineH = hasOnlineLink ? 20 : 0;
+
+    // 102 covers the label, divider, gaps, and both signature/printed-name rows; the rest
+    // scales with however many lines the acceptance and payment paragraphs actually take.
+    const boxContentH = 102 + acceptLines.length*11 + paymentLines.length*11 + linkLineH;
+    checkPageBreak(boxContentH + 20); // keep the whole acceptance/signature block on one page
+    doc.setFillColor(250,250,250);
+    doc.setDrawColor(210,210,210);
+    doc.setLineWidth(0.5);
+    doc.roundedRect(M-12, y-10, pageW-(M-12)*2, boxContentH, 5, 5, 'FD');
+    doc.setFontSize(7.5);doc.setFont('helvetica','bold');gray(80);
+    doc.text('ACCEPTANCE OF ESTIMATE', M, y+4);
+    doc.setDrawColor(180,180,180);doc.setLineWidth(0.4);
+    doc.line(M, y+8, R, y+8);
+    y+=18;
+    doc.setFontSize(8);doc.setFont('helvetica','normal');gray(100);
+    doc.text(acceptLines, M, y);
+    y+=acceptLines.length*11+10;
+    if (paymentLines.length) {
+      doc.setFont('helvetica','bold');gray(80);
+      doc.text(paymentLines, M, y);
+      y+=paymentLines.length*11;
+    }
+    if (hasOnlineLink) {
+      // Real clickable link area, built from wherever this app is hosted — opens
+      // view-bid.html with this bid's ID so the customer can approve it from their phone.
+      const base = window.location.href.substring(0, window.location.href.lastIndexOf('/') + 1);
+      const approvalUrl = base + 'view-bid.html?id=' + currentJobId;
+      doc.setFontSize(8.5);doc.setFont('helvetica','bold');
+      doc.setTextColor(30,100,180);
+      const linkLabel = 'Or approve this bid online — tap here';
+      doc.textWithLink(linkLabel, M, y+8, { url: approvalUrl });
+      doc.setDrawColor(30,100,180);doc.setLineWidth(0.5);
+      doc.line(M, y+9.5, M+doc.getTextWidth(linkLabel), y+9.5);
+      y+=20;
+    }
+    y+=14;
+    const col1X = M;
+    const col2X = pageW/2 + 10;
+    const lineW  = (pageW/2) - M - 20;
+    doc.setDrawColor(60,60,60);doc.setLineWidth(0.75);
+    doc.line(col1X, y, col1X+lineW, y);
+    doc.setFontSize(7);doc.setFont('helvetica','normal');gray(130);
+    doc.text('Customer Signature', col1X, y+10);
+    doc.line(col2X, y, col2X+lineW, y);
+    doc.text('Date', col2X, y+10);
+    y+=28;
+    doc.setDrawColor(60,60,60);doc.setLineWidth(0.75);
+    doc.line(col1X, y, col1X+lineW, y);
+    doc.setFontSize(7);doc.setFont('helvetica','normal');gray(130);
+    doc.text('Printed Name', col1X, y+10);
+    doc.line(col2X, y, col2X+lineW, y);
+    doc.setFontSize(9);doc.setFont('helvetica','bold');gray(30);
+    doc.text('Chris Couto', col2X, y-3);
+    doc.setFontSize(7);doc.setFont('helvetica','normal');gray(130);
+    doc.text('American Legacy Glass Representative', col2X, y+10);
+    y+=30;
+    doc.setFontSize(7.5);doc.setFont('helvetica','normal');gray(170);
+    doc.text('American Legacy Glass  •  americanlegacyglass.com  •  Serving Arizona Since 1988',pageW/2,y,{align:'center'});
+    addFooterToAllPages();
+    const blob=doc.output('blob');
+    window.open(URL.createObjectURL(blob),'_blank');
+  } catch(err){alert('PDF error: '+err.message);}
+}
+
+// ─────────────────────────────────────────────────
 // PRICING TAB — DATA
 // ─────────────────────────────────────────────────
 
