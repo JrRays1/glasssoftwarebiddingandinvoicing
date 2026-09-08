@@ -2835,7 +2835,7 @@ function saveBidPDF() {
       const approvalUrl = base + 'view-bid.html?id=' + currentJobId;
       doc.setFontSize(8.5);doc.setFont('helvetica','bold');
       doc.setTextColor(30,100,180);
-      const linkLabel = 'Or approve this bid online — tap here';
+      const linkLabel = 'Or approve this bid online instantly — tap here';
       doc.textWithLink(linkLabel, M, y+8, { url: approvalUrl });
       doc.setDrawColor(30,100,180);doc.setLineWidth(0.5);
       doc.line(M, y+9.5, M+doc.getTextWidth(linkLabel), y+9.5);
