@@ -1253,7 +1253,7 @@ onAuthStateChanged(auth, user => {
       <!-- Hardware -->
       <div class="card">
         <div class="card-label collapsible-header" onclick="toggleSection('hw')">
-          <span>Hardware Costs</span>
+          <span>Hardware/Extra</span>
           <span class="collapse-arrow">▼</span>
         </div>
         <div class="collapsible-body" id="hw-body">
@@ -2685,24 +2685,19 @@ function saveBidPDF() {
     infoY += 16;
     if (hasBothAddresses) {
       doc.setFont('helvetica','normal'); doc.setTextColor(80,80,80);
-      doc.text('Billing: '+billAddr, M, infoY);
-      doc.text('Job Location: '+jloc, pageW/2, infoY);
+      doc.text(billAddr, M, infoY);
+      doc.text(jloc, pageW/2, infoY);
       infoY += 16;
     } else if (jloc) {
-      doc.setFont('helvetica','normal'); doc.setTextColor(80,80,80); doc.text('Location: '+jloc, M, infoY); infoY += 16;
+      doc.setFont('helvetica','normal'); doc.setTextColor(80,80,80); doc.text(jloc, M, infoY); infoY += 16;
     } else if (billAddr) {
-      doc.setFont('helvetica','normal'); doc.setTextColor(80,80,80); doc.text('Billing: '+billAddr, M, infoY); infoY += 16;
+      doc.setFont('helvetica','normal'); doc.setTextColor(80,80,80); doc.text(billAddr, M, infoY); infoY += 16;
     }
     if(contactLine){
+      // Phone and email sit right next to each other on one line, left-aligned,
+      // instead of split across the page width.
       doc.setFontSize(8.5); doc.setFont('helvetica','normal'); doc.setTextColor(80,80,80);
-      if(cphone && cemail) {
-        doc.text('Ph: '+cphone, M, infoY);
-        doc.text('Email: '+cemail, pageW/2, infoY);
-      } else if(cphone) {
-        doc.text('Ph: '+cphone, M, infoY);
-      } else if(cemail) {
-        doc.text('Email: '+cemail, M, infoY);
-      }
+      doc.text(contactLine, M, infoY);
     }
     y = 90 + infoBarH + 15;
 
@@ -2774,7 +2769,7 @@ function saveBidPDF() {
     if(pieces.filter(p=>getPieceW(p)&&getPieceH(p)).length===0) row('No dimensions','');
     y+=6;
     if(hardware.length>0){
-      sectionLabel('Hardware');
+      sectionLabel('Hardware/Extra');
       hardware.forEach(h=>row(h.name||'Hardware item', ''));
       y+=6;
     }
@@ -2785,17 +2780,8 @@ function saveBidPDF() {
     }
     divider();
     // Tax is calculated and included in the grand total automatically; no line printed
-    if(labor.length>0){
-      y+=4;
-      doc.setFontSize(7);doc.setFont('helvetica','bold');doc.setTextColor(122,184,232);
-      doc.text('LABOR',M,y);
-      drawColor(180);doc.setLineWidth(0.5);doc.line(M,y+3,R,y+3);y+=14;
-      labor.forEach(l=>{
-        doc.setFontSize(10);doc.setFont('helvetica','normal');doc.setTextColor(122,184,232);
-        doc.text(l.name||'Labor',M,y);
-        y+=10*1.8;
-      });
-    }
+    // Labor is folded into the one total below and no longer itemized on the
+    // customer-facing PDF at all.
     y+=10;
     fillColor(20);doc.roundedRect(M-12,y-12,pageW-(M-12)*2,52,5,5,'F');
     doc.setFontSize(10);doc.setFont('helvetica','bold');gray(160);doc.text('TOTAL BID',M,y+10);
