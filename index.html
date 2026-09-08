@@ -1209,6 +1209,10 @@ onAuthStateChanged(auth, user => {
             <label>Job Location</label>
             <input type="text" id="jobLocation" placeholder="e.g. 123 Main St, Phoenix AZ">
           </div>
+          <div class="field" style="flex:1;min-width:200px;margin-bottom:0;">
+            <label>Billing Address</label>
+            <input type="text" id="billingAddress" placeholder="Only if different from job location">
+          </div>
           <div class="field" style="width:160px;margin-bottom:0;">
             <label>Date</label>
             <input type="date" id="bidDate">
@@ -2557,6 +2561,45 @@ function calculate() {
 }
 
 // ─────────────────────────────────────────────────
+// RESET
+// ─────────────────────────────────────────────────
+function resetBid() {
+  // This button is shared between the Bid and Quick Price tabs (they use the same
+  // panel/engine), so it clears whichever one is currently active — never the other.
+  const isQP = activeDataContext === 'quickprice';
+  const confirmMsg = isQP ? 'Clear the Quick Price calculator? This will remove all pieces.' : 'Start a new bid? This will clear everything.';
+  if (!confirm(confirmMsg)) return;
+
+  pieces=[]; hardware=[]; labor=[]; extras=[];
+  // Forget the saved snapshot for whichever context we just cleared, so switching
+  // tabs and back doesn't silently bring the old data back.
+  if (isQP) qpState = null; else bidState = null;
+
+  if (!isQP) {
+    currentJobId = null;
+    ['customerName','customerPhone','customerEmail','jobDesc','jobLocation','billingAddress','pricePerSqft','glassThickness','glassType','bidNotes'].forEach(id => {
+      const el=document.getElementById(id); if(el) el.value='';
+    });
+    document.getElementById('bidDate').valueAsDate = new Date();
+    document.getElementById('bidSaveStatus').textContent = '💾 Save this bid to the dashboard';
+  }
+
+  const marginEl = document.getElementById('bidMargin'); if (marginEl) marginEl.value='';
+  const surchargeEl = document.getElementById('bidSurcharge'); if (surchargeEl) surchargeEl.value='';
+  depositRequired = true;
+  const depBtn = document.getElementById('depositToggleBtn');
+  const depLabel = document.getElementById('depositLabel');
+  if (depBtn && depLabel) {
+    depBtn.textContent = 'Deposit: ON';
+    depBtn.style.background='var(--surface2)'; depBtn.style.borderColor='var(--border)'; depBtn.style.color='var(--muted)';
+    depLabel.textContent = '50% deposit required';
+  }
+  renderHardware(); renderLabor(); renderExtras();
+  addPiece(); calculate();
+  if (!isQP) { _lastSavedBidSnapshot = bidSnapshotForCompare(); updateCopyLinkButtonState(); } // fresh reset counts as a clean baseline
+}
+
+// ─────────────────────────────────────────────────
 // PDF SHARED HELPERS
 // ─────────────────────────────────────────────────
 const LOGO_B64 = 'logo.png';
@@ -2614,13 +2657,14 @@ function saveBidPDF() {
     const cemail=document.getElementById('customerEmail').value.trim();
     const jdesc=document.getElementById('jobDesc').value.trim();
     const jloc =document.getElementById('jobLocation').value.trim();
+    const billAddr=document.getElementById('billingAddress').value.trim();
 
     // Build contact line
     const contactParts = [cphone, cemail].filter(Boolean);
     const contactLine = contactParts.join('  ·  ');
 
     // Calculate info bar height based on how many lines we need
-    const infoLines = [cname||jdesc, jloc, contactLine].filter(Boolean).length;
+    const infoLines = [cname||jdesc, jloc, billAddr, contactLine].filter(Boolean).length;
     const infoBarH = 14 + infoLines * 16;
 
     doc.setFillColor(235,238,242); doc.rect(0,90,pageW,infoBarH,'F');
@@ -2630,6 +2674,7 @@ function saveBidPDF() {
     if(jdesc) { doc.text('Job: '+jdesc, pageW/2, infoY, {align:'center'}); }
     infoY += 16;
     if(jloc){ doc.setFont('helvetica','normal'); doc.setTextColor(80,80,80); doc.text('Location: '+jloc, M, infoY); infoY += 16; }
+    if(billAddr){ doc.setFont('helvetica','normal'); doc.setTextColor(80,80,80); doc.text('Billing: '+billAddr, M, infoY); infoY += 16; }
     if(contactLine){
       doc.setFontSize(8.5); doc.setFont('helvetica','normal'); doc.setTextColor(80,80,80);
       if(cphone && cemail) {
@@ -3401,6 +3446,7 @@ function getBidSnapshot() {
     email:    document.getElementById('customerEmail').value.trim(),
     jobDesc:  document.getElementById('jobDesc').value.trim(),
     location: document.getElementById('jobLocation').value.trim(),
+    billingAddress: document.getElementById('billingAddress').value.trim(),
     date:     document.getElementById('bidDate').value,
     total:    grand,
     lineItems,
@@ -3636,8 +3682,8 @@ function openJob(id) {
         depLabel.textContent = 'No deposit required';
       }
     }
-    ['customerName','jobDesc','jobLocation','bidNotes','customerPhone','customerEmail'].forEach(id => {
-      const map = {customerName:'customer',jobDesc:'jobDesc',jobLocation:'location',bidNotes:'notes',customerPhone:'phone',customerEmail:'email'};
+    ['customerName','jobDesc','jobLocation','billingAddress','bidNotes','customerPhone','customerEmail'].forEach(id => {
+      const map = {customerName:'customer',jobDesc:'jobDesc',jobLocation:'location',billingAddress:'billingAddress',bidNotes:'notes',customerPhone:'phone',customerEmail:'email'};
       const el = document.getElementById(id);
       if (el) el.value = job[map[id]] || '';
     });
