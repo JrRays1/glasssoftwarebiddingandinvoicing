@@ -2749,13 +2749,13 @@ function saveBidPDF() {
 
     sectionLabel('Glass & Fabrication');
     pieces.filter(p=>getPieceW(p)&&getPieceH(p)).forEach(p=>{
-      const rate=parseFloat(p.rate)||0;
       const gparts=[p.thickness?p.thickness:''  ,p.glassType].filter(Boolean).join(' · ');
       const desc=getPieceDisplay(p)+(gparts?' · '+gparts:'');
-      // Combine glass + ALL fabrication costs into one unit price per piece
-      const combinedTotal = (getPieceGlassTotal(p) + getPieceFabTotal(p)) * mkup;
-      row(desc, rate?fmt(combinedTotal):'(no rate)');
-      // Fabrication names — no price, just show what's included
+      // Chris doesn't want per-item pricing shown to customers — descriptions
+      // only here; the single grand total at the bottom is the only dollar
+      // figure that appears anywhere on this document now.
+      row(desc, '');
+      // Fabrication names — descriptive only, never priced separately
       if(p.fabrications && Object.keys(p.fabrications).length>0){
         Object.entries(p.fabrications).forEach(([fabName,fabQty])=>{
           const totalFabQty=(fabQty||1)*(parseFloat(p.qty)||1);
@@ -2764,47 +2764,37 @@ function saveBidPDF() {
           y+=8*1.8;
         });
       }
-      // Edging sub-line (indented) — apply markup
+      // Edging — descriptive only
       if(getPieceEdgeTotal(p)>0){
         doc.setFontSize(8.5);doc.setFont('helvetica','normal');gray(120);
         doc.text('   + '+(p.edgeName||'Edging'),M+8,y);
-        gray(60);doc.text(fmt(getPieceEdgeTotal(p)*mkup),R,y,{align:'right'});
         y+=8.5*1.8;
       }
     });
-    if(pieces.filter(p=>getPieceW(p)&&getPieceH(p)).length===0) row('No dimensions',fmt(0));
-    // Glass section total (glass + edge + fab) — apply markup
-    const glassSectionTotal = (glassTotal + edgeTotal + fabTotal) * mkup;
-    doc.setFontSize(9);doc.setFont('helvetica','bold');gray(40);
-    doc.text('Glass & Fabrication Total',M,y);doc.text(fmt(glassSectionTotal),R,y,{align:'right'});y+=9*1.8;
+    if(pieces.filter(p=>getPieceW(p)&&getPieceH(p)).length===0) row('No dimensions','');
     y+=6;
     if(hardware.length>0){
       sectionLabel('Hardware');
-      hardware.forEach(h=>row(h.name||'Hardware item',fmt((parseFloat(h.cost)||0)*hwMkup)));
+      hardware.forEach(h=>row(h.name||'Hardware item', ''));
       y+=6;
     }
     if(extras.length>0){
       sectionLabel('Additional Costs');
-      extras.forEach(e=>{
-        const v=parseFloat(e.value)||0,amt=(e.type==='%'?taxableBase*(v/100):v)*mkup;
-        row((e.name||'Additional Cost')+(e.type==='%'?' ('+v+'%)':''),fmt(amt));
-      });y+=6;
+      extras.forEach(e=>row(e.name||'Additional Cost', ''));
+      y+=6;
     }
     divider();
     // Tax is calculated and included in the grand total automatically; no line printed
     if(labor.length>0){
       y+=4;
       doc.setFontSize(7);doc.setFont('helvetica','bold');doc.setTextColor(122,184,232);
-      doc.text('LABOR (NOT TAXED)',M,y);
+      doc.text('LABOR',M,y);
       drawColor(180);doc.setLineWidth(0.5);doc.line(M,y+3,R,y+3);y+=14;
       labor.forEach(l=>{
         doc.setFontSize(10);doc.setFont('helvetica','normal');doc.setTextColor(122,184,232);
         doc.text(l.name||'Labor',M,y);
-        doc.text(fmt(parseFloat(l.cost)||0),R,y,{align:'right'});
         y+=10*1.8;
       });
-      doc.setFontSize(9);doc.setFont('helvetica','bold');doc.setTextColor(80,160,220);
-      doc.text('Labor Total',M,y);doc.text(fmt(laborTotal),R,y,{align:'right'});y+=9*1.8;
     }
     y+=10;
     fillColor(20);doc.roundedRect(M-12,y-12,pageW-(M-12)*2,52,5,5,'F');
