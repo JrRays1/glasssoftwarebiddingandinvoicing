@@ -1211,7 +1211,7 @@ onAuthStateChanged(auth, user => {
           </div>
           <div class="field" style="flex:1;min-width:200px;margin-bottom:0;">
             <label>Billing Address</label>
-            <input type="text" id="billingAddress" placeholder="Only if different from job location">
+            <input type="text" id="billingAddress" placeholder="Only if different — leave blank to bill the job location instead">
           </div>
           <div class="field" style="width:160px;margin-bottom:0;">
             <label>Date</label>
@@ -1325,6 +1325,7 @@ onAuthStateChanged(auth, user => {
         </div>
         <div id="bidSaveActions">
           <button class="btn-print" onclick="saveBidPDF()">⬇ Save Bid as PDF</button>
+          <div style="font-family:'DM Mono',monospace;font-size:0.68rem;color:var(--muted);text-align:center;margin-top:0.35rem;">⚠ Save the bid first — otherwise the PDF won't include the online approval link</div>
           <div class="save-bar" style="margin-top:0.75rem;margin-bottom:0;">
             <div class="save-bar-text" id="bidSaveStatus">💾 Save this bid to the dashboard</div>
             <button class="btn-save-job" id="btnSaveBid" onclick="saveJobToFirebase()">Save Bid</button>
