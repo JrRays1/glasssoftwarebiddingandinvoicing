@@ -8,7 +8,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.12.1/firebase-app.js";
-import { getFirestore, collection, addDoc, setDoc, updateDoc, deleteDoc, doc, getDocs, query, orderBy } from "https://www.gstatic.com/firebasejs/12.12.1/firebase-firestore.js";
+import { getFirestore, collection, addDoc, setDoc, updateDoc, deleteDoc, doc, getDoc, getDocs, query, orderBy } from "https://www.gstatic.com/firebasejs/12.12.1/firebase-firestore.js";
 import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.12.1/firebase-auth.js";
 
 const firebaseConfig = {
@@ -33,6 +33,7 @@ window._setDoc     = setDoc;
 window._updateDoc  = updateDoc;
 window._deleteDoc  = deleteDoc;
 window._doc        = doc;
+window._getDoc     = getDoc;
 window._getDocs    = getDocs;
 window._query      = query;
 window._orderBy    = orderBy;
@@ -40,10 +41,24 @@ window._signInWithEmailAndPassword = signInWithEmailAndPassword;
 window._signOut    = signOut;
 
 // Watch auth state — show app or login screen
-onAuthStateChanged(auth, user => {
+window._currentUserRole = 'owner'; // default — unchanged behavior for the existing shared login unless a staffUsers doc says otherwise
+onAuthStateChanged(auth, async user => {
   if (user) {
     document.getElementById('loginScreen').style.display = 'none';
     document.getElementById('appContainer').style.display = '';
+    // A user with no staffUsers doc at all is treated as full access — this
+    // is what keeps the existing shared owner login working exactly as
+    // before with zero setup required. Only a login explicitly added to
+    // staffUsers with role:'employee' gets restricted.
+    try {
+      const roleSnap = await getDoc(doc(db, 'staffUsers', user.email));
+      window._currentUserRole = (roleSnap.exists() && roleSnap.data().role === 'employee') ? 'employee' : 'owner';
+      const staffBtn = document.getElementById('btnManageStaff');
+      if (staffBtn) staffBtn.style.display = window._currentUserRole === 'owner' ? '' : 'none';
+    } catch (e) {
+      console.error('Could not check staff role, defaulting to owner access:', e);
+      window._currentUserRole = 'owner';
+    }
     if (window.loadJobs) window.loadJobs();
     if (window.loadCustomers) window.loadCustomers();
     if (window.switchTab) window.switchTab('dashboard');
@@ -1168,6 +1183,16 @@ onAuthStateChanged(auth, user => {
         onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'">
       <button onclick="loadJobs()" title="Refresh — picks up any bid a customer just approved online" style="background:none;border:1px solid var(--border);border-radius:6px;color:var(--muted);cursor:pointer;font-family:'DM Mono',monospace;font-size:0.72rem;padding:0.32rem 0.7rem;white-space:nowrap;">🔄 Refresh</button>
       <button onclick="exportAllData()" title="Download every job and customer as a backup file" style="background:none;border:1px solid var(--border);border-radius:6px;color:var(--muted);cursor:pointer;font-family:'DM Mono',monospace;font-size:0.72rem;padding:0.32rem 0.7rem;white-space:nowrap;">⬇ Backup</button>
+      <button id="btnManageStaff" onclick="toggleStaffPanel()" style="display:none;background:none;border:1px solid var(--border);border-radius:6px;color:var(--muted);cursor:pointer;font-family:'DM Mono',monospace;font-size:0.72rem;padding:0.32rem 0.7rem;white-space:nowrap;">👥 Manage Staff</button>
+    </div>
+
+    <div id="staffPanel" style="display:none;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:0.85rem;margin:0.5rem 0;">
+      <div style="font-family:'DM Mono',monospace;font-size:0.7rem;color:var(--muted);margin-bottom:0.6rem;">Employee logins are created in the Firebase Console (Authentication → Add user) — this panel only controls what an existing login is allowed to do once it exists.</div>
+      <div style="display:flex;gap:0.5rem;margin-bottom:0.75rem;">
+        <input type="email" id="staffEmailInput" placeholder="employee@email.com" style="flex:1;background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:0.85rem;padding:0.5rem 0.7rem;outline:none;">
+        <button onclick="grantEmployeeRole()" style="background:rgba(126,212,160,0.12);border:1px solid rgba(126,212,160,0.35);border-radius:6px;color:#7ed4a0;cursor:pointer;font-family:'DM Mono',monospace;font-size:0.75rem;padding:0.5rem 0.9rem;white-space:nowrap;">Restrict to Employee</button>
+      </div>
+      <div id="staffList" style="font-family:'DM Mono',monospace;font-size:0.78rem;color:var(--muted);"></div>
     </div>
 
     <div style="font-family:'DM Mono',monospace;font-size:0.7rem;color:var(--muted);text-align:center;margin:0.5rem 0 0.25rem;">📨 A Google review request is emailed automatically once an invoice is paid in full — sent once per customer, regardless of whether the invoice was created here or directly in Xero.</div>
@@ -3253,6 +3278,10 @@ function cancelCustomerEdit() {
 }
 
 async function deleteCustomer(id) {
+  if (window._currentUserRole === 'employee') {
+    showToast('Employee accounts cannot delete customers', 'error');
+    return;
+  }
   if (!confirm('Delete this customer?')) return;
   try {
     await window._deleteDoc(window._doc(window._db, 'customers', id));
@@ -3289,7 +3318,7 @@ function renderCustomerList() {
       <div class="cust-actions">
         <button class="btn-cust-fill" onclick="fillBidFromCustomer('${c.id}')">Use on Bid</button>
         <button class="btn-cust-edit" onclick="editCustomer('${c.id}')">Edit</button>
-        <button class="btn-cust-del" onclick="deleteCustomer('${c.id}')">✕</button>
+        ${window._currentUserRole !== 'employee' ? `<button class="btn-cust-del" onclick="deleteCustomer('${c.id}')">✕</button>` : ''}
       </div>`;
     list.appendChild(row);
   });
@@ -3633,8 +3662,8 @@ function renderDashboard() {
       <div class="job-actions">
         <button class="btn-job-open" onclick="openJob('${job.id}')">Open</button>
         ${isPendingBid ? `<button class="btn-job-open" style="color:#7ed4a0;border-color:rgba(126,212,160,0.35);" onclick="manuallyApproveBid('${job.id}')" title="Use only when the customer agreed in person or by phone — not through the online approval link">✓ Approve Manually</button>` : ''}
-        ${isAcceptedBid ? `<button class="btn-job-open" style="color:#e0a060;border-color:rgba(224,160,96,0.35);" onclick="undoApproval('${job.id}')" title="Voids the Xero invoice (if any) and resets this bid to pending">Undo</button>` : ''}
-        <button class="btn-job-del" onclick="deleteJob(event,'${job.id}')">✕</button>
+        ${isAcceptedBid && window._currentUserRole !== 'employee' ? `<button class="btn-job-open" style="color:#e0a060;border-color:rgba(224,160,96,0.35);" onclick="undoApproval('${job.id}')" title="Voids the Xero invoice (if any) and resets this bid to pending">Undo</button>` : ''}
+        ${window._currentUserRole !== 'employee' ? `<button class="btn-job-del" onclick="deleteJob(event,'${job.id}')">✕</button>` : ''}
       </div>`;
     list.appendChild(row);
   });
@@ -3647,8 +3676,70 @@ function renderDashboard() {
 // creates the Xero invoice through the same route the online flow uses —
 // nothing about invoice creation, duplicate protection, or the review-email
 // system needs to know or care which path an approval came through.
+function toggleStaffPanel() {
+  const panel = document.getElementById('staffPanel');
+  const opening = panel.style.display === 'none';
+  panel.style.display = opening ? '' : 'none';
+  if (opening) renderStaffList();
+}
+
+// Restricts a login to the employee role. This does NOT create the login
+// itself — that's done once, manually, in the Firebase Console — this just
+// writes the permission marker the app checks after that login signs in.
+async function grantEmployeeRole() {
+  const email = document.getElementById('staffEmailInput').value.trim().toLowerCase();
+  if (!email) return;
+  try {
+    await window._setDoc(window._doc(window._db, 'staffUsers', email), {
+      role: 'employee',
+      addedAt: new Date().toISOString(),
+    });
+    document.getElementById('staffEmailInput').value = '';
+    showToast('✓ ' + email + ' restricted to employee access');
+    renderStaffList();
+  } catch (e) {
+    showToast('Failed to update staff record: ' + e.message, 'error');
+  }
+}
+
+// Removing the marker doesn't delete or disable the login — it just means
+// the app no longer restricts it, so this person goes back to full access
+// the next time they sign in (same as anyone with no staffUsers doc at all).
+async function revokeEmployeeRole(email) {
+  if (!confirm('Remove the employee restriction for ' + email + '? They will have full access again the next time they sign in.')) return;
+  try {
+    await window._deleteDoc(window._doc(window._db, 'staffUsers', email));
+    showToast('✓ Restriction removed for ' + email);
+    renderStaffList();
+  } catch (e) {
+    showToast('Failed: ' + e.message, 'error');
+  }
+}
+
+async function renderStaffList() {
+  const list = document.getElementById('staffList');
+  list.innerHTML = 'Loading…';
+  try {
+    const snap = await window._getDocs(window._collection(window._db, 'staffUsers'));
+    const employees = [];
+    snap.forEach(d => { if (d.data().role === 'employee') employees.push(d.id); });
+    if (!employees.length) {
+      list.innerHTML = 'No employee-restricted logins yet.';
+      return;
+    }
+    list.innerHTML = employees.map(email => `
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:0.4rem 0;border-bottom:1px solid var(--border);">
+        <span style="color:var(--text);">${email}</span>
+        <button onclick="revokeEmployeeRole('${email}')" style="background:none;border:1px solid var(--border);border-radius:5px;color:var(--muted);cursor:pointer;font-family:'DM Mono',monospace;font-size:0.7rem;padding:0.25rem 0.6rem;">Grant Full Access</button>
+      </div>`).join('');
+  } catch (e) {
+    list.innerHTML = 'Could not load staff list: ' + e.message;
+  }
+}
+
 async function manuallyApproveBid(jobId) {
   if (!confirm('Mark this bid as approved? Use this only when the customer agreed in person or over the phone — not for a bid they can still approve online themselves. This will create the Xero invoice right away.')) return;
+  const db = window._db;
   try {
     await window._updateDoc(window._doc(db, 'jobs', jobId), {
       status: 'accepted',
@@ -3774,6 +3865,10 @@ function openJob(id) {
 // ─────────────────────────────────────────────────
 async function deleteJob(e, id) {
   e.stopPropagation();
+  if (window._currentUserRole === 'employee') {
+    showToast('Employee accounts cannot delete jobs', 'error');
+    return;
+  }
   if (!confirm('Delete this job? This cannot be undone.')) return;
   try {
     await window._deleteDoc(window._doc(window._db, 'jobs', id));
