@@ -1195,9 +1195,10 @@ onAuthStateChanged(auth, async user => {
       <div id="staffList" style="font-family:'DM Mono',monospace;font-size:0.78rem;color:var(--muted);"></div>
     </div>
 
-    <div style="font-family:'DM Mono',monospace;font-size:0.7rem;color:var(--muted);text-align:center;margin:0.5rem 0 0.25rem;">📨 A Google review request is emailed automatically once an invoice is paid in full — sent once per customer, regardless of whether the invoice was created here or directly in Xero.</div>
-
-    <div style="font-family:'DM Mono',monospace;font-size:0.7rem;color:var(--muted);text-align:center;margin:0 0 0.75rem;">✓ Customers who agreed in person or over the phone can be approved manually — open the bid's row, click "Approve Manually," and the Xero invoice is created immediately, the same as if they'd approved online.</div>
+    <div style="position:fixed;bottom:1rem;right:1rem;max-width:280px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:0.65rem 0.8rem;font-family:'DM Mono',monospace;font-size:0.66rem;color:var(--muted);line-height:1.5;z-index:50;box-shadow:0 4px 12px rgba(0,0,0,0.3);">
+      <div style="margin-bottom:0.5rem;">📨 A Google review request is emailed automatically once an invoice is paid in full — sent once per customer, regardless of whether the invoice was created here or directly in Xero.</div>
+      <div>✓ Customers who agreed in person or over the phone can be approved manually — open the bid's row, click "Approve Manually," and the Xero invoice is created immediately, the same as if they'd approved online.</div>
+    </div>
 
     <!-- Job list -->
     <div class="job-list" id="jobList">
