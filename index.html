@@ -1188,7 +1188,6 @@ onAuthStateChanged(auth, async user => {
       <input type="text" id="dashSearch" placeholder="Search customer or job…" oninput="renderDashboard()"
         style="margin-left:auto;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:0.82rem;padding:0.32rem 0.75rem;outline:none;transition:border-color 0.2s;width:200px;"
         onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'">
-      <button onclick="loadJobs()" title="Refresh — picks up any bid a customer just approved online" style="background:none;border:1px solid var(--border);border-radius:6px;color:var(--muted);cursor:pointer;font-family:'DM Mono',monospace;font-size:0.72rem;padding:0.32rem 0.7rem;white-space:nowrap;">🔄 Refresh</button>
       <button onclick="exportAllData()" title="Download every job and customer as a backup file" style="background:none;border:1px solid var(--border);border-radius:6px;color:var(--muted);cursor:pointer;font-family:'DM Mono',monospace;font-size:0.72rem;padding:0.32rem 0.7rem;white-space:nowrap;">⬇ Backup</button>
       <button id="btnManageStaff" onclick="toggleStaffPanel()" style="display:none;background:none;border:1px solid var(--border);border-radius:6px;color:var(--muted);cursor:pointer;font-family:'DM Mono',monospace;font-size:0.72rem;padding:0.32rem 0.7rem;white-space:nowrap;">👥 Manage Staff</button>
     </div>
