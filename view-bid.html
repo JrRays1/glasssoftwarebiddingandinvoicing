@@ -144,31 +144,11 @@
         return;
       }
 
-      const pieces = job.pieces || [];
-      const pieceLines = pieces
-        .filter(p => p.wWhole || p.hWhole)
-        .map(p => {
-          const w = (parseFloat(p.wWhole)||0) + (parseFloat(p.wFrac)||0);
-          const h = (parseFloat(p.hWhole)||0) + (parseFloat(p.hFrac)||0);
-          const qty = parseFloat(p.qty) || 1;
-          const label = [p.thickness, p.glassType].filter(Boolean).join(' · ');
-          const dims = `${w}" × ${h}"${qty>1?' ×'+qty:''}`;
-          const parts = [dims + (label ? ' · ' + label : '')];
-          if (p.edgeName) parts.push(p.edgeName + ' edges');
-          const fabNames = Object.keys(p.fabrications || {});
-          if (fabNames.length) parts.push(fabNames.join(', '));
-          return `<div class="piece-line"><span>${parts.join(', ')}</span></div>`;
-        }).join('');
-
       content.innerHTML = `
         <div class="card">
           <div class="card-label">Prepared For</div>
           <div style="font-size:1.1rem;font-weight:600;">${job.customer || 'Customer'}</div>
           ${job.jobDesc ? `<div style="color:var(--muted);font-size:0.85rem;margin-top:0.25rem;">${job.jobDesc}</div>` : ''}
-        </div>
-        <div class="card">
-          <div class="card-label">Glass Pieces</div>
-          ${pieceLines}
         </div>
         <div class="card">
           <div class="row total">
