@@ -199,6 +199,7 @@
         transaction.update(jobRef, {
           status: 'accepted',
           acceptedAt: new Date().toISOString(),
+          pipelineStage: 'accepted',
         });
         return { alreadyAccepted: false, job: current };
       });
