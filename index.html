@@ -8,7 +8,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.12.1/firebase-app.js";
-import { getFirestore, collection, addDoc, setDoc, updateDoc, deleteDoc, doc, getDoc, getDocs, query, orderBy } from "https://www.gstatic.com/firebasejs/12.12.1/firebase-firestore.js";
+import { getFirestore, collection, addDoc, setDoc, updateDoc, deleteDoc, doc, getDoc, getDocs, query, orderBy, onSnapshot } from "https://www.gstatic.com/firebasejs/12.12.1/firebase-firestore.js";
 import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.12.1/firebase-auth.js";
 
 const firebaseConfig = {
@@ -34,6 +34,7 @@ window._updateDoc  = updateDoc;
 window._deleteDoc  = deleteDoc;
 window._doc        = doc;
 window._getDoc     = getDoc;
+window._onSnapshot = onSnapshot;
 window._getDocs    = getDocs;
 window._query      = query;
 window._orderBy    = orderBy;
@@ -63,6 +64,8 @@ onAuthStateChanged(auth, async user => {
     if (window.loadCustomers) window.loadCustomers();
     if (window.switchTab) window.switchTab('dashboard');
   } else {
+    if (window._unsubscribeJobs) window._unsubscribeJobs();
+    if (window._unsubscribeCustomers) window._unsubscribeCustomers();
     document.getElementById('loginScreen').style.display = 'flex';
     document.getElementById('appContainer').style.display = 'none';
   }
@@ -3201,16 +3204,22 @@ function setActivePerson(p) {
 // CUSTOMERS
 // ─────────────────────────────────────────────────
 let allCustomers = [];
+let _customersUnsubscribe = null;
 let custPickerOpen = false;
 
-window.loadCustomers = async function() {
+window.loadCustomers = function() {
   const db = window._db;
   if (!db) return;
+  // Already live — the listener set up below keeps allCustomers current on
+  // its own, so every other call site that calls loadCustomers() expecting
+  // a refresh is already covered without doing anything further.
+  if (_customersUnsubscribe) return;
   try {
     const q = window._query(window._collection(db, 'customers'), window._orderBy('name', 'asc'));
-    const snap = await window._getDocs(q);
-    allCustomers = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    renderCustomerList();
+    _customersUnsubscribe = window._onSnapshot(q, snap => {
+      allCustomers = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      renderCustomerList();
+    }, err => console.error('Customers listener error:', err));
   } catch(e) { console.error('loadCustomers error:', e); }
 };
 
@@ -3556,19 +3565,33 @@ function copyBidLink() {
 // FIREBASE — LOAD JOBS
 // ─────────────────────────────────────────────────
 let allJobs = [];
+let _jobsUnsubscribe = null;
 let dashFilter = 'all';
 
-window.loadJobs = async function() {
+window.loadJobs = function() {
   const db = window._db;
   if (!db) return;
+  // Already live — see loadCustomers above for why every other call site
+  // calling loadJobs() to "refresh" doesn't need to do anything further.
+  if (_jobsUnsubscribe) return;
   try {
     const q = window._query(window._collection(db, 'jobs'), window._orderBy('savedAt', 'desc'));
-    const snap = await window._getDocs(q);
-    allJobs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    renderDashboard();
+    _jobsUnsubscribe = window._onSnapshot(q, snap => {
+      allJobs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      renderDashboard();
+    }, err => console.error('Jobs listener error:', err));
   } catch(e) {
     console.error('Load error:', e);
   }
+};
+// Stops the live jobs/customers listeners — called on logout so they don't
+// keep running (and erroring against Firestore rules) with no authenticated
+// user behind them.
+window._unsubscribeJobs = function() {
+  if (_jobsUnsubscribe) { _jobsUnsubscribe(); _jobsUnsubscribe = null; }
+};
+window._unsubscribeCustomers = function() {
+  if (_customersUnsubscribe) { _customersUnsubscribe(); _customersUnsubscribe = null; }
 };
 
 async function exportAllData() {
