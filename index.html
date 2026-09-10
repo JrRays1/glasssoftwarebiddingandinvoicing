@@ -3677,6 +3677,7 @@ function renderDashboard() {
         <div class="job-amount" style="color:${amountColor};">${fmt(job.total||0)}</div>
         <span class="job-status-badge ${isAcceptedBid ? 'paid' : job.type==='bid'?'bid':job.status||'draft'}">${statusLabel}</span>
         ${job.xeroInvoiceId ? `<span class="job-status-badge paid" title="Created in Xero">✓ Invoiced${job.xeroInvoiceNumber ? ' — '+job.xeroInvoiceNumber : ''}</span>` : ''}
+        ${job.pipelineDrift ? `<span class="job-status-badge" style="background:rgba(224,96,96,0.15);border-color:rgba(224,96,96,0.4);color:#e06060;cursor:pointer;" title="${job.pipelineDriftNote || 'This job pipeline stage may be stale'} — click to dismiss once reviewed" onclick="dismissPipelineDrift(event,'${job.id}')">⚠ Stage may be stale</span>` : ''}
       </div>
       <div class="job-actions">
         <button class="btn-job-open" onclick="openJob('${job.id}')">Open</button>
@@ -3753,6 +3754,21 @@ async function renderStaffList() {
       </div>`).join('');
   } catch (e) {
     list.innerHTML = 'Could not load staff list: ' + e.message;
+  }
+}
+
+// Clears a drift warning once staff has actually looked into it. Doesn't
+// touch pipelineStage itself — reviewing and correcting the stage (if it
+// actually needs correcting) is a separate, deliberate decision, not
+// something dismissing the warning should silently do on its own.
+async function dismissPipelineDrift(e, jobId) {
+  e.stopPropagation();
+  const db = window._db;
+  try {
+    await window._updateDoc(window._doc(db, 'jobs', jobId), { pipelineDrift: false });
+    await loadJobs();
+  } catch (err) {
+    showToast('Could not dismiss: ' + err.message, 'error');
   }
 }
 
