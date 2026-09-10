@@ -2791,7 +2791,6 @@ function saveBidPDF() {
       // dollar figure that appears anywhere on this document now.
       row(desc, '');
     });
-    if(pieces.filter(p=>getPieceW(p)&&getPieceH(p)).length===0) row('No dimensions','');
     y+=6;
     if(hardware.length>0){
       sectionLabel('Hardware/Extra');
