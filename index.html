@@ -1119,6 +1119,8 @@ onAuthStateChanged(auth, async user => {
     <div class="login-title">American Legacy <span style="color:var(--accent)">Glass</span></div>
     <div class="login-sub">Estimating & Invoicing Tool</div>
     <label class="login-label">Enter PIN to continue</label>
+    <input type="email" class="login-input" id="loginEmail" placeholder="Employee email (leave blank for owner login)" autocomplete="username"
+      style="margin-bottom:0.5rem;font-size:0.85rem;" onkeydown="if(event.key==='Enter')document.getElementById('loginPin').focus()">
     <input type="password" class="login-input" id="loginPin" placeholder="••••••" maxlength="20"
       onkeydown="if(event.key==='Enter')doLogin()">
     <button class="btn-login" id="btnLogin" onclick="doLogin()">Login</button>
@@ -3647,6 +3649,7 @@ function renderDashboard() {
           <div class="job-name">${job.customer}</div>
           ${desc ? `<div class="job-desc">${desc}</div>` : ''}
           <div style="font-family:'DM Mono',monospace;font-size:0.68rem;color:var(--muted);margin-top:0.15rem;">${dateStr}</div>
+          ${isAcceptedBid ? `<div style="font-family:'DM Mono',monospace;font-size:0.65rem;color:var(--muted);margin-top:0.1rem;">${job.approvedVia === 'staff' ? '✓ Approved by ' + (job.approvedByEmail || 'staff') : '✓ Approved online by customer'}</div>` : ''}
         </div>
       </div>
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:0.25rem;flex-shrink:0;">
@@ -3740,6 +3743,7 @@ async function manuallyApproveBid(jobId) {
       status: 'accepted',
       acceptedAt: new Date().toISOString(),
       approvedVia: 'staff',
+      approvedByEmail: window._auth?.currentUser?.email || 'unknown',
     });
     const res = await fetch('https://morning-frost-ce94.rdenmyers1201.workers.dev/create-xero-invoice', {
       method: 'POST',
@@ -3880,6 +3884,7 @@ async function deleteJob(e, id) {
 // ─────────────────────────────────────────────────
 async function doLogin() {
   const pin = document.getElementById('loginPin').value.trim();
+  const typedEmail = document.getElementById('loginEmail').value.trim();
   if (!pin) return;
   const btn = document.getElementById('btnLogin');
   const errEl = document.getElementById('loginError');
@@ -3889,7 +3894,12 @@ async function doLogin() {
   errEl.textContent = '';
   inputEl.classList.remove('error');
   try {
-    const _u = ['al','g@','log','in','.co','m'].join('');
+    // Leaving the email field blank keeps using the one shared owner
+    // account — the only login this app has ever had until now — so
+    // nothing changes for the three owners. Typing an email signs in as
+    // that specific account instead (an employee login, or any other
+    // individual account created in Firebase Console).
+    const _u = typedEmail || ['al','g@','log','in','.co','m'].join('');
     await window._signInWithEmailAndPassword(window._auth, _u, pin);
   } catch(e) {
     inputEl.classList.add('error');
