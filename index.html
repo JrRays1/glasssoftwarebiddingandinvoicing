@@ -1180,6 +1180,8 @@ onAuthStateChanged(auth, async user => {
       <button class="filter-btn active" onclick="setDashFilter('all', this)">All</button>
       <button class="filter-btn" onclick="setDashFilter('bid', this)">Bids</button>
       <button class="filter-btn" onclick="setDashFilter('accepted', this)">Accepted</button>
+      <button class="filter-btn" onclick="setDashFilter('invoiced', this)">Invoiced</button>
+      <button class="filter-btn" onclick="setDashFilter('done', this)">Done</button>
       <input type="text" id="dashSearch" placeholder="Search customer or job…" oninput="renderDashboard()"
         style="margin-left:auto;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:0.82rem;padding:0.32rem 0.75rem;outline:none;transition:border-color 0.2s;width:200px;"
         onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'">
@@ -3593,6 +3595,22 @@ async function exportAllData() {
   }
 }
 
+// Resolves a job's pipeline stage for the dashboard tabs. Once the Xero
+// webhook has explicitly set pipelineStage (on AUTHORISED/PAID events),
+// that's authoritative. For jobs that predate this feature and have no
+// explicit stage recorded yet, this makes a reasonable best-effort guess
+// from what's already known — an old fully-paid job might show as
+// "Invoiced" instead of "Done" until something updates it explicitly, which
+// is a real limitation worth knowing about rather than assuming this sorts
+// every historical job correctly on its own.
+function getPipelineStage(job) {
+  if (job.pipelineStage) return job.pipelineStage;
+  if (job.type !== 'bid') return job.status === 'paid' ? 'done' : 'invoiced';
+  if (job.status !== 'accepted') return 'bid';
+  if (!job.xeroInvoiceId) return 'accepted';
+  return 'invoiced';
+}
+
 function renderDashboard() {
   const bids        = allJobs.filter(j => j.type === 'bid');
   const accepted    = bids.filter(j => j.status === 'accepted');
@@ -3603,8 +3621,10 @@ function renderDashboard() {
   document.getElementById('statValue').textContent    = '$' + totalValue.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g,',');
 
   let filtered = allJobs;
-  if (dashFilter === 'bid') filtered = allJobs.filter(j => j.type === 'bid');
-  else if (dashFilter === 'accepted') filtered = allJobs.filter(j => j.status === 'accepted');
+  if (dashFilter === 'bid') filtered = allJobs.filter(j => getPipelineStage(j) === 'bid');
+  else if (dashFilter === 'accepted') filtered = allJobs.filter(j => getPipelineStage(j) === 'accepted');
+  else if (dashFilter === 'invoiced') filtered = allJobs.filter(j => getPipelineStage(j) === 'invoiced');
+  else if (dashFilter === 'done') filtered = allJobs.filter(j => getPipelineStage(j) === 'done');
 
   const q = (document.getElementById('dashSearch')?.value || '').toLowerCase().trim();
   if (q) {
@@ -3638,7 +3658,8 @@ function renderDashboard() {
     const dateStr = job.date ? new Date(job.date+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '—';
     const isAcceptedBid = job.type === 'bid' && job.status === 'accepted';
     const isPendingBid = job.type === 'bid' && job.status !== 'accepted';
-    const statusLabel = isAcceptedBid ? '✓ Accepted' : job.type === 'bid' ? 'Bid' : (job.status||'draft');
+    const stageLabels = { bid: 'Bid', accepted: '✓ Accepted', invoiced: '🧾 Invoiced', done: '✓ Done' };
+    const statusLabel = job.type === 'bid' ? stageLabels[getPipelineStage(job)] : (job.status||'draft');
     const amountColor = isAcceptedBid ? 'var(--green)' : job.type==='invoice'&&job.status==='paid' ? 'var(--green)' : job.type==='invoice'&&job.status==='overdue' ? '#e06060' : job.type==='invoice' ? 'var(--invoice-accent)' : 'var(--text)';
     const typeIcon = job.type === 'bid' ? '📋' : '🧾';
     const desc = job.jobDesc || job.invNumber || '';
@@ -3744,6 +3765,7 @@ async function manuallyApproveBid(jobId) {
       acceptedAt: new Date().toISOString(),
       approvedVia: 'staff',
       approvedByEmail: window._auth?.currentUser?.email || 'unknown',
+      pipelineStage: 'accepted',
     });
     const res = await fetch('https://morning-frost-ce94.rdenmyers1201.workers.dev/create-xero-invoice', {
       method: 'POST',
