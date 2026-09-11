@@ -1328,6 +1328,17 @@ onAuthStateChanged(auth, async user => {
         </div>
       </div>
 
+      <!-- Exclusions -->
+      <div class="card full">
+        <div class="card-label collapsible-header" onclick="toggleSection('exclusions')">
+          <span>Exclusions</span>
+          <span class="collapse-arrow">▼</span>
+        </div>
+        <div class="collapsible-body" id="exclusions-body">
+          <textarea id="bidExclusions" placeholder="e.g. Permits not included, does not include disposal of existing glass, electrical work by others..." style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:0.9rem;padding:0.65rem 0.85rem;outline:none;resize:vertical;min-height:90px;transition:border-color 0.2s;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'"></textarea>
+        </div>
+      </div>
+
       <!-- Total -->
       <div class="card total-card" id="bidSummaryCard">
         <div class="card-label">Bid Summary</div>
@@ -2687,7 +2698,7 @@ function resetBid() {
   if (!isQP) {
     currentJobId = null;
     linkedCustomerId = null;
-    ['customerName','customerPhone','customerEmail','jobDesc','jobLocation','billingAddress','pricePerSqft','glassThickness','glassType','bidNotes'].forEach(id => {
+    ['customerName','customerPhone','customerEmail','jobDesc','jobLocation','billingAddress','pricePerSqft','glassThickness','glassType','bidNotes','bidExclusions'].forEach(id => {
       const el=document.getElementById(id); if(el) el.value='';
     });
     document.getElementById('bidDate').valueAsDate = new Date();
@@ -2879,10 +2890,21 @@ function saveBidPDF() {
     // Notes now shown above the total price, not after the deposit line
     const bidNotes=document.getElementById('bidNotes').value.trim();
     if(bidNotes){
+      const nlPre=doc.splitTextToSize(bidNotes,R-M);
+      checkPageBreak(nlPre.length*12+24);
       doc.setFontSize(8);doc.setFont('helvetica','bold');gray(80);doc.text('NOTES',M,y);
       doc.setDrawColor(200,200,200);doc.setLineWidth(0.5);doc.line(M,y+3,R,y+3);y+=14;
       doc.setFont('helvetica','normal');gray(80);
-      const nl=doc.splitTextToSize(bidNotes,R-M);doc.text(nl,M,y);y+=nl.length*12+10;
+      doc.text(nlPre,M,y);y+=nlPre.length*12+10;
+    }
+    const bidExclusions=document.getElementById('bidExclusions').value.trim();
+    if(bidExclusions){
+      const elPre=doc.splitTextToSize(bidExclusions,R-M);
+      checkPageBreak(elPre.length*12+24);
+      doc.setFontSize(8);doc.setFont('helvetica','bold');gray(80);doc.text('EXCLUSIONS',M,y);
+      doc.setDrawColor(200,200,200);doc.setLineWidth(0.5);doc.line(M,y+3,R,y+3);y+=14;
+      doc.setFont('helvetica','normal');gray(80);
+      doc.text(elPre,M,y);y+=elPre.length*12+10;
     }
     y+=10;
     fillColor(20);doc.roundedRect(M-12,y-12,pageW-(M-12)*2,52,5,5,'F');
@@ -3556,6 +3578,7 @@ function getBidSnapshot() {
     lineItems,
     status:   'bid',
     notes:    document.getElementById('bidNotes').value.trim(),
+    exclusions: document.getElementById('bidExclusions').value.trim(),
     margin:   parseFloat(document.getElementById('bidMargin')?.value) || 0,
     surcharge:parseFloat(document.getElementById('bidSurcharge')?.value) || 0,
     depositRequired,
@@ -3968,8 +3991,8 @@ function openJob(id) {
         depLabel.textContent = 'No deposit required';
       }
     }
-    ['customerName','jobDesc','jobLocation','billingAddress','bidNotes','customerPhone','customerEmail'].forEach(id => {
-      const map = {customerName:'customer',jobDesc:'jobDesc',jobLocation:'location',billingAddress:'billingAddress',bidNotes:'notes',customerPhone:'phone',customerEmail:'email'};
+    ['customerName','jobDesc','jobLocation','billingAddress','bidNotes','bidExclusions','customerPhone','customerEmail'].forEach(id => {
+      const map = {customerName:'customer',jobDesc:'jobDesc',jobLocation:'location',billingAddress:'billingAddress',bidNotes:'notes',bidExclusions:'exclusions',customerPhone:'phone',customerEmail:'email'};
       const el = document.getElementById(id);
       if (el) el.value = job[map[id]] || '';
     });
